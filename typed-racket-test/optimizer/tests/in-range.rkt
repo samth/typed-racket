@@ -6,6 +6,6 @@ END
 "0123"
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (for ([i 4])
   (display i))

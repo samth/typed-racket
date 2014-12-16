@@ -8,6 +8,6 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (vector-ref (ann (vector 1 2) (Vector Integer Integer)) 0)

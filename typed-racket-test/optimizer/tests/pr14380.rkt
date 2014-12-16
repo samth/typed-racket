@@ -13,7 +13,7 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 ;; Test for PR14380. None of these should get optimized.
 

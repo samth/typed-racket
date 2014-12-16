@@ -7,7 +7,7 @@ TR opt: annotations.rkt 8:10 (+ 1.0 2.0) -- binary float
 END
 ""
 #lang typed/racket #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (define a (+ 1.0 2.0))
 

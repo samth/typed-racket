@@ -20,7 +20,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 
 (let: loop : Float-Complex   ((z : Float-Complex   0.0+0.0i)

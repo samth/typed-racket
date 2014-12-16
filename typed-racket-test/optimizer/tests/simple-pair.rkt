@@ -8,6 +8,6 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (car (cons 1 2))

@@ -5,7 +5,7 @@ END
 ""
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (vector-set! (ann (vector 1 2) (Vector Integer Integer))
              0

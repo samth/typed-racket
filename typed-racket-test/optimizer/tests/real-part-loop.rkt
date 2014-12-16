@@ -20,7 +20,7 @@ END
 END
 #lang typed/racket/base
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (ann
  (let loop ([v 0.0+1.0i])

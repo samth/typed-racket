@@ -8,6 +8,6 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (+ 2.0 2.0 2.0)

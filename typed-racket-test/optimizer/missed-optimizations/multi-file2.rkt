@@ -8,7 +8,7 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (require "multi-file1.rkt")
 
 (f (* 3.4 (+ 3 5)))

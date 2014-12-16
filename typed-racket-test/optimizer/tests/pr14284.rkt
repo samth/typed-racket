@@ -19,7 +19,7 @@ a
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (letrec:
   ([y (+ 1.0 0.0+2.0i)]

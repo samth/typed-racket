@@ -5,7 +5,7 @@ END
 ""
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (: f ( -> Void))
 (define (f) ; in a function, to prevent evaluation
   (display (quotient 4 0))) ; 2 fixnums, but the second is 0, cannot optimize

@@ -11,6 +11,6 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (conjugate (+ 1.0+2.0i 2.0+4.0i))

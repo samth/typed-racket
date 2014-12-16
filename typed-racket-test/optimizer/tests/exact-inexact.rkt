@@ -24,7 +24,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (exact->inexact (expt 10 100)) ; must not be a fixnum
 (round (exact->inexact (expt 2.3 3.2))) ; already a float

@@ -14,7 +14,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 ((lambda: ((t : Integer))
           (+ (sin (* t 6.28)) 0.0+0.0i))
  1)

@@ -24,7 +24,7 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (define: l : (List Integer Integer Integer Integer) '(1 2 3 4))
 (first l)

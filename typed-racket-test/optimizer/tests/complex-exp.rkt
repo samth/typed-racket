@@ -11,6 +11,6 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (- (exp 0) 1.0+2.0i)

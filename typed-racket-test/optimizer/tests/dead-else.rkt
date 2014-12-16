@@ -10,7 +10,7 @@ END
 "5.05.0"
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (display (if (number? 3)
              (+ 2.0 3.0)
              (+ 4.0 5.0)))

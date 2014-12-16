@@ -17,7 +17,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 ;; simple case, function with single complex arg
 (let ((f (lambda: ((x :   Float-Complex)) (+ x 3.0+6.0i))))

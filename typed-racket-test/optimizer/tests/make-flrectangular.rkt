@@ -10,7 +10,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (require racket/flonum)
 (make-rectangular 1.0 2.2)
 (make-flrectangular 1.0 2.2)

@@ -17,7 +17,7 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 
 (letrec-values (((x) 5.0+5.0i)

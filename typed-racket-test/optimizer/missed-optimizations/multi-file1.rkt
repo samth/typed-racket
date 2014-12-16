@@ -5,7 +5,7 @@ TR missed opt: multi-file1.rkt 5:2 (* x (ann 3 Integer)) -- all args float-arg-e
 END
 ""
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (provide f)
 
 (: f : Float -> Real)

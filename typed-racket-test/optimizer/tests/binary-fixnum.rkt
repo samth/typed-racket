@@ -6,7 +6,7 @@ END
 ""
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (: f (All (X) ((Vectorof X) -> Natural)))
 (define (f v)

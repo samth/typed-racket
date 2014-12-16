@@ -30,7 +30,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (+ 1.0+2.0i 3.0)
 (+ 1.0 2.0+4.0i)

@@ -10,7 +10,7 @@ END
 END
 #lang typed/racket
 (require racket/flonum)
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (define: been-there-vector?   : Boolean #f)
 (define: been-there-flvector? : Boolean #f)

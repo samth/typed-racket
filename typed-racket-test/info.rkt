@@ -1,6 +1,6 @@
 #lang info
 
-(define collection 'use-pkg-name)
+(define collection "tests/typed-racket")
 (define deps '("base"
                "typed-racket"
                "typed-racket-more"

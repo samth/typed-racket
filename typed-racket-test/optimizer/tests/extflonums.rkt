@@ -64,7 +64,7 @@ END
 END
 
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (require racket/extflonum)
 

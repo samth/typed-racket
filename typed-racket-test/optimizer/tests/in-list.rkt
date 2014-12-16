@@ -6,6 +6,6 @@ END
 "123"
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (for: ((i : Natural '(1 2 3)))
       (display i))

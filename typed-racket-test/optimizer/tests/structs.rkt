@@ -10,7 +10,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (define-struct: pt ((x : Integer) (y : Integer)) #:mutable)
 (define a (pt 3 4))
 (pt-x a)

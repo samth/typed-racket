@@ -11,7 +11,7 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 ;; all-real expressions
 ;; They currently get reported as missed float optimizations.

@@ -5,7 +5,7 @@ END
 ""
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (: f ((MListof Integer) -> Integer))
 (define (f x)
   (mcar x))

@@ -17,7 +17,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 ;; function with a mix of complex and non-complex args, non-complex first
 (let ((f (lambda: ((y : Float) (x : Float-Complex))

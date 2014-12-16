@@ -11,7 +11,7 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 ;; a Complex type is "unexpected" if it pops up in an expressions for which
 ;; all subexpressions have a Real type

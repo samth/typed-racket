@@ -9,6 +9,6 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (if (false? #t) 1 2)
 (if (not #t) 1 2)

@@ -18,7 +18,7 @@ END
 END
 #lang typed/scheme
 #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (let ((x (+ 1.0+2.0i 2.0+3.0i)))
   (let ((x (+ x 2.0+3.0i)))

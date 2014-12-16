@@ -23,7 +23,7 @@ END
 
 END
 #lang typed/racket #:optimize
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (: x (List Integer Integer Integer))
 (define x (list 1 2 3))

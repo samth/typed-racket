@@ -12,7 +12,7 @@ TR opt: pr12475.rkt 9:5 for-loop -- unboxed let loop
 END
 ""
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 
 (: coefficients->poly (-> Float-Complex))
 (define (coefficients->poly)

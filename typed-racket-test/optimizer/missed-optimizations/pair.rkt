@@ -52,7 +52,7 @@ END
 
 END
 #lang typed/racket
-#reader typed-racket-test/optimizer/reset-port
+#reader tests/typed-racket/optimizer/reset-port
 (require compatibility/mlist)
 
 ;; car/cdr can be optimized if they are guaranteed to be applied only to
