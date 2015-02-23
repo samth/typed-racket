@@ -1,8 +1,8 @@
 #lang racket/unit
 
 (require "../utils/utils.rkt"
-	 (types abbrev union subtype)
-	 unstable/sequence
+         (types abbrev union subtype)
+         unstable/sequence racket/set
          "fail.rkt" "signatures.rkt" "constraint-structs.rkt"
          racket/match
          racket/list)
@@ -17,16 +17,16 @@
 ;; index variables Y.  For now, we add the widest constraints for
 ;; variables in X to the cmap and create an empty dmap.
 (define (empty-cset X Y)
-  (make-cset (list (cons (for/hash ([x (in-list X)])
+  (make-cset (set (cons (for/hash ([x (in-list X)])
                            (values x no-constraint))
-                         (make-dmap (make-immutable-hash null))))))
+                        (make-dmap (make-immutable-hash null))))))
 
 
 ;; add the constraints S <: var <: T to every map in cs
 (define (insert cs var S T)
   (match cs
     [(struct cset (maps))
-     (make-cset (for/list ([(map dmap) (in-pairs maps)])
+     (make-cset (for/set ([(map dmap) (in-pairs (in-set maps))])
                   (cons (hash-set map var (make-c S T))
                         dmap)))]))
 
@@ -66,14 +66,15 @@
     [(x y)
      (match* (x y)
       [((struct cset (maps1)) (struct cset (maps2)))
-       (define maps (for*/list ([(map1 dmap1) (in-pairs (remove-duplicates maps1))]
-                                [(map2 dmap2) (in-pairs (remove-duplicates maps2))]
-                                [v (in-value (% cons
-                                                (hash-union/fail map1 map2 #:combine c-meet)
-                                                (dmap-meet dmap1 dmap2)))]
-                                #:when v)
+       (printf "map-lens: ~a ~a\n" (set-count maps1) (set-count maps2))
+       (define maps (for*/set ([l1 (in-set maps1)]
+                               [l2 (in-set maps2)]
+                               [v (in-value (% cons
+                                               (hash-union/fail (car l1) (car l2) #:combine c-meet)
+                                               (dmap-meet (cdr l1) (cdr l2))))]
+                               #:when v)
                       v))
-       (cond [(null? maps)
+       (cond [(set-empty? maps)
               #f]
              [else (make-cset maps)])])]
     [(x . ys)
@@ -89,4 +90,6 @@
 ;; FIXME: should this call `remove-duplicates`?
 (define (cset-join l)
   (let ([mapss (map cset-maps l)])
-    (make-cset (apply append mapss))))
+    (if (null? mapss)
+        (make-cset (set))
+        (make-cset (apply set-union mapss)))))

@@ -54,6 +54,7 @@
     [() -Bottom]
     [(t) t]
     [args 
-     (define ts (foldr merge '()
+     #;
+     (define ts (foldr cons '()
                        (remove-dups (sort (append-map flat args) type<?))))
-     (make-union* ts)]))
+     (make-union* (remove-dups (sort (append-map flat args) type<?)))]))

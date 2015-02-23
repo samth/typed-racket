@@ -20,7 +20,7 @@
          "signatures.rkt" "fail.rkt"
          "promote-demote.rkt"
          racket/match
-         mzlib/etc
+         mzlib/etc racket/set
          (contract-req)
          (for-syntax
            racket/base
@@ -106,7 +106,7 @@
 ;; (CMap DMap -> Pair<CMap, DMap>) CSet -> CSet
 ;; Map a function over a constraint set
 (define (map/cset f cset)
-  (% make-cset (for/list/fail ([(cmap dmap) (in-pairs (cset-maps cset))])
+  (% make-cset (for/set/fail ([(cmap dmap) (in-pairs (in-set (cset-maps cset)))])
                  (f cmap dmap))))
 
 ;; Symbol DCon -> DMap
@@ -754,7 +754,7 @@
                          ;; TODO figure out if there is a better subst here
                          [Invariant (i-subst null)]))))
      S))
-  (match (car (cset-maps C))
+  (match (set-first (cset-maps C))
     [(cons cmap (dmap dm))
      (let ([subst (hash-union
                     (for/hash ([(k dc) (in-hash dm)])

@@ -1,7 +1,7 @@
 #lang racket/base
 (provide (all-defined-out) early-return)
 (require (for-syntax racket/base syntax/parse racket/syntax) "../utils/early-return.rkt"
-         racket/match)
+         racket/match racket/set)
 
 ;; like `match*`, but with `early-return` around the rhss
 (define-syntax (match*/early stx)
@@ -58,6 +58,12 @@
      (for/fold ([result null]) (cl ... #:break (not result))
        (let ([e (let () body ...)])
          (and e (cons e result))))))
+
+(define-syntax-rule (for/set/fail (cl ...) body ...)
+  (% reverse
+     (for/fold ([result (set)]) (cl ... #:break (not result))
+       (let ([e (let () body ...)])
+         (and e (set-add result e))))))
 
 ;; like hash-union, but if combine ever produces #f, the overall result is #f
 (define (hash-union/fail #:combine combine one two)
