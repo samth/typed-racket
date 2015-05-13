@@ -4,7 +4,7 @@ env:
 - PATH=~/racket/bin:$PATH
 
 before_install:
-- curl -L -o installer.sh http://www.cs.utah.edu/plt/snapshots/current/installers/min-racket-current-x86_64-linux-precise.sh
+- curl -L -o installer.sh http://www.cs.utah.edu/plt/snapshots/current/installers/racket-current-x86_64-linux-precise.sh
 - sh installer.sh --in-place --dest ~/racket/
 
 install:
@@ -12,9 +12,12 @@ install:
 - echo file://`pwd`/pkgs-catalog/ > catalog-config.txt
 - raco pkg config catalogs >> catalog-config.txt
 - raco pkg config --set catalogs `cat catalog-config.txt`
-- raco pkg install --deps search-auto typed-racket-lib
+- ls
+- raco pkg update source-syntax/ typed-racket-lib/ typed-racket-more/ typed-racket-compatibility/ typed-racket-doc/ typed-racket/
+- raco pkg install typed-racket-test/
 
 script:
+- raco test -p typed-racket-test
 - echo "done"
 
 after_script:
