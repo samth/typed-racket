@@ -15,7 +15,7 @@ install:
 - ls
 - raco pkg update -i --no-setup source-syntax/ typed-racket-lib/ typed-racket-more/ typed-racket-compatibility/ typed-racket-doc/ typed-racket/
 - raco pkg install --auto --no-setup typed-racket-test/
-- raco setup --no-docs
+#- raco setup --no-docs
 
 script:
 - raco test -p typed-racket-test
