@@ -140,18 +140,16 @@
   (type-case (#:Type st #:Filter sf #:Object (λ (f) (subst-object f k o polarity)))
     t
     [#:arr dom rng rest drest kws dep?
-           (let ([st* (λ (t) (subst-type t (add-scope k) (add-scope/object o) polarity o-ty))])
-             (make-arr (map st dom)
-                       (st* rng)
-                       (and rest (st rest))
-                       (and drest (cons (st (car drest)) (cdr drest)))
-                       (map st kws)
-                       dep?))]
+           (make-arr (map st dom)
+                     (subst-type rng (add-scope k) (add-scope/object o) polarity o-ty)
+                     (and rest (st rest))
+                     (and drest (cons (st (car drest)) (cdr drest)))
+                     (map st kws)
+                     dep?)]
     [#:InstdRef type prop
-           (let ([st* (λ (t) (subst-type t (add-scope k) (add-scope/object o) polarity o-ty))]
-                 [sf* (λ (f) (subst-filter f (add-scope k) (add-scope/object o) polarity o-ty))])
-             (make-InstdRef (st* type)
-                            (sf* prop)))]))
+                (make-InstdRef
+                 (subst-type type (add-scope k) (add-scope/object o) polarity o-ty)
+                 (subst-filter prop (add-scope k) (add-scope/object o) polarity o-ty))]))
 
 ;; add-scope : name-ref/c -> name-ref/c
 ;; Add a scope to an index name-ref

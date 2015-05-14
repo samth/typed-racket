@@ -799,12 +799,12 @@
 [vector? (make-pred-ty (make-VectorTop))]
 [vector->list (-poly (a) (-> (-vec a) (-lst a)))]
 [list->vector (-poly (a) (-> (-lst a) (-vec a)))]
-[vector-length (~> ([v : -VectorTop])
+[vector-length (-> -VectorTop
                    (-refine i -Index
                             (-SLI (-lt (-lexp `(1 ,(-id-path i)))
-                                       (-lexp `(1 ,(-acc-path (list -len) (-id-path v)))))))
+                                       (-lexp `(1 ,(-acc-path (list -len) (-arg-path 0 1)))))))
                    : -true-filter
-                   : (-acc-path (list -len) (-id-path v)))]
+                   : (-acc-path (list -len) (-arg-path 0)))]
 [vector (-poly (a) (->* (list) a (-vec a)))]
 [vector-immutable (-poly (a) (->* (list) a (-vec a)))]
 [vector->immutable-vector (-poly (a) (-> (-vec a) (-vec a)))]
@@ -3310,12 +3310,13 @@
 
 ;; TODO(amk) support polymorphism w/ dep fun types
 [safe-vector-ref
- (~> ([v : -VectorTop]
-      [x : (-refine i -Integer
-                    (let ([i (-lexp `(1 ,(-id-path i)))]
-                          [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
-                      (-SLI (-leq (-lexp 0) i) (-gteq i (-lexp 0))
-                            (-lt i vlen))))])
-     Univ)]
+ (-poly (a)
+        (~> ([v : (-vec a)]
+             [x : (-refine i -Integer
+                           (let ([i (-lexp `(1 ,(-id-path i)))]
+                                 [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
+                             (-SLI (-leq (-lexp 0) i)
+                                   (-lt i vlen))))])
+            a))]
 
 

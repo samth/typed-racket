@@ -1,15 +1,15 @@
 #lang racket/base
 
 (require (rename-in "../utils/utils.rkt" [infer r:infer])
-         racket/match
+         racket/match racket/list
          (prefix-in c: (contract-req))
          (env tvar-env lexical-env)
          (for-syntax syntax/parse racket/base)
          (types utils subtype resolve abbrev
                 substitute classes)
          (logic type-update)
-         (typecheck tc-metafunctions tc-app-helper)
-         (rep type-rep)
+         (typecheck tc-metafunctions tc-app-helper tc-subst)
+         (rep type-rep object-rep)
          (r:infer infer))
 
 (require-for-cond-contract syntax/stx)
@@ -35,8 +35,25 @@
                         #:name (and (identifier? f-stx) f-stx)
                         #:expected expected))))]))
 
+;; unabstract-arg-objs : (listof Type) (listof Object)
+;; replaces DeBruijn index variables in 'doms' with
+;; the objects given in 'objs'
+;; -- this allows type inference to more accurately reason about
+;; subtyping information since the environment contains type information
+;; only about realized objects (no DeBruijns)
+(define (unabstract-arg-objs doms objs)
+  ;;TODO(AMK) if would be nice to do this subst in one pass with
+  ;; a multi-substitution instead of repeaded single substitutions
+  (for/list ([dom (in-list doms)])
+    (for/fold ([dom dom])
+              ([obj (in-list objs)]
+               [arg (range (sub1 (length doms)) -1 -1)])
+      (if (Empty? obj)
+          dom
+          (subst-type dom (list 0 arg) obj #t)))))
+
 (define (tc/funapp f-stx args-stx f-type* args-res expected)
-  (match-define (list (tc-result1: argtys) ...) args-res)
+  (match-define (list (tc-result1: argtys _ argobjs) ...) args-res)
   (define f-type (update-function/arg-types args-res f-type*))
   (match f-type
     ;; we special-case this (no case-lambda) for improved error messages
@@ -47,7 +64,7 @@
      (or
       ;; find the first function where the argument types match
       (for/first ([dom (in-list doms)] [rng (in-list rngs)] [rest (in-list rests)] [a (in-list arrs)]
-                  #:when (subtypes/varargs argtys dom rest)) ;; TODO(AMK)? subtypes/varargs needs deps?
+                  #:when (subtypes/varargs argtys argobjs dom rest)) ;; TODO(AMK)? subtypes/varargs needs deps?
         ;; then typecheck here
         ;; we call the separate function so that we get the appropriate
         ;; filters/objects
@@ -65,8 +82,8 @@
        (Function/arrs: doms rngs rests drests (list (Keyword: _ _ #f) ...) deps? #:arrs arrs))
      (handle-clauses
       (doms rngs rests drests arrs) f-stx args-stx
-      ;; only try inference if the argument lengths are appropriate
-      (lambda (dom _ rest drest a)
+      ;; predicate fun - only try inference if the argument lengths are appropriate
+      (λ (dom _ rest drest a)
         (cond [rest (<= (length dom) (length argtys))]
               [drest (and (<= (length dom) (length argtys))
                           (eq? dotted-var (cdr drest)))]
@@ -81,11 +98,18 @@
              fixed-vars dotted-var argtys dom (car drest) rng (fv rng)
              #:expected (and expected (tc-results->values expected)))]
            [rest
-            (infer/vararg fixed-vars (list dotted-var) argtys dom rest rng
+            (infer/vararg fixed-vars
+                          (list dotted-var)
+                          argtys
+                          argobjs
+                          (unabstract-arg-objs dom argobjs)
+                          rest
+                          rng
                           (and expected (tc-results->values expected)))]
            ;; no rest or drest
-           [else (infer fixed-vars (list dotted-var) argtys dom rng
-                        (and expected (tc-results->values expected)))])))
+           [else
+            (infer fixed-vars (list dotted-var) argtys dom rng
+                   (and expected (tc-results->values expected)))])))
       f-type args-res expected)]
     ;; regular polymorphic functions without dotted rest, 
     ;; we do not choose any instantiations with mandatory keyword arguments
@@ -100,7 +124,7 @@
       ;; in filters/objects).
       (λ (dom rng rest kw? a)
         (extend-tvars vars
-         (infer/vararg vars null argtys dom rest rng
+         (infer/vararg vars null argtys argobjs (unabstract-arg-objs dom argobjs) rest rng
                        (and expected (tc-results->values expected)))))
       f-type args-res expected)]
     ;; Row polymorphism. For now we do really dumb inference that only works

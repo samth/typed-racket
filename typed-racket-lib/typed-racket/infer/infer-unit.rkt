@@ -408,9 +408,10 @@
 ;; produces a cset which determines a substitution that makes S a subtype of T
 ;; implements the V |-_X S <: T => C judgment from Pierce+Turner, extended with
 ;; the index variables from the TOPLAS paper
-(define/cond-contract (cgen context S T)
-  (context? (or/c Values/c ValuesDots? AnyValues?) (or/c Values/c ValuesDots? AnyValues?)
-   . -> . (or/c #F cset?))
+(define/cond-contract (cgen context S T #:obj [obj #f])
+  ((context? (or/c Values/c ValuesDots? AnyValues?) (or/c Values/c ValuesDots? AnyValues?))
+   (#:obj (or/c #f Object?))
+   . ->* . (or/c #F cset?))
   ;; useful quick loop
   (define/cond-contract (cg S T)
    (Type/c Type/c . -> . (or/c #f cset?))
@@ -480,7 +481,7 @@
 
           ;; they're subtypes. easy.
           [(a b) 
-           #:when (subtype a b)
+           #:when (subtype a b #:obj obj)
            empty]
 
           ;; Lists delegate to sequences
@@ -806,15 +807,21 @@
 ;;  keep the number of constraints in check. (empty by default)
 ;; produces a cset which determines a substitution that makes the Ss subtypes of the Ts
 (define/cond-contract (cgen/list context S T
-                                 #:expected-cset [expected-cset (empty-cset '() '())])
-  ((context? (listof Values/c) (listof Values/c)) (#:expected-cset cset?) . ->* . (or/c cset? #f))
+                                 #:expected-cset [expected-cset (empty-cset '() '())]
+                                 #:objs [objs #f])
+  ((context? (listof Values/c) (listof Values/c))
+   (#:expected-cset cset? #:objs (or/c #f (listof Object?)))
+   . ->* .
+   (or/c cset? #f))
   (and (= (length S) (length T))
        (% cset-meet*
-          (for/list/fail ([s (in-list S)] [t (in-list T)])
+          (for/list/fail ([s (in-list S)] 
+                          [t (in-list T)]
+                          [o (in-list (or objs (build-list (length S) (λ _ #f))))])
                          ;; We meet early to prune the csets to a reasonable size.
                          ;; This weakens the inference a bit, but sometimes avoids
                          ;; constraint explosion.
-            (% cset-meet (cgen context s t) expected-cset)))))
+            (% cset-meet (cgen context s t #:obj o) expected-cset)))))
 
 
 
@@ -829,10 +836,11 @@
 ;; just return a boolean result
 (define infer
  (let ()
-  (define/cond-contract (infer X Y S T R [expected #f])
+  (define/cond-contract (infer X Y S T R [expected #f] #:objs [objs #f])
     (((listof symbol?) (listof symbol?) (listof Type/c) (listof Type/c)
       (or/c #f Values/c ValuesDots?))
-     ((or/c #f Values/c AnyValues? ValuesDots?))
+     ((or/c #f Values/c AnyValues? ValuesDots?)
+      #:objs (or/c #f (listof Object?)))
      . ->* . (or/c boolean? substitution/c))
     (define ctx (context null X Y ))
     (define expected-cset
@@ -840,17 +848,17 @@
           (cgen ctx R expected)
           (empty-cset '() '())))
     (and expected-cset
-         (let* ([cs (cgen/list ctx S T #:expected-cset expected-cset)]
+         (let* ([cs (cgen/list ctx S T #:expected-cset expected-cset #:objs objs)]
                 [cs* (% cset-meet cs expected-cset)])
            (and cs* (if R (subst-gen cs* X Y R) #t)))))
   ;(trace infer)
   infer)) ;to export a variable binding and not syntax
 
 ;; like infer, but T-var is the vararg type:
-(define (infer/vararg X Y S T T-var R [expected #f])
+(define (infer/vararg X Y S S-Objs T T-var R [expected #f])
   (define new-T (if T-var (extend S T T-var) T))
   (and ((length S) . >= . (length T))
-       (infer X Y S new-T R expected)))
+       (infer X Y S new-T R expected #:objs S-Objs)))
 
 ;; like infer, but dotted-var is the bound on the ...
 ;; and T-dotted is the repeated type

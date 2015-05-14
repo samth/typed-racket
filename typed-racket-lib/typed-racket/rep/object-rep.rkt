@@ -349,10 +349,17 @@
        [(dict-empty? terms) c]
        [else
         (define terms*
-          (for/list ([x/c (in-dict-pairs terms)])
-            (match x/c
-              [(cons x coeff)
-               `(* ,coeff ,(Path->sexp x))]
-              [_ (int-err "invalid term/coeff pair in LExp->sexp ~a" x/c)])))
-        (cons '+ (if (zero? c) terms* (cons c terms*)))])]
+          (let ([terms (for/list ([x/c (in-dict-pairs terms)])
+                         (match x/c
+                           [(cons x coeff)
+                            (if (equal? 1 coeff)
+                                (Path->sexp x)
+                                `(* ,coeff ,(Path->sexp x)))]
+                           [_ (int-err "invalid term/coeff pair in LExp->sexp ~a" x/c)]))])
+            (if (zero? c) terms (cons c terms))))
+        (let ([len (length terms*)])
+          (cond
+            [(zero? len) 0] ;; not possible?
+            [(= len 1) (car terms*)]
+            [else (cons '+ terms*)]))])]
     [_ (int-err "invalid LExp in LExp->sexp ~a" l)]))

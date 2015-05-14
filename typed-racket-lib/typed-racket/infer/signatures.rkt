@@ -35,7 +35,8 @@
                             ;; range
                             (or/c #f Values/c ValuesDots?))
                            ;; optional expected type
-                           ((or/c #f Values/c AnyValues? ValuesDots?))
+                           ((or/c #f Values/c AnyValues? ValuesDots?)
+                            #:objs (or/c #f (listof Object?)))
                            . ->* . any)]
    [cond-contracted infer/vararg ((;; variables from the forall
                                    (listof symbol?)
@@ -43,6 +44,8 @@
                                    (listof symbol?)
                                    ;; actual argument types from call site
                                    (listof Type/c)
+                                   ;; actual argument objects from call site
+                                   (listof Object?)
                                    ;; domain
                                    (listof Type/c)
                                    ;; rest

@@ -141,13 +141,27 @@
     [(LengthPE:) 'len]
     [else `(Invalid Path-Element: ,(struct->vector pathelem))]))
 
+;; id->sexp : name-ref -> S-expression
+;; where name-ref is a syntactic identifier
+;; or a DeBruijn index
+(define (id->sexp id)
+  (match id
+    [(? identifier?) (syntax->datum id)]
+    [(list lvl argn) `(DB: ,lvl ,argn)]
+    [_ `(unknown-id ,id)]))
+
 ;; object->sexp : Object -> S-expression
 ;; Print an Object (see object-rep.rkt) to the given port
 (define (object->sexp object)
   (match object
     [(NoObject:) '-]
     [(Empty:) '-]
-    [(Path: pes i) (append (map pathelem->sexp pes) (list i))]
+    [(Path: pes i)
+     (let ([path (map pathelem->sexp pes)]
+           [id (id->sexp i)])
+       (if (null? path)
+           id
+           (append path (list id))))]
     [(? LExp? l) (LExp->sexp l object->sexp)]
     [else `(Unknown Object: ,(struct->vector object))]))
 

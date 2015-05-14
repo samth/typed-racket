@@ -33,10 +33,11 @@
   
 ;; is s a subtype of t?
 ;; type type -> boolean
-(define(subtype s t 
-                #:A [A (current-seen)] 
-                #:env [env #f] 
-                #:obj [obj #f])
+(define (subtype s t 
+                 #:A [A (current-seen)] 
+                 #:env [env #f] 
+                 #:obj [obj #f])
+  
   (and (subtype* A s t env obj) #t))
 
 ;; are all the s's subtypes of all the t's?
@@ -132,7 +133,7 @@
       [((arr: doms1 rng1 #f #f '() dep1?) ;; instantiate-n-idents
         (arr: doms2 rng2 #f #f '() dep2?))
        (cond-let*-values
-        ;; if dependent, instantiate & update for subtyping
+        ;; if dependent, instantiate & update env for subtyping
         (or dep1? dep2?) 
         ([(ids) (genids (length doms1) 'arg)]
          [(inst-many) (instantiate-many ids)]
@@ -146,7 +147,7 @@
       [((arr: doms1 rng1 #f #f kws1 dep1?)
         (arr: doms2 rng2 #f #f kws2 dep2?)) 
        (cond-let*-values
-        ;; if dependent, instantiate & update for subtyping
+        ;; if dependent, instantiate & update env for subtyping
         (or dep1? dep2?) 
         ([(ids) (genids (length doms1) 'arg)]
          [(inst-many) (instantiate-many ids)]
@@ -161,7 +162,7 @@
       [((arr: doms1 rng1 rest1 #f kws1 dep1?)
         (arr: doms2 rng2 #f #f kws2 dep2?))
        (cond-let*-values
-        ;; if dependent, instantiate & update for subtyping
+        ;; if dependent, instantiate & update env for subtyping
         (or dep1? dep2?) 
         ([(ids) (genids (length doms1) 'arg)]
          [(inst-many) (instantiate-many ids)]
@@ -180,7 +181,7 @@
       [((arr: doms1 rng1 rest1 #f kws1 dep1?)
         (arr: doms2 rng2 rest2 #f kws2 dep2?))
        (cond-let*-values
-        ;; if dependent, instantiate & update for subtyping
+        ;; if dependent, instantiate & update env for subtyping
         (or dep1? dep2?)
         ([(ids) (genids (length doms1) 'arg)]
          [(inst-many) (instantiate-many ids)]
@@ -198,7 +199,7 @@
         (arr: doms2 rng2 #f (cons drest2 dbound) kws2 dep2?))
        (cond-let*-values
         (or dep1? dep2?)
-        ;; if dependent, instantiate & update for subtyping
+        ;; if dependent, instantiate & update env for subtyping
         ([(ids) (genids (length doms1) 'arg)]
          [(inst-many) (instantiate-many ids)]
          [(doms1 rng1 drest1 dbound kws1 doms2 rng2 drest2 kws2)
@@ -223,22 +224,24 @@
     (subtype* A0 t2 t1)]
    [(_ _) #f]))
 
-(define (subtypes/varargs args dom rst #:env [env #f])
-  (handle-failure (and (subtypes*/varargs null args dom rst env) #t)))
+(define (subtypes/varargs argtys argobjs dom rst #:env [env #f])
+  (handle-failure (and (subtypes*/varargs null argtys dom rst env #:objs argobjs) #t)))
 
-(define (subtypes*/varargs A0 argtys dom rst env)
-  (let loop-varargs ([dom dom] [argtys argtys] [A A0])
+(define (subtypes*/varargs A0 argtys dom rst env #:objs [objs #f])
+  (define argobjs (or objs (build-list (length argtys) (λ _ #f))))
+  
+  (let loop-varargs ([dom dom] [argtys argtys] [argobjs argobjs] [A A0])
     (cond
       [(not A) #f]
       [(and (null? dom) (null? argtys)) A]
       [(null? argtys) #f]
       [(and (null? dom) rst)
-       (cond [(subtype* A (car argtys) rst env #f) 
-              => (lambda (A) (loop-varargs dom (cdr argtys) A))]
+       (cond [(subtype* A (car argtys) rst env (car argobjs)) 
+              => (lambda (A) (loop-varargs dom (cdr argtys) (cdr argobjs) A))]
              [else #f])]
       [(null? dom) #f]
-      [(subtype* A (car argtys) (car dom) env #f) => 
-       (lambda (A) (loop-varargs (cdr dom) (cdr argtys) A))]
+      [(subtype* A (car argtys) (car dom) env (car argobjs)) => 
+       (lambda (A) (loop-varargs (cdr dom) (cdr argtys) (cdr argobjs) A))]
       [else #f])))
 
 ;(trace subtypes*/varargs)
@@ -818,4 +821,4 @@
                    (c:listof (c:or/c Type/c SomeValues/c)))
                   (#:A list? #:env (c:or/c #f env?))
                   boolean?)]
- [subtypes/varargs (c:->* ((c:listof Type/c) (c:listof Type/c) (c:or/c Type/c #f)) (#:env (c:or/c #f env?)) boolean?)])
+ [subtypes/varargs (c:->* ((c:listof Type/c) (c:listof Object?) (c:listof Type/c) (c:or/c Type/c #f)) (#:env (c:or/c #f env?)) boolean?)])
