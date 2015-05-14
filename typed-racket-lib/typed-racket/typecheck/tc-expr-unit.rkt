@@ -194,8 +194,7 @@
            [(LExp? obj)
             (ret (-refine x t (-eqSLI obj (-lexp (list 1 (-id-path x)))))
                  fs
-                 obj)
-            v]
+                 obj)]
            [else res]))]
 
       ;; application
