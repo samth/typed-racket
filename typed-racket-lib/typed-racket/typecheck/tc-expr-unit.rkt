@@ -8,7 +8,7 @@
          (types utils abbrev union subtype type-table path-type
                 filter-ops remove-intersect resolve generalize)
          (private-in syntax-properties)
-         (rep type-rep filter-rep object-rep)
+         (rep type-rep filter-rep object-rep object-ops)
          (only-in (infer infer) restrict)
          (utils tc-utils)
          (env lexical-env)
@@ -20,7 +20,8 @@
          unstable/sequence
          racket/extflonum
          ;; Needed for current implementation of typechecking letrec-syntax+values
-         (for-template (only-in racket/base letrec-values)
+         ;; and for *'s special case
+         (for-template (only-in racket/base letrec-values *)
                        ;; see tc-app-contracts.rkt
                        racket/contract/private/provide)
 
@@ -75,11 +76,7 @@
     (unless (syntax? form)
       (int-err "bad form input to tc-expr: ~a" form))
     ;; typecheck form
-    (define t (tc-expr/check/internal form expected))
-    #;(match t
-    [(tc-result1: t fset o)
-    (printf "\n\n~a TCd at ~a ; ~a ; ~a\n\n" (syntax->datum form) t fset o)]
-    [_ (printf "\n\n~a TCd at ~a\n\n" (syntax->datum form) t)]) 
+    (define t (tc-expr/check/internal form expected)) 
     (add-typeof-expr form t)
     (cond-check-below t expected)))
 
@@ -182,8 +179,28 @@
           ;(tc-expr/check/type #'e2 Univ)
           ;(tc-expr/check #'e3 expected)
           (tc-error/expr "with-continuation-mark requires a continuation-mark-key, but got ~a" key-t)])]
+
+      ;; multiplication literal check to construct
+      ;; more informative objects & types when possible
+      ;; (we do this currently since there is no way to specify a function
+      ;;  *might* have a latent object depending on which combination of 
+      ;; non-null objects the arguments to the function have ))
+      [(#%plain-app (~literal *) e1 e2)
+       (match-define (and res (tc-result1: t fs _)) (tc/app form expected))
+       (match-let ([(tc-result1: _ _ o1) (type-of #'e1)]
+                   [(tc-result1: _ _ o2) (type-of #'e2)])
+         (define obj (-obj* o1 o2))
+         (cond
+           [(LExp? obj)
+            (ret (-refine x t (-eqSLI obj (-lexp (list 1 (-id-path x)))))
+                 fs
+                 obj)
+            v]
+           [else res]))]
+
       ;; application
-      [(#%plain-app . _) (tc/app form expected)]
+      [(#%plain-app . _)
+       (tc/app form expected)]
       ;; #%expression
       [(#%expression e) 
        (tc/#%expression form expected)]

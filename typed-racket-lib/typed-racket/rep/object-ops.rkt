@@ -1,7 +1,8 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
-         racket/match racket/lazy-require
+         (utils tc-utils)
+         racket/match
          (except-in racket/contract one-of/c)
          ;(prefix-in c: (contract-req))
          (rep object-rep rep-utils filter-rep))
@@ -14,14 +15,14 @@
 
 ;;******************************************************************************
 ;; Mathematical operations for Objects (potentially producing LExps)
-(define/cond-contract (-obj* objs)
-  (-> (listof Object?) (or/c Object? #f))
+(define/cond-contract (-obj* . objs)
+  (->* () () #:rest (listof Object?) (or/c Object? #f))
   (match objs
     [(list) #f]
     [(list o) o]
     [(list o1 o2) (multiply-Objects o1 o2)]
     [(list o1 o2 o3 os ...)
-     (-obj* (cons (multiply-Objects o1 o2) (cons o3 os)))]))
+     (apply -obj* (cons (multiply-Objects o1 o2) (cons o3 os)))]))
 
 (define (multiply-Objects o1 o2)
   (match (list o1 o2)
@@ -32,7 +33,8 @@
     [(list-no-order (? LExp? l) (? Path? p))
      (LExp-multiply l (-lexp (list 0 (list 1 p))))]
     [(list (? LExp?) (? LExp?))
-     (LExp-multiply o1 o2)]))
+     (LExp-multiply o1 o2)]
+    [_ (int-err "unrecognized object(s) in multiply-Objects ~a ~a" o1 o2)]))
 
 
 (define/cond-contract (-obj+ objs)
