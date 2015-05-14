@@ -12,7 +12,6 @@ install:
 - echo file://`pwd`/pkgs-catalog/ > catalog-config.txt
 - raco pkg config catalogs >> catalog-config.txt
 - raco pkg config --set catalogs `cat catalog-config.txt`
-- ls
 - raco pkg update -i --no-setup source-syntax/ typed-racket-lib/ typed-racket-more/ typed-racket-compatibility/ typed-racket-doc/ typed-racket/
 - raco pkg install --auto --no-setup typed-racket-test/
 # - raco setup --no-docs
