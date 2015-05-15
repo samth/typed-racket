@@ -88,6 +88,7 @@
                    (quote-syntax ,pred-id))]
     [(App: rator rands stx) `(make-App ,(sub rator) ,(sub rands) (quote-syntax ,stx))]
     [(Opaque: pred) `(make-Opaque (quote-syntax ,pred))]
+    [(InstdRef: type prop) `(make-InstdRef ,(sub type) ,(sub prop))]
     [(Refinement: parent pred) `(make-Refinement ,(sub parent)
                                                  (quote-syntax ,pred))]
     [(Mu-name: n b) `(make-Mu ,(sub n) ,(sub b))]

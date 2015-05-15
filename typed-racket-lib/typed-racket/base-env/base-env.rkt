@@ -3228,95 +3228,21 @@
         (-Input (Un -String -Input-Port -Bytes -Path)))
    (->optkey -Pattern -Input (N ?N -Bytes) #:match-select sel #f output)))
 
-;; [int+ (~> ([x : -Integer] 
-;;            [y : -Integer])
-;;           (let ([x #'x] [y #'y] [z #'z])
-;;             (-refine z -Integer 
-;;                      (-eqSLI (-lexp `(1 ,z)) 
-;;                              (-lexp 1 `(1 ,x) `(1 ,y)))))
-;;           : -true-filter
-;;           : (let ([x #'x] [y #'y]) (-lexp `(1 ,x) `(1 ,y))))]
-;; [int- (~> ([x : -Integer] 
-;;            [y : -Integer])
-;;           (let ([x #'x] [y #'y] [z #'z])
-;;             (-refine z -Integer 
-;;                      (-eqSLI (-lexp `(1 ,z)) 
-;;                              (-lexp -1 `(1 ,x) `(1 ,y)))))
-;;           : -true-filter
-;;           : (let ([x #'x] [y #'y]) (-lexp `(1 ,x) `(-1 ,y))))]
-;; [int*2 (~> ([x : -Integer]) 
-;;            (let ([x #'x] [z #'z])
-;;              (-refine z -Integer 
-;;                       (-eqSLI (-lexp `(1 ,z)) 
-;;                               (-lexp `(2 ,x)))))
-;;            : -true-filter
-;;            : (let ([x #'x]) (-lexp `(2 ,x))))]
-;; [int*3 (~> ([x : -Integer]) 
-;;            (let ([x #'x] [z #'z])
-;;              (-refine z -Integer 
-;;                       (-eqSLI (-lexp `(1 ,z)) 
-;;                               (-lexp `(3 ,x)))))
-;;            : -true-filter
-;;            : (let ([x #'x]) (-lexp `(3 ,x))))]
-;; TODO(amk) multiplication needs not only a latent object... but like
-;; a latent function that calculates it... wierd
 
-;; [int<= (->* (list -Integer -Integer)
-;;             -Boolean
-;;             : (-FS (-SLI (-leq (-lexp `(1 ,(-arg-obj 0)))
-;;                                (-lexp `(1 ,(-arg-obj 1)))))
-                   
-;;                    (-SLI (-lt (-lexp `(1 ,(-arg-obj 1)))
-;;                               (-lexp `(1 ,(-arg-obj 0)))))))]
-;; [int< (->* (list -Integer -Integer)
-;;            -Boolean
-;;            : (-FS (-SLI (-lt (-lexp `(1 ,(-arg-obj 0)))
-;;                              (-lexp `(1 ,(-arg-obj 1)))))
-                  
-;;                   (-SLI (-leq (-lexp `(1 ,(-arg-obj 1)))
-;;                               (-lexp `(1 ,(-arg-obj 0)))))))]
-;; [int< (->* (list -Integer -Integer)
-;;             -Boolean
-;;             : (-FS (-SLI (-lt (-lexp-obj (list 1 (-arg-obj 1)))
-;;                               (-lexp-obj (list 1 (-arg-obj 0)))))
-                   
-;;                    (-SLI (-gteq (-lexp-obj (list 1 (-arg-obj 1)))
-;;                                 (-lexp-obj (list 1 (-arg-obj 0)))))))]
-;; [int>= (->* (list -Integer -Integer)
-;;             -Boolean
-;;             : (-FS (-SLI (-gteq (-lexp-obj (list 1 (-arg-obj 1)))
-;;                                 (-lexp-obj (list 1 (-arg-obj 0)))))
-                   
-;;                    (-SLI (-lt (-lexp-obj (list 1 (-arg-obj 1)))
-;;                               (-lexp-obj (list 1 (-arg-obj 0)))))))]
-
-;; [int> (->* (list -Integer -Integer)
-;;            -Boolean
-;;            : (-FS (-SLI (-gt (-lexp-obj (list 1 (-arg-obj 1)))
-;;                                (-lexp-obj (list 1 (-arg-obj 0)))))
-                  
-;;                   (-SLI (-leq (-lexp-obj (list 1 (-arg-obj 1)))
-;;                              (-lexp-obj (list 1 (-arg-obj 0)))))))]
-;; [int= (->* (list -Integer -Integer)
-;;            -Boolean
-;;            : (-FS (-SLI (-eqSLI (-lexp-obj (list 1 (-arg-obj 1)))
-;;                                 (-lexp-obj (list 1 (-arg-obj 0)))))
-                  
-;;                   (-or (-SLI (-gt (list 1 (-arg-obj 1))
-;;                                   (list 1 (-arg-obj 0))))
-;;                        (-SLI (-lt (list 1 (-arg-obj 1))
-;;                                   (list 1 (-arg-obj 0)))))))]
-
-
-;; TODO(amk) support polymorphism w/ dep fun types
 [safe-vector-ref
- (-poly (a)
-        (~> ([v : (-vec a)]
-             [x : (-refine i -Integer
-                           (let ([i (-lexp `(1 ,(-id-path i)))]
-                                 [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
-                             (-SLI (-leq (-lexp 0) i)
-                                   (-lt i vlen))))])
-            a))]
-
-
+    (-poly (a)
+           (cl->* (~> ([v : (-vec a)]
+                       [x : (-refine i -Integer
+                                     (let ([i (-lexp `(1 ,(-id-path i)))]
+                                           [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
+                                       (-SLI (-leq (-lexp 0) i)
+                                             (-lt i vlen))))])
+                      a)
+                  (~> ([v : -VectorTop]
+                       [x : (-refine i -Integer
+                                     (let ([i (-lexp `(1 ,(-id-path i)))]
+                                           [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
+                                       (-SLI (-leq (-lexp 0) i)
+                                             (-lt i vlen))))])
+                      Univ)
+                  ))]
