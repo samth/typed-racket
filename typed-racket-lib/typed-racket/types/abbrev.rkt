@@ -95,7 +95,7 @@
   (make-Path null (list 0 n)))
 
 ;; an arg object that may be nested in other binding constructs
-(define/cond-contract (-narg-obj n m)
+(define/cond-contract (-lvl-arg-obj n m)
   (c:-> exact-nonnegative-integer?
         exact-nonnegative-integer?
         Object?)

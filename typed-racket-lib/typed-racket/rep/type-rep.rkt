@@ -1064,10 +1064,8 @@
 ;; listof identifiers -> (or/c Type/c Filter/c) -> (or/c Type/c Filter/c)
 (define (abstract-idents ids a)
   (define n (length ids))
-  (define mapping (for/list ([id (in-list ids)]
-                             [i (in-range n 0 -1)])
-                    ;; id, level-0 index
-                    (cons id (sub1 i))))
+  (define mapping (for/list ([(id indx) (in-indexed (in-list ids))])
+                    (cons id indx)))
   (define (transform name current-lvl)
     (cond
       ;; if there is a DeBruijn for this id, use it!
@@ -1084,9 +1082,8 @@
 ;; instantiate-idents : (listof idents) (or/c Type/c Filter/c) -> (or/c Type/c Filter/c)
 (define (instantiate-idents ids a)
   (define n (length ids))
-  (define mapping (for/list ([id (in-list ids)]
-                             [i (in-range n 0 -1)])
-                    (cons (sub1 i) id)))
+  (define mapping (for/list ([(id indx) (in-indexed (in-list ids))])
+                    (cons indx id)))
   (define (transform name current-lvl)
       (match name
         ;; DeBruijn case

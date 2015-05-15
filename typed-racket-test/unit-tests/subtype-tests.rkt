@@ -383,6 +383,9 @@
                          (-filter -Nat k)))
     (-refine l Univ (-or (-filter -Nat l)
                          (-filter -String l)))]
+   [FAIL
+    -Int
+    (-refine n -Int (-leqSLI (-lexp 0) (-lexp (list 1 (-id-path n)))))]
    
    ;; Function Refinement Types
    [(~> ([a : (Un -Nat -String)])

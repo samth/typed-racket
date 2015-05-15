@@ -607,63 +607,63 @@
              (-SLI (-leq (-lexp 0)
                          (-lexp (list 1 (-id-path x))))
                    (-lt (-lexp (list 1 (-id-path x)))
-                        (-lexp (list 1 (-narg-obj 1 arg-num)))))))
+                        (-lexp (list 1 (-lvl-arg-obj 1 arg-num)))))))
  
   (define (int+1 t)
     (-irefine t
-              (-eqSLI (-lexp (list 1 (-narg-obj 0 0)))
-                      (-lexp 1 (list 1 (-narg-obj 1 0))))))
+              (-eqSLI (-lexp (list 1 (-lvl-arg-obj 0 0)))
+                      (-lexp 1 (list 1 (-lvl-arg-obj 1 0))))))
 
   (define (int-1 t)
     (-irefine t
-              (-eqSLI (-lexp (list 1 (-narg-obj 0 0)))
-                      (-lexp -1 (list 1 (-narg-obj 1 0))))))
+              (-eqSLI (-lexp (list 1 (-lvl-arg-obj 0 0)))
+                      (-lexp -1 (list 1 (-lvl-arg-obj 1 0))))))
   
   (define (int-sign-flip d r)
     (-> d (-irefine r
-                    (-eqSLI (-lexp (list -1 (-narg-obj 0 0)))
-                            (-lexp (list 1 (-narg-obj 1 0)))))))
+                    (-eqSLI (-lexp (list -1 (-lvl-arg-obj 0 0)))
+                            (-lexp (list 1 (-lvl-arg-obj 1 0)))))))
 
   (define (int-flip-arg2 r)
     (-irefine r
-              (-eqSLI (-lexp (list -1 (-narg-obj 0 0)))
-                      (-lexp (list 1 (-narg-obj 1 1))))))
+              (-eqSLI (-lexp (list -1 (-lvl-arg-obj 0 0)))
+                      (-lexp (list 1 (-lvl-arg-obj 1 1))))))
   
   ;; a binary sum of integers type
   (define (bsum int-type) (-irefine int-type
                                     (-eqSLI
                                      ;; return value
-                                     (-lexp (list 1 (-narg-obj 0 0)))
+                                     (-lexp (list 1 (-lvl-arg-obj 0 0)))
                                      ;; sum of arguments 0 and 1
-                                     (-lexp (list 1 (-narg-obj 1 0))
-                                            (list 1 (-narg-obj 1 1))))))
+                                     (-lexp (list 1 (-lvl-arg-obj 1 0))
+                                            (list 1 (-lvl-arg-obj 1 1))))))
   ;; a binary difference of integers
   (define (bdiff int-type) (-irefine int-type
                                     (-eqSLI
                                      ;; return value
-                                     (-lexp (list 1 (-narg-obj 0 0)))
+                                     (-lexp (list 1 (-lvl-arg-obj 0 0)))
                                      ;; difference of arguments 0 and 1
-                                     (-lexp (list 1 (-narg-obj 1 0))
-                                            (list -1 (-narg-obj 1 1))))))
+                                     (-lexp (list 1 (-lvl-arg-obj 1 0))
+                                            (list -1 (-lvl-arg-obj 1 1))))))
   ;; a turnary sum of integers
   (define (tsum int-type) (-irefine int-type
                                     (-eqSLI
                                      ;; return value
-                                     (-lexp (list 1 (-narg-obj 0 0)))
+                                     (-lexp (list 1 (-lvl-arg-obj 0 0)))
                                      ;; sum of arguments 0, 1 and 2
-                                     (-lexp (list 1 (-narg-obj 1 0))
-                                            (list 1 (-narg-obj 1 1))
-                                            (list 1 (-narg-obj 1 2))))))
+                                     (-lexp (list 1 (-lvl-arg-obj 1 0))
+                                            (list 1 (-lvl-arg-obj 1 1))
+                                            (list 1 (-lvl-arg-obj 1 2))))))
 
   ;; a turnary difference of integers
   (define (tdiff int-type) (-irefine int-type
                                      (-eqSLI
                                       ;; return value
-                                      (-lexp (list 1 (-narg-obj 0 0)))
+                                      (-lexp (list 1 (-lvl-arg-obj 0 0)))
                                       ;; sum of arguments 0, 1 and 2
-                                      (-lexp (list 1 (-narg-obj 1 0))
-                                             (list -1 (-narg-obj 1 1))
-                                             (list -1 (-narg-obj 1 2))))))
+                                      (-lexp (list 1 (-lvl-arg-obj 1 0))
+                                             (list -1 (-lvl-arg-obj 1 1))
+                                             (list -1 (-lvl-arg-obj 1 2))))))
 
   
   ;; helper for adding props to binary integer comparisons
@@ -1151,13 +1151,13 @@
     (varop N))]
 [+ (from-cases
     (-> (-irefine -Zero (-eqSLI (-lexp 0)
-                                (-lexp (list 1 (-narg-obj 0 0))))))
-    (-> -Int (-irefine -Int (-eqSLI (-lexp (list 1 (-narg-obj 1 0)))
-                                    (-lexp (list 1 (-narg-obj 0 0)))))
+                                (-lexp (list 1 (-lvl-arg-obj 0 0))))))
+    (-> -Int (-irefine -Int (-eqSLI (-lexp (list 1 (-lvl-arg-obj 1 0)))
+                                    (-lexp (list 1 (-lvl-arg-obj 0 0)))))
         : -true-filter : (-arg-path 0))
     (-> N N : -true-filter : (-arg-path 0))
     (-> -Zero -Zero (-irefine -Zero (-eqSLI (-lexp 0)
-                                            (-lexp (list 1 (-narg-obj 0 0))))))
+                                            (-lexp (list 1 (-lvl-arg-obj 0 0))))))
     (-> N -Zero N : -true-filter : (-arg-path 0))
     (-> -Zero N N : -true-filter : (-arg-path 1))
     (-> -PosByte -PosByte (bsum -PosIndex))
@@ -1480,7 +1480,7 @@
 [remainder ; result has same sign as first arg
  (from-cases
   (-One -One . -> . -Zero)    
-  (map (lambda (t) (list (-> -Nat t (ret-nat-lt-arg t 0))
+  (map (lambda (t) (list (-> -Nat t (ret-nat-lt-arg t 1))
                          (-> t -Int t)))
        (list -Byte -Index -NonNegFixnum -Nat))
   (-NonPosFixnum -Int . -> . -NonPosFixnum)
@@ -1490,7 +1490,7 @@
 [modulo ; result has same sign as second arg
  (from-cases
   (-One -One . -> . -Zero)
-  (map (lambda (t) (list (-> -Int t (ret-nat-lt-arg t 0))
+  (map (lambda (t) (list (-> -Int t (ret-nat-lt-arg t 1))
                          (-> t -Nat t)))
        (list -Byte -Index -NonNegFixnum -Nat))
   (-Int -NonPosFixnum . -> . -NonPosFixnum)
@@ -1506,25 +1506,25 @@
   (map (lambda (t) (t -One . -> . (-values (list t -Zero))))
        (list -PosByte -Byte -PosIndex -Index
              -PosFixnum -NonNegFixnum -NegFixnum -NonPosFixnum -Fixnum))
-  (-Byte -Nat . -> . (-values (list -Byte (ret-nat-lt-arg -Byte 0))))
+  (-Byte -Nat . -> . (-values (list -Byte (ret-nat-lt-arg -Byte 1))))
   (-Byte -Int . -> . (-values (list -Fixnum -Byte)))
-  (-Index -Nat . -> . (-values (list -Index (ret-nat-lt-arg -Index 0))))
+  (-Index -Nat . -> . (-values (list -Index (ret-nat-lt-arg -Index 1))))
   (-Index -Int . -> . (-values (list -Fixnum -Index)))
-  (-Nat -Byte . -> . (-values (list -Nat (ret-nat-lt-arg -Byte 0))))
-  (-Nat -Index . -> . (-values (list -Nat (ret-nat-lt-arg -Index 0))))
-  (-NonNegFixnum -NonNegFixnum . -> . (-values (list -NonNegFixnum (ret-nat-lt-arg -NonNegFixnum 0))))
+  (-Nat -Byte . -> . (-values (list -Nat (ret-nat-lt-arg -Byte 1))))
+  (-Nat -Index . -> . (-values (list -Nat (ret-nat-lt-arg -Index 1))))
+  (-NonNegFixnum -NonNegFixnum . -> . (-values (list -NonNegFixnum (ret-nat-lt-arg -NonNegFixnum 1))))
   (-NonNegFixnum -NonPosFixnum . -> . (-values (list -NonPosFixnum -NonNegFixnum)))
   (-NonPosFixnum -NonNegFixnum . -> . (-values (list -NonPosFixnum -NonPosFixnum)))
   (-NonPosFixnum -NonPosFixnum . -> . (-values (list -NonNegFixnum -NonPosFixnum)))
-  (-NonNegFixnum -Nat . -> . (-values (list -NonNegFixnum (ret-nat-lt-arg -NonNegFixnum 0))))
+  (-NonNegFixnum -Nat . -> . (-values (list -NonNegFixnum (ret-nat-lt-arg -NonNegFixnum 1))))
   (-NonNegFixnum -Int . -> . (-values (list -Fixnum -NonNegFixnum)))
-  (-Nat -NonNegFixnum . -> . (-values (list -Nat (ret-nat-lt-arg -NonNegFixnum 0))))
+  (-Nat -NonNegFixnum . -> . (-values (list -Nat (ret-nat-lt-arg -NonNegFixnum 1))))
   ;; in the following cases, we can't guarantee that the quotient is within
   ;; fixnum range: (quotient min-fixnum -1) -> max-fixnum + 1
   (-NonPosFixnum -Int . -> . (-values (list -Int -NonPosFixnum)))
   (-Fixnum -Int . -> . (-values (list -Int -Fixnum)))
   (-Int -Fixnum . -> . (-values (list -Int -Fixnum)))
-  (-Nat -Nat . -> . (-values (list -Nat (ret-nat-lt-arg -Nat 0))))
+  (-Nat -Nat . -> . (-values (list -Nat (ret-nat-lt-arg -Nat 1))))
   (-Nat -NonPosInt . -> . (-values (list -NonPosInt -Nat)))
   (-Nat -Int . -> . (-values (list -Int -Nat)))
   (-NonPosInt -Nat . -> . (-values (list -NonPosInt -NonPosInt)))

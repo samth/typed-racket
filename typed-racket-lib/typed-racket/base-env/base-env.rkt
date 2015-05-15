@@ -802,7 +802,7 @@
 [vector-length (-> -VectorTop
                    (-refine i -Index
                             (-SLI (-lt (-lexp `(1 ,(-id-path i)))
-                                       (-lexp `(1 ,(-acc-path (list -len) (-arg-path 0 1)))))))
+                                       (-lexp `(1 ,(-acc-path (list -len) (-lvl-arg-obj 1 0)))))))
                    : -true-filter
                    : (-acc-path (list -len) (-arg-path 0)))]
 [vector (-poly (a) (->* (list) a (-vec a)))]
@@ -2929,7 +2929,12 @@
                    (cl->*
                     (->acc (list (-pair a b)) b (list -cdr))
                     (->* (list (-lst a)) (-lst a))))]
-[unsafe-vector-length ((make-VectorTop) . -> . -Index)]
+[unsafe-vector-length (-> -VectorTop
+                          (-refine i -Index
+                                   (-SLI (-lt (-lexp `(1 ,(-id-path i)))
+                                              (-lexp `(1 ,(-acc-path (list -len) (-lvl-arg-obj 1 0)))))))
+                          : -true-filter
+                          : (-acc-path (list -len) (-arg-path 0)))]
 [unsafe-vector*-length ((make-VectorTop) . -> . -Index)]
 [unsafe-struct-ref top-func]
 [unsafe-struct*-ref top-func]

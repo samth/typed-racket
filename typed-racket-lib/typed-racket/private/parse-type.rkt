@@ -371,14 +371,14 @@
        (cond
          [(for/or ([y (in-list ids)]) (free-identifier=? #'x y))
           (-id-path #'x)]
-         [(and (identifier-binding #'i)
+         [(and (identifier-binding #'x)
                (not (is-var-mutated? #'x)))
           (-id-path #'x)]
-         [(and (identifier-binding #'i)
+         [(and (identifier-binding #'x)
                (is-var-mutated? #'x))
           (parse-error "cannot reference mutated variables in types"
                        "given" #'x)]
-         [else (parse-error "expected a bound identifier in type-scope"
+         [else (parse-error "expected a bound identifier in type"
                             "given" #'x)])]
       [n:exact-integer
        (-int-obj (syntax->datum #'n))]

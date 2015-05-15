@@ -317,12 +317,7 @@
 ;; the algorithm for recursive types transcribed directly from TAPL, pg 305
 ;; List[(cons Number Number)] type type -> List[(cons Number Number)] or #f
 ;; is s a subtype of t, taking into account previously seen pairs A
-(define (subtype* A s t env orig-obj)
-  ;; only reason about *actual* objects
-  (define obj (if (or (Path? orig-obj)
-                      (LExp? orig-obj))
-                  orig-obj
-                  #f))
+(define (subtype* A s t env obj)
   (define ss (unsafe-Rep-seq s))
   (define st (unsafe-Rep-seq t))
   (early-return
@@ -351,7 +346,11 @@
          [(_ (Error:)) A0]
          [((Error:) _) A0]
          [((Ref: x x-t x-p) super-t)
-          (let ([obj (or obj (new-obj))])
+          ;; only reason about *actual* objects
+          (let ([obj (if (or (Path? obj)
+                             (LExp? obj))
+                         obj
+                         (new-obj))])
             ;; this not only sets the correct environment, but will
             ;; turn caching off (when env is non-#f after checking subtype)
             (when (not env) (set! env (lexical-env)))
@@ -361,7 +360,11 @@
                           (subst-filter x-p x obj #t))
                     (-filter super-t obj)))]
          [(sub-t (Ref: x x-t x-p))
-          (let ([obj (or obj (new-obj))])
+          ;; only reason about *actual* objects
+          (let ([obj (if (or (Path? obj)
+                             (LExp? obj))
+                         obj
+                         (new-obj))])
             ;; this not only sets the correct environment, but will
             ;; turn caching off (when env is non-#f after checking subtype)
             (when (not env) (set! env (lexical-env)))
