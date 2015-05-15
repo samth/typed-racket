@@ -317,7 +317,12 @@
 ;; the algorithm for recursive types transcribed directly from TAPL, pg 305
 ;; List[(cons Number Number)] type type -> List[(cons Number Number)] or #f
 ;; is s a subtype of t, taking into account previously seen pairs A
-(define (subtype* A s t env obj)
+(define (subtype* A s t env orig-obj)
+  ;; only reason about *actual* objects
+  (define obj (if (or (Path? orig-obj)
+                      (LExp? orig-obj))
+                  orig-obj
+                  #f))
   (define ss (unsafe-Rep-seq s))
   (define st (unsafe-Rep-seq t))
   (early-return

@@ -3230,19 +3230,18 @@
 
 
 [safe-vector-ref
-    (-poly (a)
-           (cl->* (~> ([v : (-vec a)]
-                       [x : (-refine i -Integer
-                                     (let ([i (-lexp `(1 ,(-id-path i)))]
-                                           [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
-                                       (-SLI (-leq (-lexp 0) i)
-                                             (-lt i vlen))))])
-                      a)
-                  (~> ([v : -VectorTop]
-                       [x : (-refine i -Integer
-                                     (let ([i (-lexp `(1 ,(-id-path i)))]
-                                           [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
-                                       (-SLI (-leq (-lexp 0) i)
-                                             (-lt i vlen))))])
-                      Univ)
-                  ))]
+ (-poly (a)
+        (cl->* (~> ([v : (-vec a)]
+                    [x : (-refine i -Integer
+                                  (let ([i (-lexp `(1 ,(-id-path i)))]
+                                        [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
+                                    (-SLI (-leq (-lexp 0) i)
+                                          (-lt i vlen))))])
+                   a)
+               (~> ([v : -VectorTop]
+                    [x : (-refine i -Integer
+                                  (let ([i (-lexp `(1 ,(-id-path i)))]
+                                        [vlen (-lexp `(1 ,(-acc-path (list -len) (-id-path v))))])
+                                    (-SLI (-leq (-lexp 0) i)
+                                          (-lt i vlen))))])
+                   Univ)))]

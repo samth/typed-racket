@@ -11,7 +11,7 @@
          (rename-in racket/private/sort [sort raw-sort])
          (rep type-rep object-rep filter-rep rep-utils free-variance)
          (for-syntax syntax/parse racket/base)
-         (types abbrev union)
+         (types abbrev union filter-ops)
          racket/dict racket/list
          mzlib/pconvert racket/match)
 
@@ -133,9 +133,9 @@
      `(apply -lexp ,(cons c (for/list ([p/c (in-list ps/cs)])
                               (list (car p/c) (sub (cdr p/c))))))]
     [(SLI-leq-pairs: leqs)
-     `(car (leqs->SLIs ,(map (λ (p) `(leq ,(sub (car p))
-                                          ,(sub (cdr p))))
-                             leqs)))]
+     `(apply -and (leqs->SLIs ,(map (λ (p) `(leq ,(sub (car p))
+                                                 ,(sub (cdr p))))
+                                    leqs)))]
     [(? Rep? rep)
      `(,(gen-constructor (vector-ref (struct->vector rep) 0))
        ,@(map sub (Rep-values rep)))]
