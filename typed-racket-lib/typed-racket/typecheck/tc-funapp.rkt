@@ -46,11 +46,10 @@
   ;; a multi-substitution instead of repeaded single substitutions
   (for/list ([dom (in-list doms)])
     (for/fold ([dom dom])
-              ([obj (in-list objs)]
-               [arg (range (sub1 (length doms)) -1 -1)])
+              ([(obj arg-num) (in-indexed (in-list objs))])
       (if (Empty? obj)
           dom
-          (subst-type dom (list 0 arg) obj #t)))))
+          (subst-type dom (list 0 arg-num) obj #t)))))
 
 (define (tc/funapp f-stx args-stx f-type* args-res expected)
   (match-define (list (tc-result1: argtys _ argobjs) ...) args-res)
