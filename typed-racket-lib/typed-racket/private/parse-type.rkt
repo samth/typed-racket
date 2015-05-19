@@ -310,6 +310,100 @@
            #:attr object (or (attribute o.object) -empty-obj)))
 
 
+(define (to-path-elem sym)
+  (match sym
+    ['a (make-CarPE)]
+    ['d (make-CdrPE)]
+    ['l (make-LengthPE)]))
+
+(define (parse-path stx)
+  (map
+   to-path-elem
+   (parameterize ([current-orig-stx stx])
+     (syntax-parse
+         stx
+       [(~datum len)
+        '(l)]
+       [(~or (~datum car)
+             (~datum first))
+        '(a)]
+       [(~datum cdr)
+        '(d)]
+       [(~datum caar)
+        '(a a)]
+       [(~or (~datum cadr)
+             (~datum second))
+        '(a d)]
+       [(~datum cdar)
+        '(d a)]
+       [(~datum cddr)
+        '(d d)]
+       [(~datum caaar)
+        '(a a a)]
+       [(~datum caadr)
+        '(a a d)]
+       [(~datum cadar)
+        '(a d a)]
+       [(~or (~datum caddr)
+             (~datum third))
+        '(a d d)]
+       [(~datum cdaar)
+        '(d a a)]
+       [(~datum cdadr)
+        '(d a d)]
+       [(~datum cddar)
+        '(d d a)]
+       [(~datum cdddr)
+        '(d d d)]
+       [(~datum caaaar)
+        '(a a a a)]
+       [(~datum caaadr)
+        '(a a a d)]
+       [(~datum caadar)
+        '(a a d a)]
+       [(~datum caaddr)
+        '(a a d d)]
+       [(~datum cadaar)
+        '(a d a a)]
+       [(~datum cadadr)
+        '(a d a d)]
+       [(~datum caddar)
+        '(a d d a)]
+       [(~or (~datum cadddr)
+             (~datum fourth))
+        '(a d d d)]
+       [(~datum cdaaar)
+        '(d a a a)]
+       [(~datum cdaadr)
+        '(d a a d)]
+       [(~datum cdadar)
+        '(d a d a)]
+       [(~datum cdaddr)
+        '(d a d d)]
+       [(~datum cddaar)
+        '(d d a a)]
+       [(~datum cddadr)
+        '(d d a d)]
+       [(~datum cdddar)
+        '(d d d a)]
+       [(~datum cddddr)
+        '(d d d d)]
+       [(~datum fifth)
+        '(a d d d d)]
+       [(~datum sixth)
+        '(a d d d d d)]
+       [(~datum seventh)
+        '(a d d d d d d)]
+       [(~datum eigth)
+        '(a d d d d d d d)]
+       [(~datum ninth)
+        '(a d d d d d d d d)]
+       [(~datum tenth)
+        '(a d d d d d d d d d)]
+       [e
+        (parse-error "expected a path accessor (e.g. car, cdr, len, etc...)"
+                     "given" #'e)]))))
+
 (define ((parse-nonlinear-obj/ids ids) stx)
   (parameterize ([current-orig-stx stx])
     (let ([obj ((parse-obj/ids ids) stx)])
@@ -364,12 +458,13 @@
        (let ([o (non-l-obj #'obj)]
              [n (syntax->datum #'int)])
          (-lexp `(,n ,o)))]
-      [(pe:path-elem ... x:id)
-       (let ([x-obj (non-l-obj #'x)])
-         (-acc-path (attribute pe.pe) x-obj))]
+      [(path-accessor:id obj:expr)
+       (let ([inner-obj (non-l-obj #'obj)])
+         (-acc-path (parse-path #'path-accessor) inner-obj))]
       [x:id
        (cond
-         [(for/or ([y (in-list ids)]) (free-identifier=? #'x y))
+         [(for/or ([y (in-list ids)])
+            (free-identifier=? #'x y))
           (-id-path #'x)]
          [(and (identifier-binding #'x)
                (not (is-var-mutated? #'x)))
@@ -454,9 +549,6 @@
 (define (parse-prop stx)
   ((parse-prop/ids '()) stx))
 
-(define (parse-types stx-list)
-  (stx-map parse-type stx-list))
-
 (define (parse-quoted-type stx)
   (syntax-parse stx
     [(t1 . t2)
@@ -468,6 +560,10 @@
   ((parse-type/ids '()) stx))
 
 (define ((parse-type/ids ids) stx)
+  (define parse-type (parse-type/ids ids))
+  (define (parse-types ts) (stx-map parse-type ts))
+  (define parse-values-type (parse-values-type/ids ids))
+  (define parse-list-type (parse-list-type/ids ids))
   (parameterize ([current-orig-stx stx])
     (syntax-parse
         stx
@@ -759,7 +855,9 @@
 
 ;; Syntax -> Type
 ;; Parse a (List ...) type
-(define (parse-list-type stx)
+(define ((parse-list-type/ids ids) stx)
+  (define parse-type (parse-type/ids ids))
+  (define (parse-types ts) (stx-map parse-type ts))
   (parameterize ([current-orig-stx stx])
     (syntax-parse stx
       [(:List^ tys ... dty :ddd/bound)
@@ -785,7 +883,9 @@
 
 ;; Syntax -> Type
 ;; Parse a (Values ...) type
-(define (parse-values-type stx)
+(define ((parse-values-type/ids ids) stx)
+  (define parse-type (parse-type/ids ids))
+  (define (parse-types ts) (stx-map parse-type ts))
   (parameterize ([current-orig-stx stx])
     (syntax-parse stx
       [((~or :Values^ :values^) tys ... dty :ddd/bound)
@@ -1033,7 +1133,7 @@
 (define (parse-tc-results stx)
   (syntax-parse stx
     [((~or :Values^ :values^) t ...)
-     (ret (parse-types #'(t ...))
+     (ret (stx-map parse-type #'(t ...))
           (stx-map (lambda (x) -no-filter) #'(t ...))
           (stx-map (lambda (x) -no-obj) #'(t ...)))]
     [t (ret (parse-type #'t) -no-filter -no-obj)]))
