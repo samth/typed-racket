@@ -12,7 +12,7 @@
          (only-in (infer infer) restrict)
          (rep type-rep object-rep filter-rep rep-utils object-ops))
 
-(provide add-scope subst-type subst-filter subst-object subst-result)
+(provide add-scope subst-type subst-filter subst-object subst-result subst-tc-results)
 
 (provide/cond-contract
   [restrict-values (-> SomeValues/c (listof Type/c) SomeValues/c)]

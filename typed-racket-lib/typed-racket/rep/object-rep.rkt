@@ -35,6 +35,7 @@
          LExp->sexp
          LExp-gcd-shrink
          -lexp
+         non-empty-obj?
          (rename-out [LExp:* LExp:]
                      [LExp-terms* LExp-terms]))
 
@@ -363,3 +364,7 @@
             [(= len 1) (car terms*)]
             [else (cons '+ terms*)]))])]
     [_ (int-err "invalid LExp in LExp->sexp ~a" l)]))
+
+
+(define (non-empty-obj? o)
+  (or (Path? o) (LExp? o)))

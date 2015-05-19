@@ -41,7 +41,7 @@
 ;; -- this allows type inference to more accurately reason about
 ;; subtyping information since the environment contains type information
 ;; only about realized objects (no DeBruijns)
-(define (unabstract-arg-objs doms objs)
+(define (unabstract-doms/arg-objs doms objs)
   ;;TODO(AMK) if would be nice to do this subst in one pass with
   ;; a multi-substitution instead of repeaded single substitutions
   (for/list ([dom (in-list doms)])
@@ -50,6 +50,16 @@
       (if (Empty? obj)
           dom
           (subst-type dom (list 0 arg-num) obj #t)))))
+
+(define (unabstract-rng/arg-objs rng objs ts)
+  ;;TODO(AMK) if would be nice to do this subst in one pass with
+  ;; a multi-substitution instead of repeaded single substitutions
+  (for/fold ([rng rng])
+            ([(obj arg-num) (in-indexed (in-list objs))]
+             [t (in-list ts)])
+    (if (Empty? obj)
+        rng
+        (subst-result rng (list 0 arg-num) obj #t t))))
 
 (define (tc/funapp f-stx args-stx f-type* args-res expected)
   (match-define (list (tc-result1: argtys _ argobjs) ...) args-res)
@@ -97,14 +107,15 @@
              fixed-vars dotted-var argtys dom (car drest) rng (fv rng)
              #:expected (and expected (tc-results->values expected)))]
            [rest
-            (infer/vararg fixed-vars
-                          (list dotted-var)
-                          argtys
-                          argobjs
-                          (unabstract-arg-objs dom argobjs)
-                          rest
-                          rng
-                          (and expected (tc-results->values expected)))]
+            (let ([doms (unabstract-doms/arg-objs dom argobjs)])
+              (infer/vararg fixed-vars
+                            (list dotted-var)
+                            argtys
+                            argobjs
+                            (unabstract-doms/arg-objs dom argobjs)
+                            rest
+                            (unabstract-rng/arg-objs rng argobjs doms)
+                            (and expected (tc-results->values expected))))]
            ;; no rest or drest
            [else
             (infer fixed-vars (list dotted-var) argtys dom rng
@@ -123,8 +134,15 @@
       ;; in filters/objects).
       (λ (dom rng rest kw? a)
         (extend-tvars vars
-         (infer/vararg vars null argtys argobjs (unabstract-arg-objs dom argobjs) rest rng
-                       (and expected (tc-results->values expected)))))
+         (let ([doms (unabstract-doms/arg-objs dom argobjs)])
+           (infer/vararg vars
+                         null
+                         argtys
+                         argobjs
+                         doms
+                         rest
+                         (unabstract-rng/arg-objs rng argobjs doms)
+                         (and expected (tc-results->values expected))))))
       f-type args-res expected)]
     ;; Row polymorphism. For now we do really dumb inference that only works
     ;; in very restricted cases, but is probably enough for most cases in

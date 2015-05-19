@@ -2,7 +2,7 @@
 
 (require "test-utils.rkt"
          (types subtype numeric-tower union utils abbrev filter-ops)
-         (rep type-rep)
+         (rep type-rep object-rep)
          (env init-envs type-env-structs)
          rackunit
          (for-syntax racket/base))

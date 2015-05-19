@@ -90,6 +90,10 @@
   (c:-> exact-integer? LExp?)
   (-lexp n))
 
+(define (-int-eq-type t n)
+  (-refine x t (-eqSLI (-lexp (list 1 (-id-path x)))
+                       (-lexp n))))
+
 (define/cond-contract (-arg-obj n)
   (c:-> exact-nonnegative-integer? Object?)
   (make-Path null (list 0 n)))

@@ -388,6 +388,7 @@
            (cgen context s t)
            (cgen/seq context t-seq s-seq)))]))
 
+;; TODO(AMK) fields obj support
 (define/cond-contract (cgen/flds context flds-s flds-t)
   (context? (listof fld?) (listof fld?)  . -> . (or/c #f cset?))
   (% cset-meet*
@@ -398,8 +399,8 @@
        ;; immutable - covariant
        [((fld: s _ #f) (fld: t _ #f)) (cgen context s t)]))))
 
-(define (cgen/inv context s t)
-  (% cset-meet (cgen context s t) (cgen context t s)))
+(define (cgen/inv context s t #:obj [obj #f])
+  (% cset-meet (cgen context s t #:obj obj) (cgen context t s #:obj obj)))
 
 
 ;; context : the context of what to infer/not infer
@@ -413,12 +414,12 @@
    (#:obj (or/c #f Object?))
    . ->* . (or/c #F cset?))
   ;; useful quick loop
-  (define/cond-contract (cg S T)
-   (Type/c Type/c . -> . (or/c #f cset?))
-   (cgen context S T))
-  (define/cond-contract (cg/inv S T)
-   (Type/c Type/c . -> . (or/c #f cset?))
-   (cgen/inv context S T))
+  (define/cond-contract (cg S T obj)
+   ((Type/c Type/c) ((or/c #f Object?)) . ->* . (or/c #f cset?))
+   (cgen context S T #:obj obj))
+  (define/cond-contract (cg/inv S T obj)
+   ((Type/c Type/c) ((or/c #f Object?)) . ->* . (or/c #f cset?))
+   (cgen/inv context S T #:obj obj))
   ;; this places no constraints on any variables
   (define empty (empty-cset/context context))
   ;; this constrains just x (which is a single var)
@@ -458,7 +459,7 @@
           ;; check each element
           [((Result: s f-s o-s)
             (Result: t f-t o-t))
-           (% cset-meet (cg s t)
+           (% cset-meet (cg s t (and (non-empty-obj? o-s) o-s))
                         (cgen/filter-set context f-s f-t)
                         (cgen/object context o-s o-t))]
 
@@ -489,8 +490,16 @@
            (cgen/seq context s-seq t-seq)]
 
           ;; refinements are erased to their bound
+          ;; TODO!!! We should use substitution to elim the
+          ;; bound refinement variable!
+          [((Ref: x S _) T)
+           (cg S T obj)]
+
+          [(S (Ref: x T _))
+           (cg S T obj)]
+
           [((Refinement: S _) T)
-           (cg S T)]
+           (cg S T obj)]
 
           ;; variables that are in X and should be constrained
           ;; all other variables are compatible only with themselves
@@ -515,16 +524,16 @@
 
           ;; recursive names should get resolved as they're seen
           [(s (? Name? t))
-           (cg s (resolve-once t))]
+           (cg s (resolve-once t) obj)]
           [((? Name? s) t)
-           (cg (resolve-once s) t)]
+           (cg (resolve-once s) t obj)]
 
           ;; constrain b1 to be below T, but don't mention the new vars
-          [((Poly: v1 b1) T) (cgen (context-add context #:bounds v1) b1 T)]
+          [((Poly: v1 b1) T) (cgen (context-add context #:bounds v1) b1 T #:obj obj)]
 
           ;; constrain *each* element of es to be below T, and then combine the constraints
           [((Union: es) T)
-           (define cs (for/list/fail ([e (in-list es)]) (cg e T)))
+           (define cs (for/list/fail ([e (in-list es)]) (cg e T obj)))
            (and cs (cset-meet* (cons empty cs)))]
 
           ;; find *an* element of es which can be made to be a supertype of S
@@ -533,7 +542,7 @@
           [(S (Union: es))
            (cset-join
             (for*/list ([e (in-list es)]
-                        [v (in-value (cg S e))]
+                        [v (in-value (cg S e obj))]
                         #:when v)
               v))]
 
@@ -543,7 +552,7 @@
            #:when (free-identifier=? nm nm*)
            (let ([proc-c
                   (cond [(and proc proc*)
-                         (cg proc proc*)]
+                         (cg proc proc* #f)] ;; TODO(AMK) more detailed obj here?
                         [proc* #f]
                         [else empty])])
              (% cset-meet proc-c (cgen/flds context flds flds*)))]
@@ -564,26 +573,31 @@
           [((Name: n _ #t) (Name: n* _ #t))
            (if (free-identifier=? n n*)
                empty ;; just succeed now
-               (% cg (resolve-once S) (resolve-once T)))]
+               (% cg (resolve-once S) (resolve-once T) obj))]
           ;; pairs are pointwise
           [((Pair: a b) (Pair: a* b*))
-           (% cset-meet (cg a a*) (cg b b*))]
+           (% cset-meet (cg a a* (-car-of obj)) (cg b b* (-cdr-of obj)))]
           ;; sequences are covariant
           [((Sequence: ts) (Sequence: ts*))
            (cgen/list context ts ts*)]
           [((Listof: t) (Sequence: (list t*)))
-           (cg t t*)]
+           (cg t t* #f)]
           [((Pair: t1 t2) (Sequence: (list t*)))
-           (% cset-meet (cg t1 t*) (cg t2 (-lst t*)))]
+           (% cset-meet
+              (cg t1 t* (-car-of obj))
+              (cg t2 (-lst t*) (-cdr-of obj)))]
           [((MListof: t) (Sequence: (list t*)))
-           (cg t t*)]
+           (cg t t* #f)]
           ;; To check that mutable pair is a sequence we check that the cdr is
           ;; both an mutable list and a sequence
           [((MPair: t1 t2) (Sequence: (list t*)))
-           (% cset-meet (cg t1 t*) (cg t2 T) (cg t2 (Un -Null (make-MPairTop))))]
+           (% cset-meet
+              (cg t1 t* (-car-of obj))
+              (cg t2 T (-cdr-of obj))
+              (cg t2 (Un -Null (make-MPairTop)) (-cdr-of obj)))]
           [((List: ts) (Sequence: (list t*)))
            (% cset-meet* (for/list/fail ([t (in-list ts)])
-                           (cg t t*)))]
+                           (cg t t* #f)))]
           [((HeterogeneousVector: ts) (HeterogeneousVector: ts*))
            (% cset-meet (cgen/list context ts ts*) (cgen/list context ts* ts))]
           [((HeterogeneousVector: ts) (Vector: s))
@@ -591,15 +605,15 @@
            (% cset-meet (cgen/list context ts ts*) (cgen/list context ts* ts))]
           [((HeterogeneousVector: ts) (Sequence: (list t*)))
            (% cset-meet* (for/list/fail ([t (in-list ts)])
-                           (cg t t*)))]
+                           (cg t t* #f)))]
           [((Vector: t) (Sequence: (list t*)))
-           (cg t t*)]
+           (cg t t* #f)]
           [((Base: 'String _ _ _) (Sequence: (list t*)))
-           (cg -Char t*)]
+           (cg -Char t* #f)]
           [((Base: 'Bytes _ _ _) (Sequence: (list t*)))
-           (cg -Nat t*)]
+           (cg -Nat t* #f)]
           [((Base: 'Input-Port _ _ _) (Sequence: (list t*)))
-           (cg -Nat t*)]
+           (cg -Nat t* #f)]
           [((Value: (? exact-nonnegative-integer? n)) (Sequence: (list t*)))
            (define possibilities
              (list
@@ -612,108 +626,111 @@
                (match pred-type
                  ((list pred? type)
                   (and (pred? n) type)))))
-           (cg type t*)]
+           (cg type t* #f)]
           [((Base: _ _ _ #t) (Sequence: (list t*)))
            (define type
              (for/or ([t (in-list (list -Byte -Index -NonNegFixnum -Nat))])
                (and (subtype S t) t)))
-           (% cg type t*)]
+           (% cg type t* #f)]
           [((Hashtable: k v) (Sequence: (list k* v*)))
            (cgen/list context (list k v) (list k* v*))]
           [((Set: t) (Sequence: (list t*)))
-           (cg t t*)]
+           (cg t t* #f)]
 
           ;; Mu's just get unfolded
           ;; We unfold S first so that unions are handled in S before T
-          [((? Mu? s) t) (cg (unfold s) t)]
-          [(s (? Mu? t)) (cg s (unfold t))]
+          [((? Mu? s) t) (cg (unfold s) t obj)]
+          [(s (? Mu? t)) (cg s (unfold t) obj)]
 
           ;; resolve applications
           [((App: _ _ _) _)
-           (% cg (resolve-once S) T)]
+           (% cg (resolve-once S) T obj)]
           [(_ (App: _ _ _))
-           (% cg S (resolve-once T))]
+           (% cg S (resolve-once T) obj)]
 
           ;; If the struct names don't match, try the parent of S
           ;; Needs to be done after App and Mu in case T is actually the current struct
           ;; but not currently visible
           [((Struct: nm (? Type? parent) _ _ _ _) other)
-           (cg parent other)]
+           (cg parent other obj)]
 
           ;; Invariant here because struct types aren't subtypes just because the
           ;; structs are (since you can make a constructor from the type).
           [((StructType: s) (StructType: t))
-           (cg/inv s t)]
+           (cg/inv s t #f)]
 
           ;; vectors are invariant - generate constraints *both* ways
           [((Vector: e) (Vector: e*))
-           (cg/inv e e*)]
+           (cg/inv e e* #f)]
           ;; boxes are invariant - generate constraints *both* ways
           [((Box: e) (Box: e*))
-           (cg/inv e e*)]
+           (cg/inv e e* #f)]
           [((Weak-Box: e) (Weak-Box: e*))
-           (cg/inv e e*)]
+           (cg/inv e e* #f)]
           [((MPair: s t) (MPair: s* t*))
-           (% cset-meet (cg/inv s s*) (cg/inv t t*))]
+           (% cset-meet
+              (cg/inv s s* (-car-of obj))
+              (cg/inv t t* (-cdr-of obj)))]
           [((Channel: e) (Channel: e*))
-           (cg/inv e e*)]
+           (cg/inv e e* #f)]
           [((Async-Channel: e) (Async-Channel: e*))
-           (cg/inv e e*)]
+           (cg/inv e e* #f)]
           [((ThreadCell: e) (ThreadCell: e*))
-           (cg/inv e e*)]
+           (cg/inv e e* #f)]
           [((Continuation-Mark-Keyof: e) (Continuation-Mark-Keyof: e*))
-           (cg/inv e e*)]
+           (cg/inv e e* #f)]
           [((Prompt-Tagof: s t) (Prompt-Tagof: s* t*))
-           (% cset-meet (cg/inv s s*) (cg/inv t t*))]
+           (% cset-meet (cg/inv s s* #f) (cg/inv t t* #f))]
           [((Promise: e) (Promise: e*))
-           (cg e e*)]
+           (cg e e* #f)]
           [((Ephemeron: e) (Ephemeron: e*))
-           (cg e e*)]
+           (cg e e* #f)]
           [((CustodianBox: e) (CustodianBox: e*))
-           (cg e e*)]
+           (cg e e* #f)]
           [((Set: a) (Set: a*))
-           (cg a a*)]
+           (cg a a* #f)]
           [((Evt: a) (Evt: a*))
-           (cg a a*)]
+           (cg a a* #f)]
           [((Base: 'Semaphore _ _ _) (Evt: t))
-           (cg S t)]
+           (cg S t #f)]
           [((Base: 'Output-Port _ _ _) (Evt: t))
-           (cg S t)]
+           (cg S t #f)]
           [((Base: 'Input-Port _ _ _) (Evt: t))
-           (cg S t)]
+           (cg S t #f)]
           [((Base: 'TCP-Listener _ _ _) (Evt: t))
-           (cg S t)]
+           (cg S t #f)]
           [((Base: 'Thread _ _ _) (Evt: t))
-           (cg S t)]
+           (cg S t #f)]
           [((Base: 'Subprocess _ _ _) (Evt: t))
-           (cg S t)]
+           (cg S t #f)]
           [((Base: 'Will-Executor _ _ _) (Evt: t))
-           (cg S t)]
+           (cg S t #f)]
           [((Base: 'LogReceiver _ _ _) (Evt: t ))
            (cg (make-HeterogeneousVector
                    (list -Symbol -String Univ
                          (Un (-val #f) -Symbol)))
-               t)]
+               t
+               #f)]
           [((Base: 'Place _ _ _) (Evt: t))
-           (cg Univ t)]
+           (cg Univ t #f)]
           [((Base: 'Base-Place-Channel _ _ _) (Evt: t))
-           (cg Univ t)]
-          [((CustodianBox: t) (Evt: t*)) (cg S t*)]
-          [((Channel: t) (Evt: t*)) (cg t t*)]
-          [((Async-Channel: t) (Evt: t*)) (cg t t*)]
+           (cg Univ t #f)]
+          [((CustodianBox: t) (Evt: t*)) (cg S t* #f)]
+          [((Channel: t) (Evt: t*)) (cg t t* #f)]
+          [((Async-Channel: t) (Evt: t*)) (cg t t* #f)]
           ;; we assume all HTs are mutable at the moment
           [((Hashtable: s1 s2) (Hashtable: t1 t2))
            ;; for mutable hash tables, both are invariant
-           (% cset-meet (cg/inv s1 t1) (cg/inv s2 t2))]
+           (% cset-meet (cg/inv s1 t1 #f) (cg/inv s2 t2 #f))]
           ;; syntax is covariant
           [((Syntax: s1) (Syntax: s2))
-           (cg s1 s2)]
+           (cg s1 s2 #f)]
           ;; futures are covariant
           [((Future: s1) (Future: s2))
-           (cg s1 s2)]
+           (cg s1 s2 #f)]
           ;; parameters are just like one-arg functions
           [((Param: in1 out1) (Param: in2 out2))
-           (% cset-meet (cg in2 in1) (cg out1 out2))]
+           (% cset-meet (cg in2 in1 #f) (cg out1 out2 #f))]
           [((Function: (list s-arr ...))
             (Function: (list t-arr ...)))
            (% cset-meet*

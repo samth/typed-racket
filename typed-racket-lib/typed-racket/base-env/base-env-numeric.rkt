@@ -621,13 +621,9 @@
   
   (define (int-sign-flip d r)
     (-> d (-irefine r
-                    (-eqSLI (-lexp (list -1 (-lvl-arg-obj 0 0)))
-                            (-lexp (list 1 (-lvl-arg-obj 1 0)))))))
-
-  (define (int-flip-arg2 r)
-    (-irefine r
-              (-eqSLI (-lexp (list -1 (-lvl-arg-obj 0 0)))
-                      (-lexp (list 1 (-lvl-arg-obj 1 1))))))
+                    (-eqSLI (-lexp (list 1 (-lvl-arg-obj 0 0)))
+                            (-lexp (list -1 (-lvl-arg-obj 1 0)))))
+        : -true-filter : (-lexp (list -1 (-arg-path 0)))))
   
   ;; a binary sum of integers type
   (define (bsum int-type) (-irefine int-type
@@ -703,6 +699,21 @@
   (define -FSt> (int-tcomp-props -gtSLI -leqSLI))
   (define -FSt>= (int-tcomp-props -gteqSLI -ltSLI))
 
+  (define isum->
+    (case-lambda
+      [(d1 d2 r) (-> d1 d2 (bsum r) : -true-filter : (-lexp (list 1 (-arg-path 0))
+                                                           (list 1 (-arg-path 1))))]
+      [(d1 d2 d3 r) (-> d1 d2 d3 (tsum r) : -true-filter : (-lexp (list 1 (-arg-path 0))
+                                                                 (list 1 (-arg-path 1))
+                                                                 (list 1 (-arg-path 2))))]))
+  
+  (define idiff->
+    (case-lambda
+      [(d1 d2 r) (-> d1 d2 (bdiff r) : -true-filter : (-lexp (list 1  (-arg-path 0))
+                                                            (list -1 (-arg-path 1))))]
+      [(d1 d2 d3 r) (-> d1 d2 d3 (tdiff r) : -true-filter : (-lexp (list 1  (-arg-path 0))
+                                                                  (list -1 (-arg-path 1))
+                                                                  (list -1 (-arg-path 2))))]))
   
   ;; There's a repetitive pattern in the types of each comparison operator.
   ;; As explained below, this is because filters don't do intersections.
@@ -1151,35 +1162,42 @@
     (varop N))]
 [+ (from-cases
     (-> (-irefine -Zero (-eqSLI (-lexp 0)
-                                (-lexp (list 1 (-lvl-arg-obj 0 0))))))
+                                (-lexp (list 1 (-lvl-arg-obj 0 0)))))
+        : -true-filter : (-int-obj 0))
     (-> -Int (-irefine -Int (-eqSLI (-lexp (list 1 (-lvl-arg-obj 1 0)))
                                     (-lexp (list 1 (-lvl-arg-obj 0 0)))))
         : -true-filter : (-arg-path 0))
     (-> N N : -true-filter : (-arg-path 0))
     (-> -Zero -Zero (-irefine -Zero (-eqSLI (-lexp 0)
-                                            (-lexp (list 1 (-lvl-arg-obj 0 0))))))
+                                            (-lexp (list 1 (-lvl-arg-obj 0 0)))))
+        : -true-filter : (-int-obj 0))
     (-> N -Zero N : -true-filter : (-arg-path 0))
     (-> -Zero N N : -true-filter : (-arg-path 1))
-    (-> -PosByte -PosByte (bsum -PosIndex))
-    (-> -Byte -Byte (bsum -Index))
-    (-> -PosByte -PosByte -PosByte (tsum -PosIndex))
-    (-> -Byte -Byte -Byte (tsum -Index))
-    (commutative-binop -PosIndex -Index (bsum -PosFixnum))
-    (-> -PosIndex -Index -Index (tsum -PosFixnum))
-    (-> -Index -PosIndex -Index (tsum -PosFixnum))
-    (-> -Index -Index -PosIndex (tsum -PosFixnum))
-    (-> -Index -Index (bsum -NonNegFixnum))
-    (-> -Index -Index -Index (tsum -NonNegFixnum))
-    (commutative-binop -NegFixnum -One (bsum -NonPosFixnum))
-    (commutative-binop -NonPosFixnum -NonNegFixnum (bsum -Fixnum))
-    (commutative-case -PosInt -Nat (bsum -PosInt))
-    (commutative-case -NegInt -NonPosInt (bsum -NegInt))
-    (-> -Nat -Nat (bsum -Nat))
-    (-> -NonPosInt -NonPosInt (bsum -NonPosInt))
-    (-> -Int -Int (bsum -Int))
-    (-> -Nat -Nat -Nat (tsum -Nat))
-    (-> -NonPosInt -NonPosInt -NonPosInt (tsum -NonPosInt))
-    (-> -Int -Int -Int (tsum -Int))
+    (isum-> -PosByte -PosByte -PosIndex)
+    (isum-> -Byte -Byte -Index)
+    (isum-> -PosByte -PosByte -PosByte -PosIndex)
+    (isum-> -Byte -Byte -Byte -Index)
+    (isum-> -PosIndex -Index -PosFixnum)
+    (isum-> -Index -PosIndex -PosFixnum)
+    (isum-> -PosIndex -Index -Index -PosFixnum)
+    (isum-> -Index -PosIndex -Index -PosFixnum)
+    (isum-> -Index -Index -PosIndex -PosFixnum)
+    (isum-> -Index -Index -NonNegFixnum)
+    (isum-> -Index -Index -Index -NonNegFixnum)
+    (isum-> -NegFixnum -One -NonPosFixnum)
+    (isum-> -One -NegFixnum -NonPosFixnum)
+    (isum-> -NonPosFixnum -NonNegFixnum -Fixnum)
+    (isum-> -NonNegFixnum -NonPosFixnum -Fixnum)
+    (isum-> -PosInt -Nat -PosInt)
+    (isum-> -Nat -PosInt -PosInt)
+    (isum-> -NegInt -NonPosInt -NegInt)
+    (isum-> -NonPosInt -NegInt -NegInt)
+    (isum-> -Nat -Nat -Nat)
+    (isum-> -NonPosInt -NonPosInt -NonPosInt)
+    (isum-> -Int -Int -Int)
+    (isum-> -Nat -Nat -Nat -Nat)
+    (isum-> -NonPosInt -NonPosInt -NonPosInt -NonPosInt)
+    (isum-> -Int -Int -Int -Int)
     (map varop (list -Nat -NonPosInt -Int))
     (commutative-case -PosRat -NonNegRat -PosRat)
     (commutative-case -NegRat -NonPosRat -NegRat)
@@ -1223,49 +1241,63 @@
 
 [- (from-cases
     (binop -Zero)
-    ;(half-negation-pattern -PosFixnum -NegFixnum -NonNegFixnum -NonPosFixnum) ;; TODO(amk) unfold
     (int-sign-flip -PosFixnum -NegFixnum)
     (int-sign-flip -NonNegFixnum -NonPosFixnum)
-    (-> -Zero -PosFixnum (bdiff -NegFixnum))
-    (-> -Zero -NonNegFixnum (bdiff -NonPosFixnum))
-    ;(negation-pattern -PosInt -NegInt -Nat -NonPosInt) ;; TODO(amk) unfold
+    (idiff-> -Zero -PosFixnum (bdiff -NegFixnum))
+    (idiff-> -Zero -NonNegFixnum (bdiff -NonPosFixnum))
     (int-sign-flip -PosInt -NegInt)
     (int-sign-flip -Nat -NonPosInt)
     (int-sign-flip -NegInt -PosInt)
     (int-sign-flip -NonPosInt -Nat)
-    (-> -Zero -PosInt (int-flip-arg2 -NegInt))
-    (-> -Zero -Nat (int-flip-arg2 -NonPosInt))
-    (-> -Zero -NegInt (int-flip-arg2 -PosInt))
-    (-> -Zero -NonPosInt (int-flip-arg2 -Nat))
-    
+    (-> -Zero -PosInt
+        (-irefine -NegInt
+                  (-eqSLI (-lexp (list -1 (-lvl-arg-obj 0 0)))
+                          (-lexp (list 1 (-lvl-arg-obj 1 1)))))
+        : -true-filter : (-lexp (list -1 (-arg-path 1))))
+    (-> -Zero -Nat
+        (-irefine -NonPosInt
+                  (-eqSLI (-lexp (list -1 (-lvl-arg-obj 0 0)))
+                          (-lexp (list 1 (-lvl-arg-obj 1 1)))))
+        : -true-filter : (-lexp (list -1 (-arg-path 1))))
+    (-> -Zero -NegInt
+        (-irefine -PosInt
+                  (-eqSLI (-lexp (list -1 (-lvl-arg-obj 0 0)))
+                          (-lexp (list 1 (-lvl-arg-obj 1 1)))))
+        : -true-filter : (-lexp (list -1 (-arg-path 1))))
+    (-> -Zero -NonPosInt
+        (-irefine -Nat
+                  (-eqSLI (-lexp (list -1 (-lvl-arg-obj 0 0)))
+                          (-lexp (list 1 (-lvl-arg-obj 1 1)))))
+        : -true-filter : (-lexp (list -1 (-arg-path 1))))
+    (idiff-> -One -One -Zero)
+    (idiff-> -PosByte -One -Byte)
+    (idiff-> -PosIndex -One -Index)
+    (idiff-> -PosFixnum -One -NonNegFixnum)
+    (idiff-> -PosInt -One -Nat)
+    (idiff-> -NonNegFixnum -NonNegFixnum -Fixnum)
+    (idiff-> -NegFixnum -NonPosFixnum -Fixnum)
+    (idiff-> -PosInt -NonPosInt -PosInt)
+    (idiff-> -PosInt -NonPosInt -NonPosInt -PosInt)
+    (->* (list -PosInt -NonPosInt) -NonPosInt -PosInt)
+    (idiff-> -Nat -NonPosInt (bdiff -Nat))
+    (idiff-> -Nat -NonPosInt -NonPosInt -Nat)
+    (->* (list -Nat -NonPosInt) -NonPosInt -Nat)
+    (idiff-> -NegInt -Nat (bdiff -NegInt))
+    (idiff-> -NegInt -Nat -NonPosInt -NegInt)
+    (->* (list -NegInt -Nat) -Nat -NegInt)
+    (idiff-> -NonPosInt -Nat -NonPosInt)
+    (idiff-> -NonPosInt -Nat -NonPosInt -NonPosInt)
+    (->* (list -NonPosInt -Nat) -Nat -NonPosInt)
+    (idiff-> -Int -Int -Int)
+    (idiff-> -Int -Int -Int -Int)
+
+    (-> N -Zero N : -true-filter : (-arg-path 0))
     (negation-pattern -PosRat -NegRat -NonNegRat -NonPosRat)
     (negation-pattern -PosFlonum -NegFlonum -NonNegFlonum -NonPosFlonum)
     (negation-pattern -PosSingleFlonum -NegSingleFlonum -NonNegSingleFlonum -NonPosSingleFlonum)
     (negation-pattern -PosInexactReal -NegInexactReal -NonNegInexactReal -NonPosInexactReal)
     (negation-pattern -PosReal -NegReal -NonNegReal -NonPosReal)
-
-    (-> N -Zero N : -true-filter : (-arg-path 0))
-    (-> -One -One (bdiff -Zero))
-    (-> -PosByte -One (bdiff -Byte))
-    (-> -PosIndex -One (bdiff -Index))
-    (-> -PosFixnum -One (bdiff -NonNegFixnum))
-    (-> -PosInt -One (bdiff -Nat))
-    (-> -NonNegFixnum -NonNegFixnum (bdiff -Fixnum))
-    (-> -NegFixnum -NonPosFixnum (bdiff -Fixnum))
-    (-> -PosInt -NonPosInt (bdiff -PosInt))
-    (-> -PosInt -NonPosInt -NonPosInt (tdiff -PosInt))
-    (->* (list -PosInt -NonPosInt) -NonPosInt -PosInt)
-    (-> -Nat -NonPosInt (bdiff -Nat))
-    (-> -Nat -NonPosInt -NonPosInt (tdiff -Nat))
-    (->* (list -Nat -NonPosInt) -NonPosInt -Nat)
-    (-> -NegInt -Nat (bdiff -NegInt))
-    (-> -NegInt -Nat -NonPosInt (tdiff -NegInt))
-    (->* (list -NegInt -Nat) -Nat -NegInt)
-    (-> -NonPosInt -Nat (bdiff -NonPosInt))
-    (-> -NonPosInt -Nat -NonPosInt (tdiff -NonPosInt))
-    (->* (list -NonPosInt -Nat) -Nat -NonPosInt)
-    (-> -Int -Int (bdiff -Int))
-    (-> -Int -Int -Int (tdiff -Int))
+    
     (varop-1+ -Int)
     (->* (list -PosRat -NonPosRat) -NonPosRat -PosRat)
     (->* (list -NonNegRat -NonPosRat) -NonPosRat -NonNegRat)

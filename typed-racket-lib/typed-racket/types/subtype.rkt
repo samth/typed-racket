@@ -213,15 +213,15 @@
       [(_ _) #f]))
 
 ;; check subtyping of filters, so that predicates subtype correctly
-(define (filter-subtype* A0 s t)
+(define (filter-subtype* A0 s t env) ;; BOOKMARK(AMK)
   (match* (s t)
    [(f f) A0]
    [((Bot:) t) A0]
    [(s (Top:)) A0]
    [((TypeFilter: t1 p) (TypeFilter: t2 p))
-    (subtype* A0 t1 t2)]
+    (subtype* A0 t1 t2 env #f)]
    [((NotTypeFilter: t1 p) (NotTypeFilter: t2 p))
-    (subtype* A0 t2 t1)]
+    (subtype* A0 t2 t1 env #f)]
    [(_ _) #f]))
 
 (define (subtypes/varargs argtys argobjs dom rst #:env [env #f])
@@ -347,8 +347,7 @@
          [((Error:) _) A0]
          [((Ref: x x-t x-p) super-t)
           ;; only reason about *actual* objects
-          (let ([obj (if (or (Path? obj)
-                             (LExp? obj))
+          (let ([obj (if (non-empty-obj? obj)
                          obj
                          (new-obj))])
             ;; this not only sets the correct environment, but will
@@ -361,8 +360,7 @@
                     (-filter super-t obj)))]
          [(sub-t (Ref: x x-t x-p))
           ;; only reason about *actual* objects
-          (let ([obj (if (or (Path? obj)
-                             (LExp? obj))
+          (let ([obj (if (non-empty-obj? obj)
                          obj
                          (new-obj))])
             ;; this not only sets the correct environment, but will
@@ -695,9 +693,9 @@
                       (and A
                            (if mut?
                                (subtype-seq A
-                                            (subtype* t s env)
-                                            (subtype* s t env)) ;; TODO(AMK) Prefab path??
-                               (subtype* A s t))))))]
+                                            (subtype* t s env #f)
+                                            (subtype* s t env #f)) ;; TODO(AMK) support Prefab paths
+                               (subtype* A s t env #f))))))]
          ;; subtyping on values is pointwise, except special case for Bottom
          [((Values: (list (Result: (== -Bottom) _ _))) _)
           A0]
@@ -707,7 +705,7 @@
                        (subtypes* s-rs t-rs env)
                        (subtype* s-dty t-dty env obj))]
          [((AnyValues: s-f) (AnyValues: t-f))
-          (filter-subtype* A0 s-f t-f)]
+          (filter-subtype* A0 s-f t-f env)]
          [((or (Values: (list (Result: _ fs _) ...))
                (ValuesDots: (list (Result: _ fs _) ...) _ _))
            (AnyValues: t-f))
@@ -715,18 +713,18 @@
             (match f
               [(FilterSet: f+ f-)
                (subtype-seq A0
-                            (filter-subtype* f+ t-f)
-                            (filter-subtype* f- t-f))]))]
+                            (filter-subtype* f+ t-f env)
+                            (filter-subtype* f- t-f env))]))]
          [((Result: t (FilterSet: ft ff) o) (Result: t* (FilterSet: ft* ff*) o))
           (subtype-seq A0
                        (subtype* t t* env obj)
-                       (filter-subtype* ft ft*)
-                       (filter-subtype* ff ff*))]
+                       (filter-subtype* ft ft* env)
+                       (filter-subtype* ff ff* env))]
          [((Result: t (FilterSet: ft ff) o) (Result: t* (FilterSet: ft* ff*) (Empty:)))
           (subtype-seq A0
                        (subtype* t t* env obj)
-                       (filter-subtype* ft ft*)
-                       (filter-subtype* ff ff*))]
+                       (filter-subtype* ft ft* env)
+                       (filter-subtype* ff ff* env))]
          ;; subtyping on other stuff
          [((Syntax: t) (Syntax: t*))
           (subtype* A0 t t* env obj)]
