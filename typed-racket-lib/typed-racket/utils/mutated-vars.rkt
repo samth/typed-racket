@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require racket/dict syntax/parse syntax/id-table unstable/sequence)
+(require racket/pretty racket/dict syntax/parse syntax/id-table unstable/sequence)
 
 ;; find and add to mapping all the set!'ed variables in form
 ;; if the supplied mapping is mutable, mutates it
@@ -9,9 +9,13 @@
 (define (find-mutated-vars form
                            [tbl (make-immutable-free-id-table)]
                            [pred #f])
+  (pretty-print (syntax->datum form))
   (define add (if (dict-mutable? tbl)
                   (lambda (t i) (dict-set! t i #t) t)
                   (lambda (t i) (dict-set t i #t))))
+  (define (add-list t l)
+    (for/fold ([t t]) ([i (in-list l)])
+      (add t i)))
   (let loop ([stx form] [tbl tbl])
     ;; syntax-list -> table
     (define (fmv/list lstx)
@@ -45,7 +49,10 @@
       [(if . es) (fmv/list #'es)]
       [(with-continuation-mark . es) (fmv/list #'es)]
       [(let-values ([_ e] ...) b ...) (fmv/list #'(b ... e ...))]
-      [(letrec-values ([_ e] ...) b ...) (fmv/list #'(b ... e ...))]
+      [(letrec-values ([(v ...) e] ...) b ...)
+       (add-list (fmv/list #'(b ... e ...)) (syntax->list #'(v ... ...)))]
+      [(letrec-syntaxes+values _ ([(v ...) e] ...) b ...)
+       (add-list (fmv/list #'(b ... e ...)) (syntax->list #'(v ... ...)))]
       [(#%plain-module-begin . forms) (fmv/list #'forms)]
       ;; all the other forms don't have any expression subforms (like #%top)
       [_ tbl])))
