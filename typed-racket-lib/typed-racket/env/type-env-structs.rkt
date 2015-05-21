@@ -38,14 +38,19 @@
   [empty-env env?]
   [raw-lookup-alias (env? identifier? (identifier? . -> . (or/c #f Object?)) . -> . (or/c #f Object?))]
   [env-extract-props (env? . -> . (values env? (listof Filter/c)))]
-  [naive-extend/type (env? identifier? Type? . -> . env?)]
+  [naive-extend/type (env? identifier? (and/c Type?
+                                              (not/c Bottom?)
+                                              (not/c Ref?))
+                           . -> . env?)]
   [naive-extend/not-type (env? identifier? Type? . -> . env?)]
   [naive-extend/types (env? (listof (cons/c identifier? (and/c Type?
-                                                               (not/c Bottom?)))) 
+                                                               (not/c Bottom?)
+                                                               (not/c Ref?)))) 
                             . -> . env?)]
   [extend/aliases (env? (listof (cons/c identifier? (and/c Object?
                                                            (not/c Empty?)))) 
-                        . -> . env?)])
+                        . -> . env?)]
+  [env-erase-type+ (-> env? identifier? env?)])
 
 
 (define empty-env
@@ -87,15 +92,23 @@
     (free-id-table-ref als key (λ () (fail key)))))
 
 
+(define (env-erase-type+ e id)
+  (match-let ([(env tys ntys ps als sli) e])
+    (define tys* (free-id-table-remove tys id))
+    (env tys* ntys ps als sli)))
+
 ;; extend that works on single arguments
 (define (naive-extend/type e id type)
   (naive-extend/types e (list (cons id type))))
 
 ;; not-type extend that works on single arguments
 (define (naive-extend/not-type e id type)
-  (match-let* ([(env tys ntys ps als sli) e])
-    (define ntys* (free-id-table-set ntys id type))
-    (env tys ntys* ps als sli)))
+  (cond
+    [(Bottom? type) e]
+    [else
+     (match-let ([(env tys ntys ps als sli) e])
+       (define ntys* (free-id-table-set ntys id type))
+       (env tys ntys* ps als sli))]))
 
 ;; extends an environment with types (no aliases)
 ;; DOES NOT FLATTEN NESTED REFINEMENT TYPE PROPS

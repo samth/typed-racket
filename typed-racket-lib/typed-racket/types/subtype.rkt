@@ -314,6 +314,7 @@
 (define bottom-key (Rep-seq -Bottom))
 (define top-key (Rep-seq Univ))
 
+
 ;; the algorithm for recursive types transcribed directly from TAPL, pg 305
 ;; List[(cons Number Number)] type type -> List[(cons Number Number)] or #f
 ;; is s a subtype of t, taking into account previously seen pairs A
@@ -573,11 +574,13 @@
                    (loop (cdr l1) (cdr l2))]
                   [else
                    (loop l1 (cdr l2))]))]
-         [((Union: es) t)
-          (and 
-           (for/and ([elem (in-list es)])
-             (subtype* A0 elem t env obj))
-           A0)]
+         [((Union: sub-ts) super)
+          (let loop ([sub-ts sub-ts] [A* A0]) 
+            (match sub-ts
+              [(list) A*]
+              [(cons sub-t* sub-ts*)
+               (let ([A* (subtype* A* sub-t* super env obj)])
+                 (and A* (loop sub-ts* A*)))]))]
          [(s (Union: es))
           (and (for/or ([elem (in-list es)])
                  (subtype* A0 s elem env obj))

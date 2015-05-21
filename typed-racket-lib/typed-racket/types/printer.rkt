@@ -35,12 +35,14 @@
 (provide print-complex-filters? type-output-sexpr-tweaker
          current-print-type-fuel current-print-unexpanded)
 
-
 ;; do we attempt to find instantiations of polymorphic types to print?
 ;; FIXME - currently broken
 (define print-poly-types? #t)
 ;; do we use simple type aliases in printing
 (define print-aliases #t)
+;; should we use subtype to better print unions?
+;; (setting to #f very helpful for debugging infinite loops in subtype/proves/etc...)
+(define use-subtyping? #t)
 
 (define type-output-sexpr-tweaker (make-parameter values))
 (define print-complex-filters? (make-parameter #f))
@@ -480,7 +482,10 @@
     [(Set: e) `(Setof ,(t->s e))]
     [(Evt: r) `(Evtof ,(t->s r))]
     [(Union: elems)
-     (define-values (covered remaining) (cover-union type ignored-names))
+     (define-values (covered remaining)
+       (if use-subtyping?
+           (cover-union type ignored-names)
+           (values '() elems)))
      (cons 'U (append covered (map t->s remaining)))]
     [(Pair: l r) `(Pairof ,(t->s l) ,(t->s r))]
     [(ListDots: dty dbound) `(List ,(t->s dty) ... ,dbound)]

@@ -1,13 +1,14 @@
 #lang racket/base
 (require (except-in "../utils/utils.rkt" infer)
          racket/match racket/function racket/lazy-require racket/list unstable/function
+         racket/trace
          (except-in racket/contract ->* -> )
          (prefix-in c: (contract-req))
          (utils tc-utils)
          (env lookup type-env-structs)
          (logic prop-ops)
          (rep type-rep object-rep filter-rep rep-utils)
-         (typecheck tc-metafunctions)
+         (typecheck tc-subst tc-metafunctions)
          (except-in "../types/abbrev.rkt" one-of/c))
 
 (lazy-require
@@ -29,24 +30,36 @@
 (define/cond-contract (proves A env new-props goal)
   (c:-> any/c env? (listof Filter/c) Filter/c
         any/c)
+  
   (let/ec exit*
     (define (exit) (exit* A))
+    ;; combine the new props w/ the props already in the environment
     (define-values (compound-props atoms slis)
       (combine-props (apply append (map flatten-nested-props new-props)) 
                      (env-props+SLIs env)
                      exit))
-    (define env* 
-      (for/fold ([Γ (replace-props env slis)]) 
+    
+    ;; update the environment based on all the known atoms
+    (define-values (env* new-exposed-props)
+      (for/fold ([Γ (replace-props env slis)]
+                 [new-props '()]) 
                 ([f (in-list atoms)])
         (match f
           [(or (? TypeFilter?) (? NotTypeFilter?))
-           (update-env/atom A Γ f exit)]
-          [_ Γ])))
-    (define goal* (apply -and (logical-reduce A env* goal)))
+           (define-values (Γ* new-ps) (update-env/atom A Γ f exit))
+           (values Γ* (append new-ps new-props))]
+          [_ (values Γ new-props)])))
     
+    (define goal* (apply -and (logical-reduce A env* goal)))
+    (define remaining-props (append new-exposed-props compound-props))
     (cond
       [(Top? goal*) A]
-      [else (and (full-proves A env* compound-props goal) A)])))
+      [else
+       ;; our Γ now has all the atomic facts fully updated in it and the goal has been
+       ;; simplified w/ this knowledge. Start reasoning about the complex 
+       ;; propositions (e.g. and/or), newly exposed propositions, etc...
+       ;; to see if we can prove the goal
+       (and (full-proves A env* remaining-props goal*) A)])))
 
 ;;returns a list of the remaining goals to be proved
 ;; only proves based on type-env lookups
@@ -96,10 +109,10 @@
     [(cons p ps)
      (match p
        [(? atomic-prop?)
-        (define env* (update-env/atom A env p (λ () #f)))
+        (define-values (env* new-props) (update-env/atom A env p (λ () #f)))
         (define goal* (and env* (apply -and (logical-reduce A env* goal))))
         (or (not env*)
-            (full-proves A env* ps goal*))]
+            (full-proves A env* (append new-props ps) goal*))]
        
        [(? SLI? s)
         (define slis* (add-SLI s (env-SLIs env)))
@@ -154,12 +167,12 @@
               ty-
               Bottom)]))
 
-(define (update-env/obj-type env o t contradiction)
-  (update-env/type+ null env t o contradiction))
+(define (update-env/obj-type env o t contra-env)
+  (update-env/type+ null env t o contra-env))
 
-(define/cond-contract (update-env/type+ A env t o contradiction)
-  (c:-> any/c env? Type? Object? (c:or/c #f procedure?)
-        (c:or/c env? #f))
+(define/cond-contract (update-env/type+ A env t o contra-env)
+  (c:-> any/c env? Type? Object? procedure?
+        (values (c:or/c env? #f) (c:listof Filter?)))
   (match o
     [(Path: π x)
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ)))
@@ -168,19 +181,27 @@
      (define new-x-ty- (update-negative-type new-x-ty+ x-ty-))
      (cond
        [(Bottom? new-x-ty+)
-        (contradiction)]
+        (values (contra-env) '())]
        [(type-equal? new-x-ty- Univ)
-        (contradiction)]
-       [else (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)])]
+        (values (contra-env) '())]
+       [else
+        (define xobj (-id-path x))
+        (match new-x-ty+
+          [(Ref: y y-t y-p)
+           (values (naive-extend/not-type (env-erase-type+ env x) x new-x-ty-)
+                   (list (-filter (subst-type y-t y xobj #t) xobj) 
+                         (subst-filter y-p y xobj #t)))]
+          [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
+                     '())])])]
     [(? LExp?)
      ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
      (if (not (overlap (integer-type) t))
-         (contradiction)
-         env)]))
+         (values (contra-env) '())
+         (values env '()))]))
 
-(define/cond-contract (update-env/type- A env t o contradiction)
+(define/cond-contract (update-env/type- A env t o contra-env)
   (c:-> any/c env? Type? Object? (c:or/c #f procedure?)
-        (c:or/c env? #f))
+        (values (c:or/c env? #f) (c:listof Filter?)))
   (match o
     [(Path: π x)
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))) ;; x is of type T
@@ -189,32 +210,50 @@
      (define new-x-ty- (update-negative-type new-x-ty+ (Un x-ty- (unpath-type π t Bottom))))
      (cond
        [(Bottom? new-x-ty+)
-        ;(printf "\n/type- exiting w/ bottom\n")
-        (contradiction)]
+        (values (contra-env) '())]
        [(type-equal? new-x-ty- Univ)
-        ;(printf "\n/type- exiting w/ neg as Univ\n")
-        (contradiction)]
+        (values (contra-env) '())]
        [else
-        (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)])]
+        (define xobj (-id-path x))
+        (match new-x-ty+
+          [(Ref: y y-t y-p)
+           (values (naive-extend/not-type (env-erase-type+ env x) x new-x-ty-)
+                   (list (-filter (subst-type y-t y xobj #t) xobj) 
+                         (subst-filter y-p y xobj #t)))]
+          [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
+                     '())])])]
     [(? LExp?)
      ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
      (if (subtype (integer-type) t #:A A #:env env #:obj o)
-         (contradiction)
+         (contra-env)
          env)]))
 
-;; TODO(AMK) 
-;; there are more complex refinement cases to consider such as 
+
+;; update-env/atom
+;; the 'contra-env' argument is a function that either:
+;;    a) produces the desired representation of a trivial environment
+;;       (i.e. an environment containing Bottom)
+;;    or
+;;    b) is a continuation that bails out of the current computation
+;; Function description:
+;; - Updates an environment w/ an atomic fact.
+;; - If the update exposed some new information from exposing a Refine type that
+;;   was previously nested within a larger type (e.g. a union) we return this
+;;   new information (since this new info could be arbitrarily comlpex, and we're
+;;   a simple update function not suited to reason about arbitrary propositions)
+;;
+;; TODO(AMK): there are more complex refinement cases to consider such as 
 ;; 1. what about updating refinements that cannot be deconstructed? (i.e. nested
 ;;    inside other types inside of unions?)
-(define/cond-contract (update-env/atom A env prop [contradiction #f])
-  (c:-> any/c env? atomic-prop? (c:or/c #f procedure?)
-        (c:or/c env? #f))
+(define/cond-contract (update-env/atom A env prop [contra-env (λ _ #f)])
+  (c:-> any/c env? atomic-prop? procedure?
+        (values (c:or/c env? #f) (c:listof Filter?)))
   
   (match prop
-    [(? Top?) env]
-    [(? Bot?) (and contradiction (contradiction))]
+    [(? Top?) (values env '())]
+    [(? Bot?) (values (contra-env) '())]
     [(TypeFilter: t o)
-     (update-env/type+ A env t o (λ () (and contradiction (contradiction))))]
+     (update-env/type+ A env t o contra-env)]
     [(NotTypeFilter: t o)
-     (update-env/type- A env t o (λ () (and contradiction (contradiction))))]
+     (update-env/type- A env t o contra-env)]
     [_ (int-err "invalid update-env prop: ~a" prop)]))

@@ -58,7 +58,6 @@
   (define obj (if (identifier? x) (-id-path x) x))
   (define ty* (extract-nested-props ty obj push))
   
-  
   (let loop ([ps '()])
       (match (pop)
         [#f (values ty* ps)]

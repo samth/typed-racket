@@ -23,7 +23,8 @@
          with-lexical-env/extend-types+aliases+props
          with-lexical-env/naive-extend-types
          update
-         env-extend-types)
+         env-extend-types
+         env+props)
 
 
 (define/cond-contract (update t ft pos? lo)
@@ -113,46 +114,64 @@
                   ps))
      new-env]))
 
+
 ;; extend the environment with a list of propositions
 ;; Returns #f if anything becomes (U)
+;; AMK: We also return the atoms? I'm sure there's a reason
+;; but from the body of this function it's difficult to
+;; understand why
 (define (env+props env fs)
   (let/ec exit*
     (define (exit) (exit* #f empty))
-    (define-values (props atoms slis) 
-      (combine-props (apply append (map flatten-nested-props fs)) 
-                     (env-props+SLIs env)
-                     exit))
-    (values
-     (for/fold ([Γ (replace-props env (append slis props))]) ([f (in-list atoms)])
-       (match f
-         [(or (TypeFilter: ft (Path: _ x)) 
-              (NotTypeFilter: ft (Path: _ x)))
-          (if (or (is-var-mutated? x)
-                  (not (identifier-binding x)))
-              ;; if it is, we do nothing
-              Γ
-              ;; otherwise, refine the type
-              (parameterize
-                  ([current-orig-stx x])
-                (update-env/atom null Γ f exit)))
-          
-          #;(update-type/lexical
-           (lambda (x t)
-             (define new-t (update t ft (TypeFilter? f) lo))
-             (when (type-equal? new-t -Bottom)
-               (exit))
-             new-t)
-           x Γ)]
-         [(TypeFilter: ft (? LExp? l))
-          (if (subtype ft -Integer #:obj l)
-              Γ
-              (exit))]
-         [(NotTypeFilter: ft (? LExp? l))
-          (if (subtype -Integer ft #:obj l)
-              (exit)
-              Γ)]
-         [_ Γ]))
-     atoms)))
+
+    (define (update-env/props env fs)
+      ;; logically combine all propositions
+      (define-values (props atoms slis) 
+        (combine-props (apply append (map flatten-nested-props fs)) 
+                       (env-props+SLIs env)
+                       exit))
+      
+      ;; update the environment w/ known atomic facts
+      (define-values (Γ* new-exposed-props)
+        (for/fold ([Γ (replace-props env (append slis props))]
+                   [new-ps '()])
+                  ([f (in-list atoms)])
+          (match f
+            [(or (TypeFilter: ft (Path: _ x)) 
+                 (NotTypeFilter: ft (Path: _ x)))
+             (cond
+               ;; don't update certain vars
+               [(or (is-var-mutated? x) (not (identifier-binding x)))
+                (values Γ new-ps)]
+               ;; otherwise, refine the type
+               [else
+                (define-values (Γ* newly-exposed-props)
+                  (parameterize
+                      ([current-orig-stx x])
+                    (update-env/atom empty Γ f exit)))
+                (values Γ* (append newly-exposed-props new-ps))])]
+            [(TypeFilter: ft (? LExp? l))
+             (if (subtype ft -Integer #:obj l)
+                 (values Γ new-ps)
+                 (exit))]
+            [(NotTypeFilter: ft (? LExp? l))
+             (if (subtype -Integer ft #:obj l)
+                 (exit)
+                 (values Γ new-ps))]
+            [_ (values Γ new-ps)])))
+      
+      (cond
+        [(null? new-exposed-props)
+         ;; simple/common case -- no new nested propositions were discovered
+         ;; when refining types
+         (values Γ* atoms)]
+        [else
+         ;; we found some new propositions when we updated a type and it became
+         ;; a refinement! we have to start over making sure to incorporate
+         ;; the new facts
+         (update-env/props Γ* (append atoms new-exposed-props))]))
+
+    (update-env/props env fs)))
 
 ;; run code in an extended env and with replaced props. Requires the body to return a tc-results.
 ;; TODO make this only add the new prop instead of the entire environment once tc-id is fixed to

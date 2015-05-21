@@ -9,15 +9,14 @@
          (env lookup lexical-env type-env-structs)
          (rep type-rep object-rep filter-rep rep-utils)
          (types tc-result)
-         (typecheck tc-subst)
+         (typecheck tc-subst tc-envops)
          (except-in "../types/abbrev.rkt" one-of/c))
 
  (lazy-require
   ("../types/remove-intersect.rkt" (overlap))
   ("../types/path-type.rkt" (path-type))
   ("../types/subtype.rkt" (subtype))
-  ("../types/filter-ops.rkt" (-and -or))
-  ("../typecheck/tc-envops.rkt" (env-extend-types)))
+  ("../types/filter-ops.rkt" (-and -or)))
 
 (provide type-update update-function/arg-types)
 
@@ -110,21 +109,22 @@
                          [o-ty (in-list arg-tys)]
                          [id (in-list tmp-ids)])
                 (if o (subst-result r* id o #t o-ty) r*)))
-            (let/ec exit*
-              (define (exit) (exit* -Bottom))
-              ;; update the lexical environment with domain types
-              (define env*
-                (for/fold ([env (lexical-env)])
-                          ([tmp-id (in-list tmp-ids)]
-                           [obj (in-list arg-objs)]
-                           [ty (in-list doms*)])
-                  (update-env/obj-type env
-                                       (if obj obj (-id-path tmp-id))
-                                       ty
-                                       exit)))
-              (define updated-doms (for/list ([d (in-list doms*)])
-                                     (abstract-idents tmp-ids (type-update d env*))))
-              (define updated-rng (abstract-idents tmp-ids (type-update rng* env*)))
-              (make-arr updated-doms updated-rng rest drest kws dep?))])))
+            ;; build props that represent domain's types
+            (define dom-ty-props
+              (for/list ([tmp-id (in-list tmp-ids)]
+                         [obj (in-list arg-objs)]
+                         [ty (in-list doms*)])
+                (-filter ty (if obj obj (-id-path tmp-id)))))
+            ;; update the lexical environment with domain types
+            (define-values (env* _)
+              (env+props (lexical-env) dom-ty-props))
+            (cond
+              ;; should we be returning bottom? or a trivial function type?
+              [(not env*) -Bottom]
+              [else
+               (define updated-doms (for/list ([d (in-list doms*)])
+                                      (abstract-idents tmp-ids (type-update d env*))))
+               (define updated-rng (abstract-idents tmp-ids (type-update rng* env*)))
+               (make-arr updated-doms updated-rng rest drest kws dep?)])])))
      (make-Function new-arrs)]
     [_ f-type]))

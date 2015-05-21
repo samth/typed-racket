@@ -20,6 +20,8 @@
                                  LExp-coeffs
                                  LExp-coeff
                                  LExp-set-coeff
+                                 LExp-const
+                                 LExp-set-const
                                  LExp-scale
                                  LExp-add1
                                  LExp-minus
@@ -544,9 +546,30 @@
 (define (SLI->sexp s Path->sexp)
   (match s
     [(SLI: sys _)
-     (for/list ([lhs/rhs (in-set sys)])
-       (match-define (leq: lhs rhs) lhs/rhs)
-       `(,(LExp->sexp lhs Path->sexp) ≤ ,(LExp->sexp rhs Path->sexp)))]
+     (define-values (eqs leqs)
+       (for/fold ([eqs empty-leq-set]
+                  [leqs empty-leq-set])
+                 ([lhs/rhs (in-set sys)])
+         (define inv (leq (leq-rhs lhs/rhs) (leq-lhs lhs/rhs)))
+         (cond
+           [(set-member? leqs inv)
+            (values (set-add eqs lhs/rhs)
+                    (set-remove leqs inv))]
+           [(set-member? eqs inv)
+            (values eqs leqs)]
+           [else (values eqs (set-add leqs lhs/rhs))])))
+     
+     (append
+      (for/list ([lhs/rhs (in-set eqs)])
+        (match-define (leq: lhs rhs) lhs/rhs)
+        `(= ,(LExp->sexp lhs Path->sexp) ,(LExp->sexp rhs Path->sexp)))
+      (for/list ([lhs/rhs (in-set leqs)])
+        (match-define (leq: lhs rhs) lhs/rhs)
+        (cond
+          [(= 1 (LExp-const lhs))
+           `(< ,(LExp->sexp (LExp-set-const lhs 0) Path->sexp) ,(LExp->sexp rhs Path->sexp))]
+          [else
+           `(≤ ,(LExp->sexp lhs Path->sexp) ,(LExp->sexp rhs Path->sexp))])))]
     [_ (int-err "invalid SLI given to SLI->sexp: ~a" s)]))
 
 
