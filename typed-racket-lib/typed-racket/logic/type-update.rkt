@@ -119,8 +119,12 @@
             (define-values (env* _)
               (env+props (lexical-env) dom-ty-props))
             (cond
-              ;; should we be returning bottom? or a trivial function type?
-              [(not env*) -Bottom]
+              [(not env*) (make-arr (map (λ _ -Bottom) doms)
+                                    rng*
+                                    rest
+                                    drest
+                                    kws
+                                    dep?)]
               [else
                (define updated-doms (for/list ([d (in-list doms*)])
                                       (abstract-idents tmp-ids (type-update d env*))))
