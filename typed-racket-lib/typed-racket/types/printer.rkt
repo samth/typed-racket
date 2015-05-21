@@ -40,7 +40,7 @@
 ;; FIXME - currently broken
 (define print-poly-types? #t)
 ;; do we use simple type aliases in printing
-(define print-aliases #t)
+(define print-aliases #f)
 
 (define type-output-sexpr-tweaker (make-parameter values))
 (define print-complex-filters? (make-parameter #f))
@@ -49,7 +49,7 @@
 ;; interp. 0 -> don't expand
 ;;         1 -> expand one level, etc.
 ;;    +inf.0 -> expand always
-(define current-print-type-fuel (make-parameter 0))
+(define current-print-type-fuel (make-parameter +inf.0))
 
 ;; this parameter allows the printer to communicate unexpanded
 ;; type aliases to its clients, which is used to cue the user
@@ -317,7 +317,7 @@
        [(list) '(case->)]
        [(list a) (arr->sexp a)]
        [(and arrs (list a b ...))
-        (define cover (cover-case-lambda arrs))
+        (define cover (map arr->sexp arrs) #;(cover-case-lambda arrs))
         (if (> (length cover) 1)
             `(case-> ,@cover)
             (car cover))])]))
@@ -462,7 +462,9 @@
     [(Set: e) `(Setof ,(t->s e))]
     [(Evt: r) `(Evtof ,(t->s r))]
     [(Union: elems)
-     (define-values (covered remaining) (cover-union type ignored-names))
+     (define-values (covered remaining) 
+       (values '() elems)
+       #;(cover-union type ignored-names))
      (cons 'U (append covered (map t->s remaining)))]
     [(Pair: l r) `(Pairof ,(t->s l) ,(t->s r))]
     [(ListDots: dty dbound) `(List ,(t->s dty) ... ,dbound)]
