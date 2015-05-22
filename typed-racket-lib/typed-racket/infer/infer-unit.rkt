@@ -874,8 +874,14 @@
 ;; like infer, but T-var is the vararg type:
 (define (infer/vararg X Y S S-Objs T T-var R [expected #f])
   (define new-T (if T-var (extend S T T-var) T))
-  (and ((length S) . >= . (length T))
-       (infer X Y S new-T R expected #:objs S-Objs)))
+  ;(and ((length S) . >= . (length T))
+  ;    (infer X Y S new-T R expected #:objs S-Objs))
+  (define v
+    (and ((length S) . >= . (length T))
+         (infer X Y S new-T R expected #:objs S-Objs)))
+  (printf "<<INFER>>\nX: ~a\n Y: ~a\n S: ~a\n S-Objs: ~a\n T: ~a\n T-var: ~a\n R: ~a\n expected: ~a\nnew-T: ~a\n\n ==> ~a\n\n\n"
+          X Y S S-Objs T T-var R expected new-T v)
+  v)
 
 ;; like infer, but dotted-var is the bound on the ...
 ;; and T-dotted is the repeated type
