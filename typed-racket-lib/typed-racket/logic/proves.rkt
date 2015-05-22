@@ -9,7 +9,8 @@
          (logic prop-ops)
          (rep type-rep object-rep filter-rep rep-utils)
          (typecheck tc-subst tc-metafunctions)
-         (except-in "../types/abbrev.rkt" one-of/c))
+         (except-in "../types/abbrev.rkt" one-of/c)
+         (for-syntax racket/base))
 
 (lazy-require
  ("../types/remove-intersect.rkt" (overlap))
@@ -27,39 +28,90 @@
 (define (simple-proves axioms goal)
   (proves null empty-env axioms goal))
 
+(define-for-syntax (DEBUG)
+  #f)
+
+(define-syntax (LOG stx)
+  (if (DEBUG)
+      (syntax-case stx ()
+        [(_ args ...)
+         #'(printf args ...)])
+      #'(void)))
+
+(define-syntax (LOG! stx)
+  (if (DEBUG)
+      (syntax-case stx ()
+        [(_ args ...)
+         #'(begin args ...)])
+      #'(void)))
+
+(define-syntax (define-for-LOG stx)
+  (if (DEBUG)
+      (syntax-case stx ()
+        [(_ args ...)
+         #'(define args ...)])
+      #'(void)))
+
+(define-for-LOG DEPTH -1)
+(define-for-LOG (DIVE!) (set! DEPTH (add1 DEPTH)))
+(define-for-LOG (RISE!) (set! DEPTH (sub1 DEPTH)))
+
 (define/cond-contract (proves A env new-props goal)
   (c:-> any/c env? (listof Filter/c) Filter/c
         any/c)
+  (LOG! (DIVE!))
+
+  (LOG "proves(~a) START!\n A: ~a\n env: ~a\n new-props: ~a\n goal: ~a\n\n"
+       DEPTH A env new-props goal)
   
-  (let/ec exit*
-    (define (exit) (exit* A))
-    ;; combine the new props w/ the props already in the environment
-    (define-values (compound-props atoms slis)
-      (combine-props (apply append (map flatten-nested-props new-props)) 
-                     (env-props+SLIs env)
-                     exit))
-    
-    ;; update the environment based on all the known atoms
-    (define-values (env* new-exposed-props)
-      (for/fold ([Γ (replace-props env slis)]
-                 [new-props '()]) 
-                ([f (in-list atoms)])
-        (match f
-          [(or (? TypeFilter?) (? NotTypeFilter?))
-           (define-values (Γ* new-ps) (update-env/atom A Γ f exit))
-           (values Γ* (append new-ps new-props))]
-          [_ (values Γ new-props)])))
-    
-    (define goal* (apply -and (logical-reduce A env* goal)))
-    (define remaining-props (append new-exposed-props compound-props))
-    (cond
-      [(Top? goal*) A]
-      [else
-       ;; our Γ now has all the atomic facts fully updated in it and the goal has been
-       ;; simplified w/ this knowledge. Start reasoning about the complex 
-       ;; propositions (e.g. and/or), newly exposed propositions, etc...
-       ;; to see if we can prove the goal
-       (and (full-proves A env* remaining-props goal*) A)])))
+  (define v
+    (let/ec exit*
+      (define (exit) (exit* A))
+      ;; combine the new props w/ the props already in the environment
+      (define-values (compound-props atoms slis)
+        (combine-props (apply append (map flatten-nested-props new-props)) 
+                       (env-props+SLIs env)
+                       exit))
+
+      (LOG "proves(~a) combined props!\n compound-props: ~a\n atoms: ~a\n slis: ~a\n\n"
+           DEPTH compound-props atoms slis)
+      
+      ;; update the environment based on all the known atoms
+      (define-values (env* new-exposed-props)
+        (for/fold ([Γ (replace-props env slis)]
+                   [new-props '()]) 
+                  ([f (in-list atoms)])
+          (match f
+            [(or (? TypeFilter?) (? NotTypeFilter?))
+             (LOG "proves(~a) update-env/atom ...\n env: ~a\n f: ~a\n\n"
+            DEPTH env f)
+             (define-values (Γ* new-ps) (update-env/atom A Γ f exit))
+             (LOG "proves(~a) update-env/atom done!\n new-env: ~a\n new-props: ~a\n\n"
+                     DEPTH Γ* new-ps)
+             (values Γ* (append new-ps new-props))]
+            [_ (values Γ new-props)])))
+
+      (LOG "proves(~a) goal updating...\n goal: ~a\n\n"
+           DEPTH goal)
+      (define goal* (apply -and (logical-reduce A env* goal)))
+      (LOG "proves(~a) goal updated!\n new goal: ~a\n\n"
+           DEPTH goal*)
+      (define remaining-props (append new-exposed-props compound-props))
+      (cond
+        [(Top? goal*) A]
+        [else
+         ;; our Γ now has all the atomic facts fully updated in it and the goal has been
+         ;; simplified w/ this knowledge. Start reasoning about the complex 
+         ;; propositions (e.g. and/or), newly exposed propositions, etc...
+         ;; to see if we can prove the goal
+         (LOG "proves(~a) working with remaining props and goal!\n remaining props: ~a\n goal: ~a\n\n"
+              DEPTH remaining-props goal*)
+         (and (full-proves A env* remaining-props goal*) A)])))
+
+  (LOG "proves(~a) END! ~a\n\n"
+       DEPTH (and v #t))
+  (LOG! (RISE!))
+  v)
 
 ;;returns a list of the remaining goals to be proved
 ;; only proves based on type-env lookups
@@ -74,9 +126,15 @@
     [(Top:) null]
     
     [(or (? TypeFilter?) (? NotTypeFilter?))
-     (if (witnesses A env goal)
-         null
-         (list goal))]
+     (LOG "proves:logical-reduce(~a) will env witness atomic goal?\n env: ~a\n goal: ~a\n\n"
+          DEPTH env goal)
+     (define v
+       (if (witnesses A env goal)
+           null
+           (list goal)))
+     (LOG "proves:logical-reduce(~a) will env witness atomic goal? ~a\n\n"
+          DEPTH v)
+     v]
     
     [(? SLI? s)
      (if (SLIs-imply? (env-SLIs env) s)
@@ -248,12 +306,21 @@
 (define/cond-contract (update-env/atom A env prop [contra-env (λ _ #f)])
   (c:-> any/c env? atomic-prop? procedure?
         (values (c:or/c env? #f) (c:listof Filter?)))
+
+  (LOG "proves:update-env/atom(~a)\n A: ~a\n env: ~a\n prop: ~a\n\n"
+       DEPTH A env prop)
   
-  (match prop
-    [(? Top?) (values env '())]
-    [(? Bot?) (values (contra-env) '())]
-    [(TypeFilter: t o)
-     (update-env/type+ A env t o contra-env)]
-    [(NotTypeFilter: t o)
-     (update-env/type- A env t o contra-env)]
-    [_ (int-err "invalid update-env prop: ~a" prop)]))
+  (define-values (env* new-props)
+    (match prop
+      [(? Top?) (values env '())]
+      [(? Bot?) (values (contra-env) '())]
+      [(TypeFilter: t o)
+       (update-env/type+ A env t o contra-env)]
+      [(NotTypeFilter: t o)
+       (update-env/type- A env t o contra-env)]
+      [_ (int-err "invalid update-env prop: ~a" prop)]))
+
+  (LOG "proves:update-env/atom(~a)\n new env: ~a\n new props: ~a\n\n"
+       DEPTH env* new-props)
+
+  (values env* new-props))

@@ -39,10 +39,10 @@
 ;; FIXME - currently broken
 (define print-poly-types? #t)
 ;; do we use simple type aliases in printing
-(define print-aliases #t)
+(define print-aliases #f)
 ;; should we use subtype to better print unions?
 ;; (setting to #f very helpful for debugging infinite loops in subtype/proves/etc...)
-(define use-subtyping? #t)
+(define use-subtyping? #f)
 
 (define type-output-sexpr-tweaker (make-parameter values))
 (define print-complex-filters? (make-parameter #f))
