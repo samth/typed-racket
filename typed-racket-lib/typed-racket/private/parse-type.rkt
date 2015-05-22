@@ -447,6 +447,8 @@
   (parameterize ([current-orig-stx stx])
     (syntax-parse
         stx
+      [((~datum DB) [(~datum l) ln:exact-integer] [(~datum a) an:exact-integer])
+       (make-Path '() (list (syntax->datum #'ln) (syntax->datum #'an)))]
       [((~datum +) term:expr terms:expr ...)
        (let ([terms (map lexp-term (syntax->list #'(term terms ...)))])
          (apply -lexp terms))]
@@ -575,8 +577,11 @@
        (-pair (parse-type #'fst) (parse-type #'rst))]
       [(:Refine^ [x:id :colon^ t:non-keyword-ty] ps:expr ...)
        (define ids* (cons #'x ids))
-       (-irefine (abstract-ident #'x ((parse-type/ids ids*) #'t))
-                 (abstract-ident #'x (apply -and (stx-map (parse-prop/ids ids*) #'(ps ...)))))]
+       (define parsed-type
+         (-irefine (abstract-ident #'x ((parse-type/ids ids*) #'t))
+                   (abstract-ident #'x (apply -and (stx-map (parse-prop/ids ids*) #'(ps ...))))))
+       (printf "INPUT STX: ~a\n\n PARSED TYPE: ~a\n\n" stx parsed-type)
+       parsed-type]
       [(:Class^ e ...)
        (parse-class-type stx)]
       [(:Object^ e ...)

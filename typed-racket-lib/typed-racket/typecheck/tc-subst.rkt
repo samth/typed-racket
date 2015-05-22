@@ -39,7 +39,7 @@
   (for/fold ([v v]) ([t (in-list ts)] [arg (in-naturals)])
     (subst-type v (list 0 arg) (-arg-path arg) #t t)))
 
-(define (subst-result res x o polarity o-ty)
+(define (subst-result res x o polarity [o-ty Univ])
   (match res
     [(AnyValues: f)
      (make-AnyValues (subst-filter f x o polarity o-ty))]
@@ -71,8 +71,12 @@
 ;; For each name replaces all uses of it in res with the corresponding object.
 ;; This is used so that names do not escape the scope of their definitions
 (define (replace-names names+objects res)
-  (for/fold ([res res]) ([name/object (in-list names+objects)])
-    (subst-tc-results res (first name/object) (second name/object) #t Univ)))
+  (define r
+    (for/fold ([res res]) ([name/object (in-list names+objects)])
+      (subst-tc-results res (first name/object) (second name/object) #t Univ)))
+  (printf "replaced-names\n names/objs: ~a\n input res: ~a\n output res: ~a\n\n"
+          names+objects res r)
+  r)
 
 ;; Substitution of objects into a tc-results
 ;; This is a combination of all of thes substitions from the paper over the different parts of the

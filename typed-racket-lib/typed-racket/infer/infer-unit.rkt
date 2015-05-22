@@ -492,10 +492,10 @@
           ;; refinements are erased to their bound
           ;; TODO!!! We should use substitution to elim the
           ;; bound refinement variable!
-          [((Ref: x S _) T)
+          #;[((Ref: x S _) T)
            (cg S T obj)]
 
-          [(S (Ref: x T _))
+          #;[(S (Ref: x T _))
            (cg S T obj)]
 
           [((Refinement: S _) T)

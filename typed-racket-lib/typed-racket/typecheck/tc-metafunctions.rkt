@@ -24,7 +24,10 @@
     (if rest-id
         (cons (list rest-id -empty-obj) positional-arg-objects)
         positional-arg-objects))
-  (tc-results->values (replace-names arg-objects results)))
+  (define r (tc-results->values (replace-names arg-objects results)))
+  (printf "\n>>abstract-results\n results: ~a \n arg-names: ~a\n abstracted: ~a\n<<\n\n"
+          results arg-names r)
+  r #;(tc-results->values (replace-names arg-objects results)))
 
 (define (tc-results->values tc)
   (match (fix-results tc)

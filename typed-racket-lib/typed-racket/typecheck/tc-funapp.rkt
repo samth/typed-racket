@@ -47,23 +47,30 @@
   (for/list ([dom (in-list doms)])
     (for/fold ([dom dom])
               ([(obj arg-num) (in-indexed (in-list objs))])
-      (if (Empty? obj)
-          dom
-          (subst-type dom (list 0 arg-num) obj #t)))))
+      (subst-type dom
+                  (list 0 arg-num)
+                  (if (non-empty-obj? obj)
+                      obj
+                      (-id-path (genid)))
+                  #t))))
 
-(define (unabstract-rng/arg-objs rng objs ts)
+(define (unabstract-rng/arg-objs rng objs)
   ;;TODO(AMK) if would be nice to do this subst in one pass with
   ;; a multi-substitution instead of repeaded single substitutions
   (for/fold ([rng rng])
-            ([(obj arg-num) (in-indexed (in-list objs))]
-             [t (in-list ts)])
-    (if (Empty? obj)
-        rng
-        (subst-result rng (list 0 arg-num) obj #t t))))
+            ([(obj arg-num) (in-indexed (in-list objs))])
+    (subst-result rng
+                  (list 0 arg-num)
+                  (if (non-empty-obj? obj)
+                      obj
+                      (-id-path (genid)))
+                  #t)))
 
 (define (tc/funapp f-stx args-stx f-type* args-res expected)
   (match-define (list (tc-result1: argtys _ argobjs) ...) args-res)
   (define f-type (update-function/arg-types args-res f-type*))
+  (printf "CHECKING tc/funapp! ~a applied to ~a \n function type: ~a\n arg types: ~a\n expected: ~a\n\n"
+          f-stx args-stx f-type args-res expected)
   (match f-type
     ;; we special-case this (no case-lambda) for improved error messages
     ;; tc/funapp1 currently cannot handle drest arities
@@ -107,14 +114,16 @@
              fixed-vars dotted-var argtys dom (car drest) rng (fv rng)
              #:expected (and expected (tc-results->values expected)))]
            [rest
-            (let ([doms (unabstract-doms/arg-objs dom argobjs)])
+            (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
+                   [dom* (unabstract-doms/arg-objs dom argobjs)]
+                   [rng* (unabstract-rng/arg-objs rng argobjs)])
               (infer/vararg fixed-vars
                             (list dotted-var)
                             argtys
                             argobjs
-                            (unabstract-doms/arg-objs dom argobjs)
+                            dom*
                             rest
-                            (unabstract-rng/arg-objs rng argobjs doms)
+                            rng*
                             (and expected (tc-results->values expected))))]
            ;; no rest or drest
            [else
@@ -134,14 +143,16 @@
       ;; in filters/objects).
       (λ (dom rng rest kw? a)
         (extend-tvars vars
-         (let ([doms (unabstract-doms/arg-objs dom argobjs)])
+         (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
+                [dom* (unabstract-doms/arg-objs dom argobjs)]
+                [rng* (unabstract-rng/arg-objs rng argobjs)])
            (infer/vararg vars
                          null
                          argtys
                          argobjs
-                         doms
+                         dom*
                          rest
-                         (unabstract-rng/arg-objs rng argobjs doms)
+                         rng*
                          (and expected (tc-results->values expected))))))
       f-type args-res expected)]
     ;; Row polymorphism. For now we do really dumb inference that only works

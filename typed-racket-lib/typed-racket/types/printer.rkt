@@ -39,7 +39,7 @@
 ;; FIXME - currently broken
 (define print-poly-types? #t)
 ;; do we use simple type aliases in printing
-(define print-aliases #f)
+(define print-aliases #t)
 ;; should we use subtype to better print unions?
 ;; (setting to #f very helpful for debugging infinite loops in subtype/proves/etc...)
 (define use-subtyping? #f)
@@ -149,7 +149,7 @@
 (define (id->sexp id)
   (match id
     [(? identifier?) (syntax->datum id)]
-    [(list lvl argn) `(DB: ,lvl ,argn)]
+    [(list lvl argn) `(DB [l ,lvl] [a ,argn])]
     [_ `(unknown-id ,id)]))
 
 ;; object->sexp : Object -> S-expression
