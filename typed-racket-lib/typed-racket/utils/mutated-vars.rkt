@@ -2,6 +2,13 @@
 
 (require racket/pretty racket/dict syntax/parse syntax/id-table unstable/sequence)
 
+(define-syntax-class simple
+  #:literal-sets (kernel-literals)
+  [pattern _:id]
+  [pattern (quote _)]
+  [pattern (#%plain-lambda . _)]
+  [pattern (case-lambda . _)])
+
 ;; find and add to mapping all the set!'ed variables in form
 ;; if the supplied mapping is mutable, mutates it
 ;; default is immutability
@@ -9,7 +16,7 @@
 (define (find-mutated-vars form
                            [tbl (make-immutable-free-id-table)]
                            [pred #f])
-  (pretty-print (syntax->datum form))
+  ;(pretty-print (syntax->datum form))
   (define add (if (dict-mutable? tbl)
                   (lambda (t i) (dict-set! t i #t) t)
                   (lambda (t i) (dict-set t i #t))))
@@ -49,10 +56,10 @@
       [(if . es) (fmv/list #'es)]
       [(with-continuation-mark . es) (fmv/list #'es)]
       [(let-values ([_ e] ...) b ...) (fmv/list #'(b ... e ...))]
-      [(letrec-values ([(v ...) e] ...) b ...)
-       (add-list (fmv/list #'(b ... e ...)) (syntax->list #'(v ... ...)))]
-      [(letrec-syntaxes+values _ ([(v ...) e] ...) b ...)
-       (add-list (fmv/list #'(b ... e ...)) (syntax->list #'(v ... ...)))]
+      [(letrec-values ([(v ...) e:simple] ... [(v2 ...) e2] ...) b ...)
+       (add-list (fmv/list #'(b ... e2 ... e ...)) (syntax->list #'(v2 ... ...)))]
+      [(letrec-syntaxes+values _ ([(v ...) e:simple] ... [(v2 ...) e2] ...) b ...)
+       (add-list (fmv/list #'(b ... e2 ... e ...)) (syntax->list #'(v2 ... ...)))]
       [(#%plain-module-begin . forms) (fmv/list #'forms)]
       ;; all the other forms don't have any expression subforms (like #%top)
       [_ tbl])))
