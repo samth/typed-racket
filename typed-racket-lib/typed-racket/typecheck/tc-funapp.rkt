@@ -69,8 +69,6 @@
 (define (tc/funapp f-stx args-stx f-type* args-res expected)
   (match-define (list (tc-result1: argtys _ argobjs) ...) args-res)
   (define f-type (update-function/arg-types args-res f-type*))
-  (printf "CHECKING tc/funapp! ~a applied to ~a \n function type: ~a\n arg types: ~a\n expected: ~a\n\n"
-          f-stx args-stx f-type args-res expected)
   (match f-type
     ;; we special-case this (no case-lambda) for improved error messages
     ;; tc/funapp1 currently cannot handle drest arities

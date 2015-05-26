@@ -5,7 +5,7 @@
          (except-in racket/contract ->* -> )
          (prefix-in c: (contract-req))
          (utils tc-utils)
-         (env lookup type-env-structs)
+         (env lexical-env lookup type-env-structs)
          (logic prop-ops)
          (rep type-rep object-rep filter-rep rep-utils)
          (typecheck tc-subst tc-metafunctions)
@@ -132,8 +132,8 @@
        (if (witnesses A env goal)
            null
            (list goal)))
-     (LOG "proves:logical-reduce(~a) will env witness atomic goal? ~a\n\n"
-          DEPTH v)
+     (LOG "proves:logical-reduce(~a) witness atomic goal: ~a\n\n"
+          DEPTH (null? v))
      v]
     
     [(? SLI? s)
@@ -201,15 +201,19 @@
      (let ([x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))]
            [x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom))]
            [goal-x-ty- (path-type π ft)])
-       (or (subtype goal-x-ty- x-ty- #:A A #:env env #:obj o)
-           (not (overlap x-ty+ goal-x-ty-))))]
+       (with-lexical-env
+        env
+        (or (subtype goal-x-ty- x-ty- #:A A #:env env #:obj o)
+            (not (overlap x-ty+ goal-x-ty-)))))]
     
     ;;TODO(amk) These should take into account the ranges
     ;; implied by the integer numeric-type when possible
     [(TypeFilter: ft (? LExp? l))
      (subtype ft (integer-type) #:A A #:env env #:obj l)]
     [(NotTypeFilter: ft (? LExp? l))
-     (not (overlap (integer-type) ft))]
+     (with-lexical-env
+      env
+      (not (overlap (integer-type) ft)))]
     [_ (int-err "invalid witnesses goal ~a" goal)]))
 
 
@@ -235,8 +239,10 @@
     [(Path: π x)
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ)))
      (define x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom)))
-     (define new-x-ty+ (update (update x-ty+ t #t π) x-ty- #f null))
-     (define new-x-ty- (update-negative-type new-x-ty+ x-ty-))
+     (define new-x-ty+
+       (with-lexical-env env (update (update x-ty+ t #t π) x-ty- #f null)))
+     (define new-x-ty-
+       (with-lexical-env env (update-negative-type new-x-ty+ x-ty-)))
      (cond
        [(Bottom? new-x-ty+)
         (values (contra-env) '())]
@@ -253,7 +259,7 @@
                      '())])])]
     [(? LExp?)
      ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
-     (if (not (overlap (integer-type) t))
+     (if (with-lexical-env env (not (overlap (integer-type) t)))
          (values (contra-env) '())
          (values env '()))]))
 
@@ -263,9 +269,11 @@
   (match o
     [(Path: π x)
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))) ;; x is of type T
-     (define new-x-ty+ (update x-ty+ t #f π)) ;; combine new type-, x is now of type T'
+     (define new-x-ty+
+       (with-lexical-env env (update x-ty+ t #f π))) ;; combine new type-, x is now of type T'
      (define x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom))) ;; env says x is not of type T-
-     (define new-x-ty- (update-negative-type new-x-ty+ (Un x-ty- (unpath-type π t Bottom))))
+     (define new-x-ty-
+       (with-lexical-env env (update-negative-type new-x-ty+ (Un x-ty- (unpath-type π t Bottom)))))
      (cond
        [(Bottom? new-x-ty+)
         (values (contra-env) '())]

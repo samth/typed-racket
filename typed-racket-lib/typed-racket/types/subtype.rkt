@@ -314,18 +314,20 @@
 (define bottom-key (Rep-seq -Bottom))
 (define top-key (Rep-seq Univ))
 
-(define DEPTH -1)
-(define (DIVE!) (set! DEPTH (add1 DEPTH)))
-(define (RISE!) (set! DEPTH (sub1 DEPTH)))
+(define-for-syntax (DEBUG)
+  #f)
+
+(define-syntax (LOG stx)
+  (if (DEBUG)
+      (syntax-case stx ()
+        [(_ args ...)
+         #'(printf args ...)])
+      #'(void)))
 
 ;; the algorithm for recursive types transcribed directly from TAPL, pg 305
 ;; List[(cons Number Number)] type type -> List[(cons Number Number)] or #f
 ;; is s a subtype of t, taking into account previously seen pairs A
 (define (subtype* A s t env obj)
-  ;(DIVE!)
-  #;(when (> DEPTH 30)
-    (printf "subtype(~a)!\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n"
-            DEPTH A s t env obj))
   (define ss (unsafe-Rep-seq s))
   (define st (unsafe-Rep-seq t))
   (early-return
@@ -361,6 +363,8 @@
             ;; this not only sets the correct environment, but will
             ;; turn caching off (when env is non-#f after checking subtype)
             (when (not env) (set! env (lexical-env)))
+            (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n"
+                 A s t env obj)
             (proves A0
                     env
                     (list (-filter (subst-type x-t x obj #t) obj)
@@ -374,6 +378,8 @@
             ;; this not only sets the correct environment, but will
             ;; turn caching off (when env is non-#f after checking subtype)
             (when (not env) (set! env (lexical-env)))
+            (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n"
+                 A s t env obj)
             (proves A0
                     env
                     (list (-filter sub-t obj)) 
@@ -817,7 +823,6 @@
    ;; TODO(amk) fix! caching must include env =(
    (when (and (null? A) (not env) (not obj))
      (hash-set! subtype-cache (cons ss st) r))
-   ;(RISE!)
    r))
 
 (define (type-compare? a b #:env [env #f] #:obj [obj #f])

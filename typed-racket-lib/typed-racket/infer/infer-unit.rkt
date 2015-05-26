@@ -10,7 +10,7 @@
 (require "../utils/utils.rkt"
          (except-in
           (combine-in
-           (utils tc-utils)
+           (utils tc-utils substitution)
            (rep free-variance type-rep filter-rep object-rep rep-utils)
            (types utils abbrev numeric-tower union subtype resolve
                   substitute generalize prefab)
@@ -489,16 +489,17 @@
           [((ListSeq: s-seq) (ListSeq: t-seq))
            (cgen/seq context s-seq t-seq)]
 
+
+          [((Ref: x S* _) T)
+           #:when (subtype (subst-type S* x (if (non-empty-obj? obj) obj -empty-obj) #t)
+                           S #:obj obj)
+           (cg (subst-type S* x obj #t) T obj)]
+
+          [(S (Ref: x T* _))
+           #:when (subtype (subst-type T* x (if (non-empty-obj? obj) obj -empty-obj) #t) T #:obj obj)
+           (cg S (subst-type T* x obj #t) obj)]
+          
           ;; refinements are erased to their bound
-          ;; TODO!!! We should use substitution to elim the
-          ;; bound refinement variable!
-          [((Ref: x S _) T)
-           (cg S T obj)]
-
-          [(S (Ref: x T* _)) #:when (subtype T* T #:obj obj) ;; TODO SUBST
-           (cg S T obj)
-           #;(cg/inv S T obj)]
-
           [((Refinement: S _) T)
            (cg S T obj)]
 

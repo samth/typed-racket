@@ -87,7 +87,7 @@
             (define arg-ts* (for/list ([t (in-list arg-ts)]
                                        [a (in-list args*)]
                                        [dom-t (in-list doms)])
-                              (or t (tc-expr/check a dom-t))))
+                              (or t (tc-expr/check a (ret dom-t)))))
             arg-ts*]
            [(Function: (? has-drest/filter?))
             (map single-value args*)]

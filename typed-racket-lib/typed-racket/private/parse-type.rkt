@@ -577,11 +577,8 @@
        (-pair (parse-type #'fst) (parse-type #'rst))]
       [(:Refine^ [x:id :colon^ t:non-keyword-ty] ps:expr ...)
        (define ids* (cons #'x ids))
-       (define parsed-type
-         (-irefine (abstract-ident #'x ((parse-type/ids ids*) #'t))
-                   (abstract-ident #'x (apply -and (stx-map (parse-prop/ids ids*) #'(ps ...))))))
-       (printf "INPUT STX: ~a\n\n PARSED TYPE: ~a\n\n" stx parsed-type)
-       parsed-type]
+       (-irefine (abstract-ident #'x ((parse-type/ids ids*) #'t))
+                 (abstract-ident #'x (apply -and (stx-map (parse-prop/ids ids*) #'(ps ...)))))]
       [(:Class^ e ...)
        (parse-class-type stx)]
       [(:Object^ e ...)

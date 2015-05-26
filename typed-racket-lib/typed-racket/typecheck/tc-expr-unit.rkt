@@ -77,7 +77,7 @@
       (int-err "bad form input to tc-expr: ~a" form))
     ;; typecheck form
     (define t (tc-expr/check/internal form expected))
-    (printf "TC DONE!\nSTX: ~a\nTYPE: ~a\nEXPD: ~a\n\n" form t expected)
+    ;(printf "TC DONE!\nSTX: ~a\nTYPE: ~a\nEXPD: ~a\n\n" form t expected)
     (add-typeof-expr form t)
     (cond-check-below t expected)))
 
