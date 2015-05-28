@@ -39,7 +39,7 @@
                      [Mu:* Mu:]
                      [Ref:* Ref:]
                      [Ref: InstdRef:]
-                     [*Ref make-InstdRef]
+                     [IRef* make-InstdRef]
                      [Poly:* Poly:]
                      [PolyDots:* PolyDots:]
                      [PolyRow:* PolyRow:]
@@ -1027,15 +1027,26 @@
       [(_ name-pat) #'(Name: name-pat _ #t)])))
 
 (def-type Ref ([type Type/c]
-               [prop Filter/c]) #:no-provide
+               [prop (and/c Filter/c
+                            (not/c Top?)
+                            (not/c Bot?))]) #:no-provide
   [#:frees (λ (f) (combine-frees (list (f type) 
                                        (f prop))))] ;; TODO(AMK) remove id??
-  [#:fold-rhs (*Ref (type-rec-id type) (filter-rec-id prop))])
+  [#:fold-rhs (IRef* (type-rec-id type) (filter-rec-id prop))])
 
 ;; the 'smart' constructor
 ;; identifier -> Type/c -> Filter/c -> Type/c
+(define (IRef* t p)
+  (cond
+    [(Top? p) t]
+    [(Bot? p) (Un)]
+    [(Bottom? t) t]
+    [else (*Ref  t p)]))
+
 (define (Ref* id type prop)
-  (*Ref (abstract-ident id type) (abstract-ident id prop)))
+  (define t (abstract-ident id type))
+  (define p (abstract-ident id prop))
+  (IRef* t p))
 
 ;; the 'smart' destructor
 ;; identifier -> Ref? -> Type/c
@@ -1048,12 +1059,24 @@
   (match-let ([(Ref: _ p) r])
     (instantiate-ident id p)))
 
+(define freshid
+  (let ([counter -1]
+        [var 'z])
+    (λ ()
+      (begin (match var
+               ['x (set! var 'y)]
+               ['y (set! var 'z)]
+               ['z (set! counter (add1 counter))
+                   (set! var 'x)])
+             (string->unreadable-symbol
+              (format "~a.~a" var counter))))))
+
 (define-match-expander Ref:*
   (lambda (stx)
     (syntax-case stx ()
       [(_ x t p)
        #'(? Ref?
-            (app (lambda (ref) (let ([id (datum->syntax #f (gensym))])
+            (app (lambda (ref) (let ([id (datum->syntax #f (freshid))])
                                  (list id (Ref-type* id ref) (Ref-prop* id ref))))
                  (list x t p)))])))
 

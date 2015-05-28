@@ -30,7 +30,7 @@
                (let ([substitution (infer vars ... a)])
                  (and substitution
                       (tc/funapp1 f-stx args-stx (subst-all substitution a)
-                                  args-res expected #:check #f))))
+                                  args-res expected #:check #f)))) ;; TODO(AMK) was #f...
              (poly-fail f-stx args-stx t args-res
                         #:name (and (identifier? f-stx) f-stx)
                         #:expected expected))))]))

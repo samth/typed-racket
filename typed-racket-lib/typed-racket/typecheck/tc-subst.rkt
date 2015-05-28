@@ -54,14 +54,13 @@
              (subst-object obj x o polarity))))]
     [(Results: ts fsets objs dty dbound)
      (make-ValuesDots
-      (make-Values
-       (map -result
-            (for/list ([t (in-list ts)])
-              (subst-type t x o polarity))
-            (for/list ([fset (in-list fsets)])
-              (subst-filter-set fset x o polarity o-ty))
-            (for/list ([obj (in-list objs)])
-              (subst-object obj x o polarity))))
+      (map -result
+           (for/list ([t (in-list ts)])
+             (subst-type t x o polarity))
+           (for/list ([fset (in-list fsets)])
+             (subst-filter-set fset x o polarity o-ty))
+           (for/list ([obj (in-list objs)])
+             (subst-object obj x o polarity)))
       (subst-type dty x o polarity)
       dbound)]
     [_ (int-err "non-result given to subst-result! ~a" res)]))

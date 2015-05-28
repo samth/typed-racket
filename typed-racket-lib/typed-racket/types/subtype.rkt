@@ -17,7 +17,7 @@
   ("../logic/proves.rkt" (proves))
   ("../logic/prop-ops.rkt" (extract-props-from-type))
   ("../typecheck/tc-envops.rkt" (env-extend-types))
-  ("../types/abbrev.rkt" (-car-of -cdr-of))
+  ("../types/abbrev.rkt" (-car-of -cdr-of -eqSLI))
   ; TODO(AMK) subst should not be in typecheck
   ("../typecheck/tc-subst.rkt" (subst-type subst-filter))
   ("filter-ops.rkt" (-and))
@@ -356,35 +356,31 @@
          [(_ (Error:)) A0]
          [((Error:) _) A0]
          [((Ref: x x-t x-p) super-t)
-          ;; only reason about *actual* objects
-          (let ([obj (if (non-empty-obj? obj)
-                         obj
-                         (new-obj))])
-            ;; this not only sets the correct environment, but will
-            ;; turn caching off (when env is non-#f after checking subtype)
-            (when (not env) (set! env (lexical-env)))
-            (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n"
-                 A s t env obj)
-            (proves A0
-                    env
-                    (list (-filter (subst-type x-t x obj #t) obj)
-                          (subst-filter x-p x obj #t))
-                    (-filter super-t obj)))]
+          (when (not env) (set! env (lexical-env)))
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n" A s t env obj)
+          (define obj* (cond
+                         [(LExp? obj) (new-obj)]
+                         [(non-empty-obj? obj) obj]
+                         [else (new-obj)]))
+          (define axioms (append
+                          (if (LExp? obj) (list (-eqSLI obj (-lexp (list 1 obj*)))) null)
+                          (list (-filter (subst-type x-t x obj* #t) obj*)
+                                (subst-filter x-p x obj* #t))))
+          (define goal (-filter super-t obj*))
+          (proves A0 env axioms goal)]
          [(sub-t (Ref: x x-t x-p))
-          ;; only reason about *actual* objects
-          (let ([obj (if (non-empty-obj? obj)
-                         obj
-                         (new-obj))])
-            ;; this not only sets the correct environment, but will
-            ;; turn caching off (when env is non-#f after checking subtype)
-            (when (not env) (set! env (lexical-env)))
-            (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n"
-                 A s t env obj)
-            (proves A0
-                    env
-                    (list (-filter sub-t obj)) 
-                    (-and (-filter (subst-type x-t x obj #t) obj)
-                          (subst-filter x-p x obj #t))))]
+          (when (not env) (set! env (lexical-env)))
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n" A s t env obj)
+          (define obj* (cond
+                         [(LExp? obj) (new-obj)]
+                         [(non-empty-obj? obj) obj]
+                         [else (new-obj)]))
+          (define axioms (append
+                          (if (LExp? obj) (list (-eqSLI obj (-lexp (list 1 obj*)))) null)
+                          (list (-filter sub-t obj*))))
+          (define goal (-and (-filter (subst-type x-t x obj* #t) obj*)
+                             (subst-filter x-p x obj* #t)))
+          (proves A0 env axioms goal)]
          ;; (Un) is bot
          [(_ (Union: (list))) #f]
          ;; value types

@@ -380,13 +380,31 @@
          [drest (dotted-end (car drest) (cdr drest))]
          [else (null-end)]))
 
-     (define s-seq (seq ss (rest->end s-rest s-drest)))
-     (define t-seq (seq ts (rest->end t-rest t-drest)))
-     (and (null? s-kws)
-          (null? t-kws)
-          (% cset-meet
-           (cgen context s t)
-           (cgen/seq context t-seq s-seq)))]))
+     #;(printf "cgen/arr 1 \ncontext: ~a\n ss: ~a\ns: ~a\nts: ~a\n t: ~a\n... \n\n"
+             context ss s ts t)
+     ;; remove 'free' de bruijn indices that can escape their context if they
+     ;; are bound to a type variable used outside of this function type
+     (let ([ss (for/list ([s (in-list ss)])
+                 (for/fold ([s s]) ([arg (in-range (length ss))])
+                   (subst-type s (list 0 arg) -empty-obj #t)))]
+           [ts (for/list ([t (in-list ts)])
+                 (for/fold ([t t]) ([arg (in-range (length ts))])
+                   (subst-type t (list 0 arg) -empty-obj #t)))]
+           [s (for/fold ([s s]) ([arg (in-range (length ss))])
+                (subst-result s (list 0 arg) -empty-obj #t))]
+           [t (for/fold ([t t]) ([arg (in-range (length ts))])
+                (subst-result t (list 0 arg) -empty-obj #t))])
+       #;(printf "--> cgen/arr 2 \ncontext: ~a\n ss: ~a\ns: ~a\nts: ~a\n t: ~a\n\n\n"
+               context ss s ts t)
+       (define s-seq (seq ss (rest->end s-rest s-drest)))
+       (define t-seq (seq ts (rest->end t-rest t-drest)))
+       (and (null? s-kws)
+            (null? t-kws)
+            (% cset-meet
+               (cgen context s t)
+               (cgen/seq context t-seq s-seq))))]))
+     
+     
 
 ;; TODO(AMK) fields obj support
 (define/cond-contract (cgen/flds context flds-s flds-t)
@@ -483,6 +501,7 @@
           ;; they're subtypes. easy.
           [(a b) 
            #:when (subtype a b #:obj obj)
+           ;(printf "CGEN SUBTYPE \n~a \n AND \n ~a\n@ ~a\n\n" a b obj)
            empty]
 
           ;; Lists delegate to sequences
@@ -491,13 +510,23 @@
 
 
           [((Ref: x S* _) T)
-           #:when (subtype (subst-type S* x (if (non-empty-obj? obj) obj -empty-obj) #t)
-                           S #:obj obj)
-           (cg (subst-type S* x obj #t) T obj)]
+           #:when (begin
+                    ;(printf "\nREF LOWER CHECK: ~a   --   ~a\n" S T)
+                    (subtype (subst-type S* x (if (non-empty-obj? obj) obj -empty-obj) #t)
+                           S #:obj obj))
+           (define v (cg (subst-type S* x obj #t) T obj))
+           ;(printf "\nREF LOWER cgen\nS: ~a\n\nT: ~a\n\nobj: ~a\n\n RESULT: ~a\n\n\n" S T obj v)
+           v]
 
           [(S (Ref: x T* _))
-           #:when (subtype (subst-type T* x (if (non-empty-obj? obj) obj -empty-obj) #t) T #:obj obj)
-           (cg S (subst-type T* x obj #t) obj)]
+           #:when (begin
+                    ;(printf "\nREF UPPER CHECK: ~a   --   ~a\n" S T)
+                    (subtype (subst-type T* x (if (non-empty-obj? obj) obj -empty-obj) #t)
+                             T
+                             #:obj obj))
+           (define v (cg S (subst-type T* x obj #t) obj))
+           ;(printf "\nREF UPPER cgen\nS: ~a\n\nT: ~a\n\nobj: ~a\n\n RESULT: ~a\n\n\n" S T obj v)
+           v]
           
           ;; refinements are erased to their bound
           [((Refinement: S _) T)
@@ -758,6 +787,8 @@
    . -> . (or/c #f substitution/c))
   (define var-hash (free-vars-hash (free-vars* R)))
   (define idx-hash (free-vars-hash (free-idxs* R)))
+  #;(printf "\nSUBST-CGEN \n <<C>>: ~a\n <<X>>: ~a\n <<Y>>: ~a\n <<R>>: ~a\n <<var-hash>>: ~a\n <<idx-hash>>: ~a\n"
+          C X Y R var-hash idx-hash)
   ;; c : Constaint
   ;; variance : Variance
   (define (constraint->type v variance)
@@ -790,27 +821,45 @@
                          ;; TODO figure out if there is a better subst here
                          [Invariant (i-subst null)]))))
      S))
+  ;(printf "\nSUBST-GEN> matching on (car (cset-maps C)) = ~a ...\n" (car (cset-maps C)))
   (match (car (cset-maps C))
     [(cons cmap (dmap dm))
      (let ([subst (hash-union
-                    (for/hash ([(k dc) (in-hash dm)])
-                      (define (c->t c) (constraint->type c (hash-ref idx-hash k Constant)))
-                      (values
-                        k
-                        (match dc
-                          [(dcon fixed #f)
-                           (i-subst (map c->t fixed))]
-                          [(or (dcon fixed rest) (dcon-exact fixed rest))
-                           (i-subst/starred
-                             (map c->t fixed)
-                             (c->t rest))]
-                          [(dcon-dotted fixed dc dbound)
-                           (i-subst/dotted
-                             (map c->t fixed)
-                             (c->t dc)
-                             dbound)])))
-                   (for/hash ([(k v) (in-hash cmap)])
-                     (values k (t-subst (constraint->type v (hash-ref var-hash k Constant))))))])
+                   (let ([h* (for/hash ([(k dc) (in-hash dm)])
+                               (define (c->t c) (constraint->type c (hash-ref idx-hash k Constant)))
+                               (values
+                                k
+                                (match dc
+                                  [(dcon fixed #f)
+                                   (define v (i-subst (map c->t fixed)))
+                                   #;(printf "\nSUBST-GEN> (dcon fixed #f) adding to new hash:   <~a , ~a>\n"
+                                           k v)
+                                   v]
+                                  [(or (dcon fixed rest) (dcon-exact fixed rest))
+                                   (define v (i-subst/starred
+                                              (map c->t fixed)
+                                              (c->t rest)))
+                                   #;(printf "\nSUBST-GEN> (or (dcon fixed rest) (dcon-exact fixed rest)) adding to new hash:   <~a , ~a>\n"
+                                           k v)
+                                   v]
+                                  [(dcon-dotted fixed dc dbound)
+                                   (define v (i-subst/dotted
+                                              (map c->t fixed)
+                                              (c->t dc)
+                                              dbound))
+                                   #;(printf "\nSUBST-GEN> (dcon-dotted fixed dc dbound) adding to new hash:   <~a , ~a>\n"
+                                           k v)
+                                   v])))])
+                     #;(printf "\nSUBST-GEN> NEW HASH1:\n  ~a\n" h*)
+                     h*)
+                   (let ([h* (for/hash ([(k v) (in-hash cmap)])
+                               (values k (let* ([t (constraint->type v (hash-ref var-hash k Constant))]
+                                                [t* (t-subst t)])
+                                           #;(printf "\nSUBST-GEN> constraint->type:\n  (constraint->type ~a ~a) --> ~a\nAND (t-subst ~a) --> ~a\n\n"
+                                                   v (hash-ref var-hash k Constant) t t t*)
+                                           t*)))])
+                     #;(printf "\nSUBST-GEN> NEW HASH2:\n  ~a\n" h*)
+                     h*))])
        ;; verify that we got all the important variables
        (and (for/and ([v (in-list X)])
               (let ([entry (hash-ref subst v #f)])
@@ -868,9 +917,12 @@
           (cgen ctx R expected)
           (empty-cset '() '())))
     (and expected-cset
-         (let* ([cs (cgen/list ctx S T #:expected-cset expected-cset #:objs objs)]
-                [cs* (% cset-meet cs expected-cset)])
-           (and cs* (if R (subst-gen cs* X Y R) #t)))))
+           (let* ([cs (cgen/list ctx S T #:expected-cset expected-cset #:objs objs)]
+                  [cs* (% cset-meet cs expected-cset)])
+             (define v (and cs* (if R (subst-gen cs* X Y R) #t)))
+             #;(printf "INFER\n <<X>>: ~a\n <<Y>>: ~a\n <<S>>: ~a\n <<T>>: ~a\n <<R>>: ~a\n <<expected>>: ~a\n <<objs>>: ~a\n <<expected-cset>>: ~a\n <<cs>>: ~a\n <<cs*>>: ~a\n <<subst-gen-result>>: ~a\n<<result!>>: ~a\n\n\n"
+                     X Y S T R expected objs expected-cset cs cs* (subst-gen cs* X Y R) v)
+             v)))
   ;(trace infer)
   infer)) ;to export a variable binding and not syntax
 
@@ -878,7 +930,7 @@
 (define (infer/vararg X Y S S-Objs T T-var R [expected #f])
   (define new-T (if T-var (extend S T T-var) T))
   (and ((length S) . >= . (length T))
-       (infer X Y S new-T R expected #:objs S-Objs)))
+         (infer X Y S new-T R expected #:objs S-Objs)))
 
 ;; like infer, but dotted-var is the bound on the ...
 ;; and T-dotted is the repeated type

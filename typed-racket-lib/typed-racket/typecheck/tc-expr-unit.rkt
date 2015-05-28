@@ -139,10 +139,11 @@
                      (-int-obj datum))
                 (ret t* -true-filter)))]
          [_
-          (let ([datum (syntax->datum #'val)])
+          (let ([datum (syntax->datum #'val)]
+                [t* (tc-literal #'val)])
             (if (exact-integer? datum)
-                (ret (tc-literal #'val) -true-filter (-int-obj datum))
-                (ret (tc-literal #'val) -true-filter)))])]
+                (ret (-int-eq-type t* datum) -true-filter (-int-obj datum))
+                (ret t* -true-filter)))])]
       ;; syntax
       [(quote-syntax datum)
        (define expected-type

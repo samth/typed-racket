@@ -827,7 +827,7 @@
         [tc-e (list 2 3 4) (-lst* -PosByte -PosByte -PosByte)]
         [tc-e (list 2 3 4 'a) (-lst* -PosByte -PosByte -PosByte (-val 'a))]
 
-        [tc-e `(1 2 ,(+ 3 4)) (-lst* -One -PosByte -PosIndex)]
+        [tc-e `(1 2 ,(+ 3 4)) (-lst* -One -PosByte (-int-eq-type -PosIndex 7))]
 
         [tc-e (let: ([x : Any 1])
                     (when (and (list? x) (not (null? x)))
@@ -926,7 +926,7 @@
         [tc-e/t (let* ([z 1]
                        [p? (lambda: ([x : Any]) (not (number? z)))])
                   (lambda: ([x : Any]) (if (p? x) x 12)))
-                (t:-> Univ (-int-eq-type -PosByte 12) : -true-filter : (-int-obj 12))]
+                (t:-> Univ (-int-eq-type  12) : -true-filter : (-int-obj 12))]
         [tc-e/t (let* ([z 1]
                        [p? (lambda: ([x : Any]) z)])
                   (lambda: ([x : Any]) (if (p? x) x 12)))
@@ -1086,7 +1086,8 @@
                   (define y 2)
                   (define z (+ x y))
                   (* x z))
-                -PosIndex]
+                -PosIndex
+                (-int-obj 3)]
 
         [tc-e/t (let ()
                   (define: (f [x : Number]) : Number
@@ -1095,7 +1096,7 @@
                         (+ z w)))
                     (g 4))
                   5)
-                -PosByte
+                (-int-eq-type -PosByte 5)
                 (-int-obj 5)]
 
         [tc-err (let ()
@@ -1109,13 +1110,13 @@
         [tc-e ((case-lambda:
                 [[x : Number *] (+ 1 (car x))])
                5)
-              -Number]
+              #:ret (ret -Number -true-filter -empty-obj)]
         [tc-e ((tr:case-lambda
                 [[x : Number *] (+ 1 (car x))])
                5)
-              -Number]
+              #:ret (ret -Number -true-filter -empty-obj)]
 
-        [tc-e `(4 ,@'(3)) (-pair -PosByte (-lst* -PosByte))]
+        [tc-e `(4 ,@'(3)) (-pair (-int-eq-type -PosByte 4) (-lst* -PosByte))]
 
         [tc-e
          (let ((x '(1 3 5 7 9)))
@@ -1126,7 +1127,9 @@
 
         [tc-e/t (if #f 1 'foo) (-val 'foo)]
 
-        [tc-e (list* 1 2 3) (-pair -One (-pair -PosByte -PosByte))]
+        [tc-e (list* 1 2 3) (-pair (-int-eq-type -One 1)
+                                   (-pair (-int-eq-type -PosByte 2)
+                                          (-int-eq-type -PosByte 3)))]
         [tc-err (list*)]
 
         [tc-err (apply append (list 1) (list 2) (list 3) (list (list 1) "foo"))]
@@ -2221,14 +2224,18 @@
         ;; can reference an identifier object in addition to
         ;; an integer object.
         [tc-e/t
-         (λ (x)
-           (define f
-             (ann (λ (y) (exact-integer? x))
-                  ;; note the filters
-                  (Any -> Boolean : #:+ (Integer @ x) #:- (! Integer @ x))))
-           (if (f 'dummy) (add1 x) 2))
-         (t:-> Univ -Integer : (-FS -top (-filter -Integer 0)))]
+         (let ()
+           (: foo (-> Any Integer : #:+ Top #:- (Integer @ 0)))
+           (define (foo x)
+             (define f
+               (ann (λ (y) (exact-integer? x))
+                    ;; note the filters
+                    (Any -> Boolean : #:+ (Integer @ x) #:- (! Integer @ x))))
+             (if (f 'dummy) (add1 x) 2))
+           (void))
+         -void]
 
+        
         ;; This test ensures that curried predicates have
         ;; the correct filters so that they can be used for
         ;; occurrence typing.
@@ -2381,15 +2388,15 @@
        ;; test functions which do lookup with the "wrong type", where the
        ;; result type shouldn't be widened to include that type
        [tc-e (memq 3 '(a b c))
-             #:ret (ret (t:Un (-val #f) (-lst (one-of/c 'a 'b 'c))) 
+             #:ret (ret (t:Un (-val #f) (-ne-lst (one-of/c 'a 'b 'c))) 
                         (-FS -bot (-not-filter (one-of/c 'a 'b 'c) (-int-obj 3))))]
        [tc-e (memv 3 '(a b c))
-             #:ret (ret (t:Un (-val #f) (-lst (one-of/c 'a 'b 'c))) 
+             #:ret (ret (t:Un (-val #f) (-ne-lst (one-of/c 'a 'b 'c))) 
                         (-FS -bot (-not-filter (one-of/c 'a 'b 'c) (-int-obj 3))))]
        [tc-e (member 3 '(a b c))
-             #:ret (ret (t:Un (-val #f) (-lst (one-of/c 'a 'b 'c)))
+             #:ret (ret (t:Un (-val #f) (-ne-lst (one-of/c 'a 'b 'c)))
                         (-FS -bot (-not-filter (one-of/c 'a 'b 'c) (-int-obj 3))))] ;; oddly specific? 
-       [tc-e (member 3 '(a b c) equal?) (t:Un (-val #f) (-lst (one-of/c 'a 'b 'c)))]
+       [tc-e (member 3 '(a b c) equal?) (t:Un (-val #f) (-ne-lst (one-of/c 'a 'b 'c)))]
        ;; (U False (Listof (U 'a 'b 'c))) (Bot | (! (U 'a 'b 'c) @ 3)) -)
        [tc-e (memf symbol? '(a b c)) (t:Un (-val #f) (-ne-lst (one-of/c 'a 'b 'c)))]
        [tc-e (assq 3 '((a . 5) (b . 7))) (t:Un (-val #f) (-pair (one-of/c 'a 'b) -PosByte))]
