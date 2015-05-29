@@ -113,7 +113,7 @@
        ;TODO(amk) punt for now! support later?
        (int-error "nope - not supported! Hey, who uncommented this!?")]
     
-    ;; default to Bottom (since this function supports claims about negative types
+    ;; default to specified fail-type (since this function supports claims about negative types
     ;; (at least it does right now...)
     [_ fail-type]))
 

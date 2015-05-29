@@ -926,7 +926,7 @@
         [tc-e/t (let* ([z 1]
                        [p? (lambda: ([x : Any]) (not (number? z)))])
                   (lambda: ([x : Any]) (if (p? x) x 12)))
-                (t:-> Univ (-int-eq-type  12) : -true-filter : (-int-obj 12))]
+                (t:-> Univ (-int-eq-type -PosByte 12) : -true-filter : (-int-obj 12))]
         [tc-e/t (let* ([z 1]
                        [p? (lambda: ([x : Any]) z)])
                   (lambda: ([x : Any]) (if (p? x) x 12)))
@@ -937,10 +937,10 @@
           #:ret (ret -Boolean -false-filter)]
 
         [tc-err ((lambda () 1) 2)
-          #:ret (ret (-val 1) -true-filter (-int-obj 1))]
+          #:ret (ret (-int-eq-type (-val 1) 1) -true-filter (-int-obj 1))]
         [tc-err (apply (lambda () 1) '(2))]
         [tc-err ((lambda: ([x : Any] [y : Any]) 1) 2)
-          #:ret (ret (-val 1) -true-filter (-int-obj 1))]
+          #:ret (ret (-int-eq-type (-val 1) 1) -true-filter (-int-obj 1))]
         [tc-err (map map '(2))]
         [tc-err ((plambda: (a) ([x : (a -> a)] [y : a]) (x y)) 5)]
         [tc-err ((plambda: (a) ([x : a] [y : a]) x) 5)]
@@ -995,7 +995,7 @@
         [tc-e/t (with-continuation-mark
                   ((inst make-continuation-mark-key Symbol)) 'mark
                   3)
-              -PosByte
+              (-int-eq-type -PosByte 3)
               (-int-obj 3)]
         [tc-err (with-continuation-mark (5 4) 1
                   3)]
@@ -1018,7 +1018,7 @@
               -Number]
         [tc-err (call-with-values (lambda () 1)
                                   (lambda: () 2))
-          #:ret (ret -PosByte -true-filter (-int-obj 2))]
+          #:ret (ret (-int-eq-type -PosByte 2) -true-filter (-int-obj 2))]
 
         [tc-err (call-with-values (lambda () (values 2))
                                   (lambda: ([x : Number] [y : Number]) (+ x y)))
@@ -1110,11 +1110,11 @@
         [tc-e ((case-lambda:
                 [[x : Number *] (+ 1 (car x))])
                5)
-              #:ret (ret -Number -true-filter -empty-obj)]
+              -Number]
         [tc-e ((tr:case-lambda
                 [[x : Number *] (+ 1 (car x))])
                5)
-              #:ret (ret -Number -true-filter -empty-obj)]
+              -Number]
 
         [tc-e `(4 ,@'(3)) (-pair (-int-eq-type -PosByte 4) (-lst* -PosByte))]
 

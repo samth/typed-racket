@@ -235,14 +235,19 @@
 (define/cond-contract (update-env/type+ A env t o contra-env)
   (c:-> any/c env? Type? Object? procedure?
         (values (c:or/c env? #f) (c:listof Filter?)))
+  ;(printf "update-env/type+ \n o: ~a\n t: ~a\n" o t)
   (match o
     [(Path: π x)
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ)))
+     ;(printf "update-env/type+ x-ty+: ~a\n" x-ty+)
      (define x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom)))
+     ;(printf "update-env/type+ x-ty-: ~a\n" x-ty-)
      (define new-x-ty+
-       (with-lexical-env env (update (update x-ty+ t #t π) x-ty- #f null)))
+       (with-lexical-env env (update (update x-ty+ (unpath-type π t Univ) #t '()) x-ty- #f null)))
+     ;(printf "update-env/type+ new-x-ty+: ~a\n" new-x-ty+)
      (define new-x-ty-
        (with-lexical-env env (update-negative-type new-x-ty+ x-ty-)))
+     ;(printf "update-env/type+ new-x-ty-: ~a\n" new-x-ty-)
      (cond
        [(Bottom? new-x-ty+)
         (values (contra-env) '())]

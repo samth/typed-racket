@@ -357,7 +357,6 @@
          [((Error:) _) A0]
          [((Ref: x x-t x-p) super-t)
           (when (not env) (set! env (lexical-env)))
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n" A s t env obj)
           (define obj* (cond
                          [(LExp? obj) (new-obj)]
                          [(non-empty-obj? obj) obj]
@@ -367,10 +366,11 @@
                           (list (-filter (subst-type x-t x obj* #t) obj*)
                                 (subst-filter x-p x obj* #t))))
           (define goal (-filter super-t obj*))
-          (proves A0 env axioms goal)]
+          (define v (proves A0 env axioms goal))
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n ---> ~a\n\n" A s t env obj v)
+          v]
          [(sub-t (Ref: x x-t x-p))
           (when (not env) (set! env (lexical-env)))
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n\n" A s t env obj)
           (define obj* (cond
                          [(LExp? obj) (new-obj)]
                          [(non-empty-obj? obj) obj]
@@ -380,7 +380,9 @@
                           (list (-filter sub-t obj*))))
           (define goal (-and (-filter (subst-type x-t x obj* #t) obj*)
                              (subst-filter x-p x obj* #t)))
-          (proves A0 env axioms goal)]
+          (define v (proves A0 env axioms goal))
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n ---> ~a\n\n" A s t env obj v)
+          v]
          ;; (Un) is bot
          [(_ (Union: (list))) #f]
          ;; value types
