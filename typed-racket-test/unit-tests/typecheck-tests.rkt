@@ -17,7 +17,7 @@
   (struct cross-phase-failure (message check-infos) #:prefab)
 
   (define no-arg (gensym 'no-arg))
-
+  
   (define (cross-phase-failure* message #:actual [actual no-arg] #:expected [expected no-arg])
     (cross-phase-failure
       message
@@ -34,7 +34,7 @@
     (submod ".." cross-phase-failure)
     typed-racket/utils/utils
     racket/base racket/match
-    (types tc-result printer)
+    (types tc-result printer abbrev)
     syntax/parse
     (for-template (only-in typed-racket/typed-racket do-standard-inits))
     (typecheck typechecker check-below tc-envops)
@@ -42,11 +42,21 @@
     (env lexical-env mvar-env))
   (provide
     test-literal test-literal/fail
-    test test/proc test/fail)
+    test test/proc test/fail -int-type)
 
 
   (do-standard-inits)
   (print-complex-filters? #t)
+
+  ;; -int-type: exact-integer? [Type?] -> Type?
+  ;; smart constructor for specific integers
+  (define (-int-type i [specific-type #f])
+    (cond
+      [(not (exact-integer? i))
+       (error '-int-type "given non exact integer! ~a" i)]
+      [specific-type
+       (-int-eq-type specific-type i)]
+      [else (-int-eq-type (tc-literal #`#,i) i)]))
   
   ;; tr-expand: syntax? -> syntax?
   ;; Expands out a form and annotates it with necesarry TR machinery.
@@ -354,49 +364,49 @@
                (if (pair? x)
                    (+ 1 (car x))
                    5))
-         -Number]
-        (tc-e/t 0 -Zero (-int-obj 0))
-        (tc-e/t 1 -One (-int-obj 1))
-        (tc-e/t (if (let ([y 12]) y) 3 4) -PosByte (-int-obj 3))
-        (tc-e/t 2 -PosByte (-int-obj 2))
-        (tc-e/t 3 -PosByte (-int-obj 3))
-        (tc-e/t 100 -PosByte (-int-obj 100))
-        (tc-e/t 255 -PosByte (-int-obj 255))
-        (tc-e/t 256 -PosIndex (-int-obj 256))
-        (tc-e/t -1 -NegFixnum (-int-obj -1))
-        (tc-e/t -100 -NegFixnum (-int-obj -100))
-        (tc-e/t 1000 -PosIndex (-int-obj 1000))
-        (tc-e/t 268435455 -PosIndex (-int-obj 268435455))
-        (tc-e/t -268435456 -NegFixnum (-int-obj -268435456))
-        (tc-e/t 268435456 -PosFixnum (-int-obj 268435456))
-        (tc-e/t -268435457 -NegFixnum (-int-obj -268435457))
-        (tc-e/t 1073741823 -PosFixnum (-int-obj 1073741823))
-        (tc-e/t -1073741824 -NegFixnum (-int-obj -1073741824))
-        (tc-e/t 1073741824 -PosInt (-int-obj 1073741824))
-        (tc-e/t -1073741825 -NegInt (-int-obj -1073741825))
+         (t:Un -Number (-int-type 5))]
+        (tc-e/t 0 (-int-type 0 -Zero) (-int-obj 0))
+        (tc-e/t 1 (-int-type 1 -One) (-int-obj 1))
+        (tc-e/t (if (let ([y 12]) y) 3 4) (-int-type 3 -PosByte) (-int-obj 3))
+        (tc-e/t 2 (-int-type 2 -PosByte) (-int-obj 2))
+        (tc-e/t 3 (-int-type 3 -PosByte) (-int-obj 3))
+        (tc-e/t 100 (-int-type 100 -PosByte) (-int-obj 100))
+        (tc-e/t 255 (-int-type 255 -PosByte) (-int-obj 255))
+        (tc-e/t 256 (-int-type 256 -PosIndex) (-int-obj 256))
+        (tc-e/t -1 (-int-type -1 -NegFixnum) (-int-obj -1))
+        (tc-e/t -100 (-int-type -100 -NegFixnum) (-int-obj -100))
+        (tc-e/t 1000 (-int-type 1000 -PosIndex) (-int-obj 1000))
+        (tc-e/t 268435455 (-int-type 268435455 -PosIndex) (-int-obj 268435455))
+        (tc-e/t -268435456 (-int-type -268435456 -NegFixnum) (-int-obj -268435456))
+        (tc-e/t 268435456 (-int-type 268435456 -PosFixnum) (-int-obj 268435456))
+        (tc-e/t -268435457 (-int-type -268435457 -NegFixnum) (-int-obj -268435457))
+        (tc-e/t 1073741823 (-int-type 1073741823 -PosFixnum) (-int-obj 1073741823))
+        (tc-e/t -1073741824 (-int-type -1073741824 -NegFixnum) (-int-obj -1073741824))
+        (tc-e/t 1073741824 (-int-type 1073741824 -PosInt) (-int-obj 1073741824))
+        (tc-e/t -1073741825 (-int-type -1073741825 -NegInt) (-int-obj -1073741825))
         (tc-e/t "foo" -String)
-        (tc-e/t (+ 3 4) (-int-eq-type -PosIndex 7) (-int-obj 7))
-        (tc-e/t (- 1) (-int-eq-type -NegFixnum -1) (-int-obj -1))
+        (tc-e/t (+ 3 4) (-int-type 7 -PosIndex) (-int-obj 7))
+        (tc-e/t (- 1) (-int-type -1) (-int-obj -1))
         (tc-e/t (- 1073741823)
-                (-int-eq-type -NegFixnum -1073741823)
+                (-int-type -1073741823)
               (-int-obj -1073741823))
         (tc-e/t (- -4)
-                (-int-eq-type -PosInt 4)
+                (-int-type 4 -PosInt)
                 (-int-obj 4)) 
         (tc-e/t (- (ann -5 Nonpositive-Fixnum))
-                (-int-eq-type -Nat 5)
+                (-int-type 5 -Nat)
                 (-int-obj 5))
         (tc-e/t 1152921504606846975
-                (-int-eq-type -PosInt 1152921504606846975)
+                (-int-type 1152921504606846975)
                 (-int-obj 1152921504606846975))
         (tc-e/t -1152921504606846975
-                (-int-eq-type -NegInt -1152921504606846975)
+                (-int-type -1152921504606846975)
                 (-int-obj -1152921504606846975))
         (tc-e/t (- 3253463567262345623)
-                (-int-eq-type -NegInt -3253463567262345623)
+                (-int-type -3253463567262345623)
                 (-int-obj -3253463567262345623))
         (tc-e/t (- -23524623547234734568)
-                (-int-eq-type -PosInt 23524623547234734568)
+                (-int-type 23524623547234734568)
                 (-int-obj 23524623547234734568))
         (tc-e (- 241.3) -NegFlonum)
         (tc-e (- -24.3) -PosFlonum)
@@ -405,22 +415,22 @@
         (tc-e (/ (ann 0 Nonnegative-Real) (ann 1 Nonnegative-Real)) -NonNegReal)
 
         (tc-e/t (- (ann 1000 Index) 1)
-                (-int-eq-type -Fixnum 999)
+                (-int-type 999 -Fixnum)
                 (-int-obj 999))
         (tc-e/t (- (ann 1000 Positive-Index) 1)
-                (-int-eq-type -Index 999)
+                (-int-type 999 -Index)
                 (-int-obj 999))
         (tc-e/t (- (ann 1000 Fixnum) 1)
-                (-int-eq-type -Int 999)
+                (-int-type 999 -Int)
                 (-int-obj 999))
         (tc-e/t (- (ann 1000 Nonnegative-Fixnum) 1)
-                (-int-eq-type -Fixnum 999)
+                (-int-type 999 -Fixnum)
                 (-int-obj 999))
         (tc-e/t (- (ann 1000 Positive-Fixnum) 1)
-                (-int-eq-type -NonNegFixnum 999)
+                (-int-type 999 -NonNegFixnum)
                 (-int-obj 999))
         (tc-e/t (- (ann 1000 Exact-Positive-Integer) 1)
-                (-int-eq-type -Nat 999)
+                (-int-type 999 -Nat)
                 (-int-obj 999))
 
         (tc-e (fx- (ann 1000 Index) 1) -Fixnum)
@@ -470,7 +480,7 @@
         (tc-e (extflexpt 0.00000000001t0 100000000000.0t0) -NonNegExtFlonum)
         (tc-e (extflexpt -2.0t0 -0.5t0) -ExtFlonum) ; NaN
         (tc-e/t (let-values ([(x y) (integer-sqrt/remainder 0)]) (+ x y))
-                (-int-eq-type -Zero 0)
+                (-int-type 0)
                 (-int-obj 0))
         (tc-e (tanh (ann 0 Nonnegative-Integer)) -NonNegReal)
         (tc-e (sinh (ann 0 Nonpositive-Integer)) -NonPosReal)
@@ -517,20 +527,20 @@
         (tc-err (let: ([z : 4611686018427387903 4611686018427387903]) z)) ; unsafe
         (tc-e/t (let: ([z : 4611686018427387904 4611686018427387904]) z) (-val 4611686018427387904))
 
-        [tc-e/t (lambda: () 3) (t:-> (-int-eq-type -PosByte 3)
+        [tc-e/t (lambda: () 3) (t:-> (-int-type 3)
                                      : -true-filter : (-int-obj 3))]
-        [tc-e/t (lambda: ([x : Number]) 3) (t:-> -Number (-int-eq-type -PosByte 3)
+        [tc-e/t (lambda: ([x : Number]) 3) (t:-> -Number (-int-type 3)
                                                  : -true-filter : (-int-obj 3))]
         [tc-e/t (lambda: ([x : Number] [y : Boolean]) 3)
-                (t:-> -Number -Boolean (-int-eq-type -PosByte 3)
+                (t:-> -Number -Boolean (-int-type 3)
                       : -true-filter : (-int-obj 3))]
-        [tc-e/t (lambda () 3) (t:-> (-int-eq-type -PosByte 3)
+        [tc-e/t (lambda () 3) (t:-> (-int-type 3)
                                     : -true-filter : (-int-obj 3))]
-        [tc-e (values 3 4) #:ret (ret (list (-int-eq-type -PosByte 3)
-                                            (-int-eq-type -PosByte 4))
+        [tc-e (values 3 4) #:ret (ret (list (-int-type 3)
+                                            (-int-type 4))
                                       (list -true-filter -true-filter)
                                       (list (-int-obj 3) (-int-obj 4)))]
-        [tc-e (cons 3 4) (-pair (-int-eq-type -PosByte 3) (-int-eq-type -PosByte 4))]
+        [tc-e (cons 3 4) (-pair (-int-type 3) (-int-type 4))] ;; TODO(AMK) should cons use the refinements?
         [tc-e (cons 3 (ann '() : (Listof Integer))) (make-Listof -Integer)]
         [tc-e (void) -Void]
         [tc-e (void 3 4) -Void]
@@ -574,14 +584,14 @@
                 (t:-> -Number -Number -Number)]
         [tc-e/t (let: ([x : Number 5]) x) -Number]
         [tc-e/t (let-values ([(x) 4]) (+ x 1))
-                (-int-eq-type -PosIndex 4)
+                (-int-type 5 -PosIndex)
                 (-int-obj 5)]
         [tc-e (let-values ([(x y) (values 3 #t)]) (and (= x 1) (not y)))
               #:ret (ret -Boolean -false-filter)]
-        [tc-e/t (values 3) (-int-eq-type -PosByte 3) (-int-obj 3)]
+        [tc-e/t (values 3) (-int-type 3) (-int-obj 3)]
         [tc-e (values) #:ret (ret null)]
         [tc-e (values 3 #f) #:ret
-              (ret (list (-int-eq-type -PosByte 3) (-val #f))
+              (ret (list (-int-type 3) (-val #f))
                    (list -true-filter -false-filter)
                    (list (-int-obj 3) -empty-obj))]
         [tc-e (map #{values @ Symbol} '(a b c)) (-pair -Symbol (make-Listof -Symbol))]
@@ -596,28 +606,28 @@
               -Number]
         [tc-e (let: ([v : Any 5])
                     (if (number? v) (+ v 1) 3))
-              -Number]
+              (t:Un -Number (-int-type 3))]
         [tc-e (let: ([v : Any #f])
                     (if (number? v) (+ v 1) 3))
-              -Number]
+              (t:Un -Number (-int-type 3))]
         [tc-e (let: ([v : (Un Number Boolean) #f])
                     (if (boolean? v) 5 (+ v 1)))
-              -Number]
+              (t:Un -Number (-int-type 5))]
         [tc-e (let: ([f : (Number Number -> Number) +]) (f 3 4)) -Number]
         [tc-e (let: ([+ : (Boolean -> Number) (lambda: ([x : Boolean]) 3)]) (+ #f)) -Number]
         [tc-e (when #f #t) -Void]
         [tc-e (when (number? #f) (+ 4 5)) -Void]
         [tc-e (let: ([x : (Un #f Number) 7])
                     (if x (+ x 1) 3))
-              -Number]
+              (t:Un -Number (-int-type 3))]
         [tc-e (let: ([x : Number 1])
                     (if (and (number? x) #t)
                         (+ x 4)
                         'bc))
               -Number]
         [tc-e/t (let: ((x : Number 3)) (if (boolean? x) (not x) #t)) (-val #t)]
-        [tc-e/t (begin 3) (-int-eq-type -PosByte 3) (-int-obj 3)]
-        [tc-e/t (begin #f 3) (-int-eq-type -PosByte 3) (-int-obj 3)]
+        [tc-e/t (begin 3) (-int-type 3) (-int-obj 3)]
+        [tc-e/t (begin #f 3) (-int-type 3) (-int-obj 3)]
         [tc-e/t (begin #t) (-val #t)]
         [tc-e/t (begin0 #t) (-val #t)]
         [tc-e/t (begin0 #t 3) (-val #t)]
@@ -625,14 +635,14 @@
         [tc-e #f #:ret (ret (-val #f) -false-filter)]
         [tc-e/t '#t (-val #t)]
         [tc-e '#f #:ret (ret (-val #f) -false-filter)]
-        [tc-e/t (if #f 'a 3) (-int-eq-type -PosByte 3) (-int-obj 3)]
+        [tc-e/t (if #f 'a 3) (-int-type 3) (-int-obj 3)]
         [tc-e/t (if #f #f #t) (t:Un (-val #t))]
         [tc-e (when #f 3) -Void]
         [tc-e/t '() -Null]
         [tc-e/t (let: ([x : (Listof Number) '(1)])
                       (cond [(pair? x) 1]
                             [(null? x) 1]))
-              -One
+              (-int-type 1)
               (-int-obj 1)]
         [tc-e/t (lambda: ([x : Number] . [y : Number *]) (car y))
                 (->* (list -Number) -Number -Number)]
@@ -668,14 +678,14 @@
                     (if (list? x)
                         (begin (car x) 1)
                         2))
-              -PosByte]
+              (t:Un (-int-type 1) (-int-type 2))]
 
 
         [tc-e (let: ([x : (U Number Boolean) 3])
                     (if (not (boolean? x))
                         (add1 x)
                         3))
-              -Number]
+              (t:Un -Number (-int-type 3))]
 
         [tc-e/t (let ([x 1]) x) -One (-int-obj 1)]
         [tc-e (let ([x 1]) (boolean? x)) #:ret (ret -Boolean -false-filter)]
@@ -688,7 +698,7 @@
                     (if (let ([z 1]) x)
                         (add1 x)
                         12))
-              -Number]
+              (t:Un -Number (-int-type 12))]
         [tc-err (5 4) #:msg "Cannot apply expression of type"]
         [tc-err (apply 5 '(2))]
         [tc-err (map (lambda: ([x : Any] [y : Any]) 1) '(1))]
@@ -698,7 +708,7 @@
                 (if (eq? x 1)
                     12
                     14))
-              -PosByte]
+              (t:Un (-int-type 12) (-int-type 14))]
 
         [tc-e (car (append (list 1 2) (list 3 4))) -PosByte]
 
@@ -827,7 +837,7 @@
         [tc-e (list 2 3 4) (-lst* -PosByte -PosByte -PosByte)]
         [tc-e (list 2 3 4 'a) (-lst* -PosByte -PosByte -PosByte (-val 'a))]
 
-        [tc-e `(1 2 ,(+ 3 4)) (-lst* -One -PosByte (-int-eq-type -PosIndex 7))]
+        [tc-e `(1 2 ,(+ 3 4)) (-lst* -One -PosByte (-int-type 7))]
 
         [tc-e (let: ([x : Any 1])
                     (when (and (list? x) (not (null? x)))
@@ -913,7 +923,7 @@
         [tc-e/t (let* ([z 1]
                        [p? (lambda: ([x : Any]) (number? z))])
                   (lambda: ([x : Any]) (if (p? x) 11 12)))
-                (t:-> Univ (-int-eq-type -PosByte 11) : -true-filter : (-int-obj 11))]
+                (t:-> Univ (-int-type 11) : -true-filter : (-int-obj 11))]
         [tc-e/t (let* ([z 1]
                        [p? (lambda: ([x : Any]) (number? z))])
                   (lambda: ([x : Any]) (if (p? x) x 12)))
@@ -926,7 +936,7 @@
         [tc-e/t (let* ([z 1]
                        [p? (lambda: ([x : Any]) (not (number? z)))])
                   (lambda: ([x : Any]) (if (p? x) x 12)))
-                (t:-> Univ (-int-eq-type -PosByte 12) : -true-filter : (-int-obj 12))]
+                (t:-> Univ (-int-type 12) : -true-filter : (-int-obj 12))]
         [tc-e/t (let* ([z 1]
                        [p? (lambda: ([x : Any]) z)])
                   (lambda: ([x : Any]) (if (p? x) x 12)))
@@ -937,10 +947,10 @@
           #:ret (ret -Boolean -false-filter)]
 
         [tc-err ((lambda () 1) 2)
-          #:ret (ret (-int-eq-type (-val 1) 1) -true-filter (-int-obj 1))]
+          #:ret (ret (-int-type 1) -true-filter (-int-obj 1))]
         [tc-err (apply (lambda () 1) '(2))]
         [tc-err ((lambda: ([x : Any] [y : Any]) 1) 2)
-          #:ret (ret (-int-eq-type (-val 1) 1) -true-filter (-int-obj 1))]
+          #:ret (ret (-int-type 1) -true-filter (-int-obj 1))]
         [tc-err (map map '(2))]
         [tc-err ((plambda: (a) ([x : (a -> a)] [y : a]) (x y)) 5)]
         [tc-err ((plambda: (a) ([x : a] [y : a]) x) 5)]
@@ -995,7 +1005,7 @@
         [tc-e/t (with-continuation-mark
                   ((inst make-continuation-mark-key Symbol)) 'mark
                   3)
-              (-int-eq-type -PosByte 3)
+              (-int-type 3)
               (-int-obj 3)]
         [tc-err (with-continuation-mark (5 4) 1
                   3)]
@@ -1018,7 +1028,7 @@
               -Number]
         [tc-err (call-with-values (lambda () 1)
                                   (lambda: () 2))
-          #:ret (ret (-int-eq-type -PosByte 2) -true-filter (-int-obj 2))]
+          #:ret (ret (-int-type 2) -true-filter (-int-obj 2))]
 
         [tc-err (call-with-values (lambda () (values 2))
                                   (lambda: ([x : Number] [y : Number]) (+ x y)))
@@ -1096,7 +1106,7 @@
                         (+ z w)))
                     (g 4))
                   5)
-                (-int-eq-type -PosByte 5)
+                (-int-type 5)
                 (-int-obj 5)]
 
         [tc-err (let ()
@@ -1116,7 +1126,7 @@
                5)
               -Number]
 
-        [tc-e `(4 ,@'(3)) (-pair (-int-eq-type -PosByte 4) (-lst* -PosByte))]
+        [tc-e `(4 ,@'(3)) (-pair (-int-type 4) (-lst* -PosByte))]
 
         [tc-e
          (let ((x '(1 3 5 7 9)))
@@ -1127,9 +1137,9 @@
 
         [tc-e/t (if #f 1 'foo) (-val 'foo)]
 
-        [tc-e (list* 1 2 3) (-pair (-int-eq-type -One 1)
-                                   (-pair (-int-eq-type -PosByte 2)
-                                          (-int-eq-type -PosByte 3)))]
+        [tc-e (list* 1 2 3) (-pair (-int-type 1)
+                                   (-pair (-int-type 2)
+                                          (-int-type 3)))]
         [tc-err (list*)]
 
         [tc-err (apply append (list 1) (list 2) (list 3) (list (list 1) "foo"))]
