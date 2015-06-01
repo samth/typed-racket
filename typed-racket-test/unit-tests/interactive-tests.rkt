@@ -142,8 +142,8 @@
 
     (test-form #rx"Positive-Index"
       (:print-type (+ 1 1)))
-    (test-form (regexp-quote "(values One One)")
-      (:print-type (values 1 1)))
+    (test-form (regexp-quote "(values String String)")
+      (:print-type (values "A" "B")))
     (test-form-exn #rx":print-type.*applied to arguments"
       :print-type)
     (test-form-exn #rx":print-type.*only valid at the top-level"

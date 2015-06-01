@@ -89,6 +89,7 @@
              (LOG "proves(~a) update-env/atom done!\n new-env: ~a\n new-props: ~a\n\n"
                      DEPTH Γ* new-ps)
              (values Γ* (append new-ps new-props))]
+            ;; [(SLI? sli) ] TODO(AMK) slis update types!
             [_ (values Γ new-props)])))
 
       (LOG "proves(~a) goal updating...\n goal: ~a\n\n"
@@ -195,15 +196,16 @@
   (match goal
     [(TypeFilter: ft (and o (Path: π x)))
      (let ([ty (lookup-id-type x env #:fail (λ (_) Univ))])
-       (subtype (path-type π ty) ft #:A A #:env env #:obj o))]
+       (subtype (path-type π ty) ft #:A A #:env (env-erase-type+ env x) #:obj o))]
     
     [(NotTypeFilter: ft (and o (Path: π x)))
      (let ([x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))]
            [x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom))]
-           [goal-x-ty- (path-type π ft)])
+           [goal-x-ty- (path-type π ft)]
+           [env* (env-erase-type+ env x)])
        (with-lexical-env
-        env
-        (or (subtype goal-x-ty- x-ty- #:A A #:env env #:obj o)
+        env*
+        (or (subtype goal-x-ty- x-ty- #:A A #:env env* #:obj o)
             (not (overlap x-ty+ goal-x-ty-)))))]
     
     ;;TODO(amk) These should take into account the ranges

@@ -51,11 +51,16 @@
 ;; uses the variable from `c1` (which must be the same as the one from
 ;; `c2`)
 (define (c-meet c1 c2 [var #f])
+  ;(printf "c-meet ~a ~a [var ~a]\n\n" c1 c2 var)
   (match*/early (c1 c2)
     [((struct c (S T)) (struct c (S* T*)))
      (let ([S (join S S*)] [T (meet T T*)])
-       (and (subtype S T)
+       ;(printf "inside c-meet... \n S: ~a\n T: ~a\n\n" S T)
+       (and (let ([v (subtype S T)])
+                ;(printf "subtype? ~a ~a --->  ~a\n\n" S T v)
+                v)
             (make-c S T)))]))
+
 
 ;; compute the meet of two constraint sets
 ;; returns #f for failure

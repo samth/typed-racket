@@ -356,19 +356,26 @@
          [(_ (Error:)) A0]
          [((Error:) _) A0]
          [((Ref: x x-t x-p) super-t)
-          (when (not env) (set! env (lexical-env)))
-          (define obj* (cond
-                         [(LExp? obj) (new-obj)]
-                         [(non-empty-obj? obj) obj]
-                         [else (new-obj)]))
-          (define axioms (append
-                          (if (LExp? obj) (list (-eqSLI obj (-lexp (list 1 obj*)))) null)
-                          (list (-filter (subst-type x-t x obj* #t) obj*)
-                                (subst-filter x-p x obj* #t))))
-          (define goal (-filter super-t obj*))
-          (define v (proves A0 env axioms goal))
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n ---> ~a\n\n" A s t env obj v)
-          v]
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n \n\n" A s t)
+          (cond
+            ;; quick yes, it's a refinement of the parent type
+            [(eq? (unsafe-Rep-seq x-t) st) A0]
+            ;; else methodically reason about what's going on
+            [else
+             (when (not env) (set! env (lexical-env)))
+             (define obj* (cond
+                            [(LExp? obj) (new-obj)]
+                            [(non-empty-obj? obj) obj]
+                            [else (new-obj)]))
+             (define axioms (append
+                             (if (LExp? obj) (list (-eqSLI obj (-lexp (list 1 obj*)))) null)
+                             (list (-filter (subst-type x-t x obj* #t) obj*)
+                                   (subst-filter x-p x obj* #t))))
+             (define goal (-filter super-t obj*))
+             (LOG "\n(-filter ~a ~a) --> ~a\n" super-t obj* goal)
+             (define v (proves A0 env axioms goal))
+             (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n ---> ~a\n\n" A s t env obj v)
+             v])]
          [(sub-t (Ref: x x-t x-p))
           (when (not env) (set! env (lexical-env)))
           (define obj* (cond
@@ -736,7 +743,7 @@
                        (filter-subtype* ff ff* env))]
          [((Result: t (FilterSet: ft ff) o) (Result: t* (FilterSet: ft* ff*) (Empty:)))
           (subtype-seq A0
-                       (subtype* t t* env obj)
+                       (subtype* t t* env (or obj (and (non-empty-obj? o) o)))
                        (filter-subtype* ft ft* env)
                        (filter-subtype* ff ff* env))]
          ;; subtyping on other stuff

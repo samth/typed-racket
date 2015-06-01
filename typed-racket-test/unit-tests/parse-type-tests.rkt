@@ -487,7 +487,7 @@
                                     (-lexp (list 3 (-cdr-of (-id-path x)))))))]
    [(Refine [v : (Vectorof Any)] (<= 0 (len v)))
     (-refine x (make-Vector Univ) (-SLI (-leq (-lexp 0)
-                                              (-lexp (list 3 (-len-of (-id-path x)))))))]
+                                              (-lexp (list 1 (-len-of (-id-path x)))))))]
    
    ;; unbound id
    [FAIL (Refine [x : Integer] (<= 0 (* y 1)))]

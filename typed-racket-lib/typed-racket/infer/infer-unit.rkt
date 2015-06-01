@@ -14,7 +14,7 @@
            (rep free-variance type-rep filter-rep object-rep rep-utils)
            (types utils abbrev numeric-tower union subtype resolve
                   substitute generalize prefab)
-           (env index-env tvar-env))
+           (env index-env tvar-env lexical-env))
           make-env -> ->* one-of/c)
          "constraint-structs.rkt"
          "signatures.rkt" "fail.rkt"
@@ -537,18 +537,25 @@
           ;; A single -Bottom in a Values means that there is no value returned and so any other
           ;; Values or ValuesDots should be above it.
           [((ValuesSeq: s-seq) (ValuesSeq: t-seq))
+           (LOG "!!!ValuesSeq!!!\n s-seq: ~a\n t-seq: ~a\n\n" S T)
            ;; Check for a substition that S is below (ret -Bottom).
            (define bottom-case
              (match S
                [(Values: (list (Result: s f-s o-s)))
-                (cg s -Bottom #f)] ;; is #f correct obj here?
+                (LOG "VALUES bottom case cg: \n   (cg ~a -Bottom ~a)\n\n" s o-s)
+                (cg s -Bottom o-s)] ;; is #f correct obj here?
                [else #f]))
            (define regular-case
              (cgen/seq context s-seq t-seq))
+           (LOG "VALUES bottom case: \n   ~a\n\n" bottom-case)
+           (LOG "VALUES regular case: \n   ~a\n\n" regular-case)
            ;; If we want the OR of the csets that the two cases return.
-           (cset-join
-             (filter values
-               (list bottom-case regular-case)))]
+           (define joined
+             (cset-join
+              (filter values
+                      (list bottom-case regular-case))))
+           (LOG "VALUES joined:\n   ~a\n\n" joined)
+           joined]
 
           ;; they're subtypes. easy.
           [(a b) 
@@ -559,10 +566,11 @@
 
           ;; Lists delegate to sequences
           [((ListSeq: s-seq) (ListSeq: t-seq))
+           (LOG "!!!LisSeq!!!\n")
            (cgen/seq context s-seq t-seq)]
 
 
-          [((Ref: x S* _) T)
+          #;[((Ref: x S* _) T)
            #:when (begin
                     (LOG "\nREF LOWER CHECK: ~a   --   ~a\n" S T)
                     (subtype (subst-type S* x (if (non-empty-obj? obj) obj -empty-obj) #t)
@@ -571,7 +579,7 @@
            (LOG "\nREF LOWER cgen\nS: ~a\n\nT: ~a\n\nobj: ~a\n\n RESULT: ~a\n\n\n" S T obj v)
            v]
 
-          [(S (Ref: x T* _))
+          #;[(S (Ref: x T* _))
            #:when (begin
                     (LOG "\nREF UPPER CHECK: ~a   --   ~a\n" S T)
                     (subtype (subst-type T* x (if (non-empty-obj? obj) obj -empty-obj) #t)
@@ -660,9 +668,11 @@
                (% cg (resolve-once S) (resolve-once T) obj))]
           ;; pairs are pointwise
           [((Pair: a b) (Pair: a* b*))
+           (LOG "cgen Pair! (~a ~a) (~a ~a)  @ ~a\n\n" a b a* b* obj)
            (% cset-meet (cg a a* (-car-of obj)) (cg b b* (-cdr-of obj)))]
           ;; sequences are covariant
           [((Sequence: ts) (Sequence: ts*))
+           (LOG "\n!!!Seq!!!\n")
            (cgen/list context ts ts*)]
           [((Listof: t) (Sequence: (list t*)))
            (cg t t* #f)]
@@ -934,16 +944,30 @@
    (#:expected-cset cset? #:objs (or/c #f (listof Object?)))
    . ->* .
    (or/c cset? #f))
-  (and (= (length S) (length T))
-       (% cset-meet*
-          (for/list/fail ([s (in-list S)] 
-                          [t (in-list T)]
-                          [o (in-list (or objs (build-list (length S) (λ _ #f))))])
-                         ;; We meet early to prune the csets to a reasonable size.
-                         ;; This weakens the inference a bit, but sometimes avoids
-                         ;; constraint explosion.
-                         (let ([cs (cgen context s t #:obj o)])
-                           (% cset-meet cs expected-cset))))))
+  (LOG "CALL cgen/list\n <<context>>: ~a\n <<S>>: ~a\n  <<T>>: ~a\n <<expected-cset>>: ~a\n <<objs>>: ~a\n\n"
+       context S T expected-cset objs)
+  (define v
+    (and (= (length S) (length T))
+         (% cset-meet*
+            (begin
+              (let ([css
+                     (for/list/fail ([s (in-list S)] 
+                                     [t (in-list T)]
+                                     [o (in-list (or objs (map (λ _ #f) S)))])
+                                    ;; We meet early to prune the csets to a reasonable size.
+                                    ;; This weakens the inference a bit, but sometimes avoids
+                                    ;; constraint explosion.
+                                    (let ([cs (cgen context s t #:obj o)])
+                                      (LOG "INNER CALL (cgen ~a ~a ~a #:obj ~a) \n --> \n ~a\n\n"
+                                              context s t o cs)
+                                      (define v (% cset-meet cs expected-cset))
+                                      (LOG "INNER CALL (% cset-meet ~a ~a) \n --> \n ~a\n\n"
+                                              cs expected-cset v)
+                                      v))])
+                (LOG "\ncset-meeting css: ~a\n\n" css)
+                css)))))
+  (LOG "cgen/list met to: ~a\n\n" v)
+  v)
 
 
 
@@ -964,18 +988,34 @@
      ((or/c #f Values/c AnyValues? ValuesDots?)
       #:objs (or/c #f (listof Object?)))
      . ->* . (or/c boolean? substitution/c))
+    (LOG "INFER\n <<env>>: ~a\n <<X>>: ~a\n <<Y>>: ~a\n <<S>>: ~a\n <<T>>: ~a\n <<R>>: ~a\n <<expected>>: ~a\n <<objs>>: ~a\n \n\n"
+                  (lexical-env) X Y S T R expected objs)
     (define ctx (context null X Y ))
     (define expected-cset
       (if expected
-          (cgen ctx R expected)
+          (match* (R expected)
+            [((Result: _ _ _) (Result: _ _ _))
+             (cgen ctx R expected)]
+            [((Result: t fs o) (? Type?))
+             (cgen ctx t expected #:obj (and (non-empty-obj? o) o))]
+            [(_ _) (cgen ctx R expected)])
           (empty-cset '() '())))
-    (and expected-cset
-           (let* ([cs (cgen/list ctx S T #:expected-cset expected-cset #:objs objs)]
+    (LOG "INFER\n <<env>>: ~a\n <<X>>: ~a\n <<Y>>: ~a\n <<S>>: ~a\n <<T>>: ~a\n <<R>>: ~a\n <<expected>>: ~a\n <<objs>>: ~a\n <<expected cs set>>: ~a\n\n\n"
+                  (lexical-env) X Y S T R expected objs expected-cset)
+    (define ret
+      (and expected-cset
+           (let* ([cs (begin
+                        (LOG "CALLING! (cgen/list ~a ~a ~a #:expected-cset ~a #:objs ~a)\n"
+                             ctx S T expected-cset objs)
+                        (cgen/list ctx S T #:expected-cset expected-cset #:objs objs))]
                   [cs* (% cset-meet cs expected-cset)])
              (define v (and cs* (if R (subst-gen cs* X Y R) #t)))
-             (LOG "INFER\n <<X>>: ~a\n <<Y>>: ~a\n <<S>>: ~a\n <<T>>: ~a\n <<R>>: ~a\n <<expected>>: ~a\n <<objs>>: ~a\n <<expected-cset>>: ~a\n <<cs>>: ~a\n <<cs*>>: ~a\n <<subst-gen-result>>: ~a\n<<result!>>: ~a\n\n\n"
-                     X Y S T R expected objs expected-cset cs cs* (subst-gen cs* X Y R) v)
+             (LOG "INFER\n <<env>>: ~a\n <<X>>: ~a\n <<Y>>: ~a\n <<S>>: ~a\n <<T>>: ~a\n <<R>>: ~a\n <<expected>>: ~a\n <<objs>>: ~a\n <<expected-cset>>: ~a\n <<cs>>: ~a\n <<cs*>>: ~a\n<<result!>>: ~a\n\n\n"
+                  (lexical-env) X Y S T R expected objs expected-cset cs cs* v)
              v)))
+    (LOG "INFER\n <<env>>: ~a\n <<X>>: ~a\n <<Y>>: ~a\n <<S>>: ~a\n <<T>>: ~a\n <<R>>: ~a\n <<expected>>: ~a\n <<objs>>: ~a\n <<expected-cset>>: ~a\n <<ret!>>: ~a\n\n\n"
+                  (lexical-env) X Y S T R expected objs expected-cset ret)
+    ret)
   ;(trace infer)
   infer)) ;to export a variable binding and not syntax
 

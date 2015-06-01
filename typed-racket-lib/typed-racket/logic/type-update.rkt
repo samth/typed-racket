@@ -21,6 +21,8 @@
 (provide type-update update-function/arg-types)
 
 (define (type-update ty env)
+  ;(define new-props '())
+  
   (define (do-type ty)
     (type-case
      (#:Type do-type #:Filter do-filter #:Object do-obj)

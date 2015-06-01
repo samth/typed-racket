@@ -50,8 +50,7 @@
     [((NotTypeFilter: t2 p) (TypeFilter: t1 p))
      (subtype t2 t1)]
     [((Top:) (Top:)) #t]
-    ;; TODO(amk) I'm not sure if this is worth the cost?
-    ;; [((? SLI? s1) (? SLI? s2)) (complementary-SLIs? s1 s2)]
+    [((? SLI? s1) (? SLI? s2)) (complementary-SLIs? s1 s2)]
     [(_ _) #f]))
 
 (define (name-ref=? a b)

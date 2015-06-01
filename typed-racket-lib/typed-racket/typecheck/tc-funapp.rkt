@@ -41,30 +41,28 @@
 ;; -- this allows type inference to more accurately reason about
 ;; subtyping information since the environment contains type information
 ;; only about realized objects (no DeBruijns)
-(define (unabstract-doms/arg-objs doms objs)
+(define (unabstract-doms/arg-objs doms objs argtys)
   ;;TODO(AMK) if would be nice to do this subst in one pass with
   ;; a multi-substitution instead of repeaded single substitutions
   (for/list ([dom (in-list doms)])
     (for/fold ([dom dom])
-              ([(obj arg-num) (in-indexed (in-list objs))])
-      (subst-type dom
-                  (list 0 arg-num)
-                  (if (non-empty-obj? obj)
-                      obj
-                      (-id-path (genid)))
-                  #t))))
+              ([(obj arg-num) (in-indexed (in-list objs))]
+               [ty (in-list argtys)])
+      (subst-type dom (list 0 arg-num) obj #t ty))))
 
-(define (unabstract-rng/arg-objs rng objs)
+(define (unabstract-rng/arg-objs rng objs argtys)
   ;;TODO(AMK) if would be nice to do this subst in one pass with
   ;; a multi-substitution instead of repeaded single substitutions
   (for/fold ([rng rng])
-            ([(obj arg-num) (in-indexed (in-list objs))])
-    (subst-result rng
-                  (list 0 arg-num)
-                  (if (non-empty-obj? obj)
-                      obj
-                      (-id-path (genid)))
-                  #t)))
+            ([(obj arg-num) (in-indexed (in-list objs))]
+             [ty (in-list argtys)])
+    (subst-result rng (list 0 arg-num) obj #t ty)))
+
+(define (unabstract-expected/arg-objs exptd objs argtys)
+  (for/fold ([exptd exptd])
+            ([(obj arg-num) (in-indexed (in-list objs))]
+             [ty (in-list argtys)])
+    (subst-tc-results exptd (list 0 arg-num) obj #t ty)))
 
 (define (tc/funapp f-stx args-stx f-type* args-res expected)
   (match-define (list (tc-result1: argtys _ argobjs) ...) args-res)
@@ -113,8 +111,9 @@
              #:expected (and expected (tc-results->values expected)))]
            [rest
             (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
-                   [dom* (unabstract-doms/arg-objs dom argobjs)]
-                   [rng* (unabstract-rng/arg-objs rng argobjs)])
+                   [dom* (unabstract-doms/arg-objs dom argobjs argtys)]
+                   [rng* (unabstract-rng/arg-objs rng argobjs argtys)]
+                   [expected* (and expected (tc-results->values (unabstract-expected/arg-objs expected argobjs argtys)))])
               (infer/vararg fixed-vars
                             (list dotted-var)
                             argtys
@@ -122,7 +121,7 @@
                             dom*
                             rest
                             rng*
-                            (and expected (tc-results->values expected))))]
+                            expected*))]
            ;; no rest or drest
            [else
             (infer fixed-vars (list dotted-var) argtys dom rng
@@ -142,8 +141,9 @@
       (λ (dom rng rest kw? a)
         (extend-tvars vars
          (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
-                [dom* (unabstract-doms/arg-objs dom argobjs)]
-                [rng* (unabstract-rng/arg-objs rng argobjs)])
+                [dom* (unabstract-doms/arg-objs dom argobjs argtys)]
+                [rng* (unabstract-rng/arg-objs rng argobjs argtys)]
+                [expected* (and expected (tc-results->values (unabstract-expected/arg-objs expected argobjs argtys)))])
            (infer/vararg vars
                          null
                          argtys
@@ -151,7 +151,7 @@
                          dom*
                          rest
                          rng*
-                         (and expected (tc-results->values expected))))))
+                         expected*))))
       f-type args-res expected)]
     ;; Row polymorphism. For now we do really dumb inference that only works
     ;; in very restricted cases, but is probably enough for most cases in

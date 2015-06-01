@@ -23,7 +23,6 @@
   (match* (ftype0 args-res)
     [((arr: dom rng rest #f (and kws (list (Keyword: _ _ #f) ...)) dep?)
       (list (tc-result1: t-a phi-a o-a) ...))
-
      (when check?
        (cond [(and (not rest) (not (= (length dom) (length t-a))))
               (tc-error/fields "could not apply function"

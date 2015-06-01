@@ -950,8 +950,8 @@
    ;; and is assumed to be Any
    [tc-err (class object% (super-new)
              (define/public (m) (n))
-             (define/public (n x) 0))
-           #:ret (ret (-class #:method ([m (t:-> -Bottom)] [n (t:-> Univ -Zero : -true-filter : (-int-obj 0))])))
+             (define/public (n x) "A"))
+           #:ret (ret (-class #:method ([m (t:-> -Bottom)] [n (t:-> Univ -String : -true-filter)])))
            #:msg #rx"since it is not a function type"]
    ;; test type-checking for classes without any
    ;; internal type annotations on methods
@@ -1326,9 +1326,9 @@
    [tc-err (class object%
              #:forall (Z)
              (super-new)
-             (init-field [x : Z] [y : Z 0]))
+             (init-field [x : Z] [y : Z "A"]))
            #:ret (ret (-poly (Z) (-class #:init-field ([x Z #f] [y Z #t]))))
-           #:msg #rx"expected: Z.*given: Zero"]
+           #:msg #rx"expected: Z.*given: String"]
    ;; fails because default field value cannot be polymorphic
    [tc-err (class object%
              #:forall (Z)
@@ -1391,10 +1391,10 @@
            #:msg #rx"expected: String.*given: Symbol"]
    ;; fails, but make sure it's not an internal error
    [tc-err (class object% (super-new)
-             (define/pubment (foo x) 0)
+             (define/pubment (foo x) #t)
              (define/public (g x) (foo 3)))
            #:ret (ret (-class #:method ([g (t:-> Univ -Bottom)]
-                                        [foo (t:-> Univ -Zero : -true-filter : (-int-obj 0))])
+                                        [foo (t:-> Univ (-val #t) : -true-filter)])
                               #:augment ([foo top-func])))
            #:msg #rx"Cannot apply expression of type Any"]
    ;; the next several tests are for positional init arguments

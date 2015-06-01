@@ -8,7 +8,7 @@
          racket/match racket/dict
          racket/list
          racket/lazy-require racket/set
-         racket/function
+         racket/function racket/stream
          (for-syntax racket/base)
          (utils tc-utils))
 
@@ -32,6 +32,7 @@
                                  LExp-has-var?
                                  LExp->sexp
                                  LExp-gcd-shrink
+                                 LExp-const-normalize
                                  object-equal?)]
               ["../types/filter-ops.rkt" (-or)])
 
@@ -43,6 +44,7 @@
          SLI-trivially-valid?
          SLI-implies?
          SLIs-imply?
+         complementary-SLIs?
          SLI->LExp-pairs
          SLI-paths
          leq
@@ -113,7 +115,8 @@
 ;; smart constructor -- reduces them when possible by gcds
 (define/cond-contract (leq l1 l2)
   (-> LExp? LExp? leq?)
-  (let-values ([(l1* l2*) (LExp-gcd-shrink l1 l2)])
+  (let*-values ([(l1* l2*) (LExp-gcd-shrink l1 l2)]
+                [(l1* l2*) (LExp-const-normalize l1 l2)])
     (cons l1* l2*)))
 
 (define (leq-lhs x)
@@ -477,6 +480,23 @@
   (-> SLI? boolean?)
   (internal-sli-trivially-valid? (SLI-system sli)))
 
+
+;; complementary-SLIs?
+;; two SLIs s1 and s2 are complimentary iff
+;; ~s1 --> s2  and  ~s2 --> s1
+;; (i.e. just prove the Or of the two is a tautology)
+(define/cond-contract (complementary-SLIs? s1 s2)
+  (-> SLI? SLI? boolean?)
+  (define not-s1 (SLI-negate s1))
+  (define not-s2 (SLI-negate s2))
+  (define not-s1-implies-s2
+    (or (Bot? not-s1)
+        (and (SLI? not-s1) (SLI-implies? not-s1 s2))))
+  
+  (and not-s1-implies-s2
+       (or (Bot? not-s2)
+           (and (SLI? not-s2) (SLI-implies? not-s2 s1)))))
+
 ;;**********************************************************************
 ;; Logical Implication for Integer Linear Inequalities
 ;; using Fourier-Motzkin elimination
@@ -578,7 +598,7 @@
   (match sli
     [(SLI: sys ps)
      (apply -or (for/list ([ineq (in-set sys)])
-                  (define sys* (make-immutable-leq-set (leq-negate ineq)))
+                  (define sys* (make-immutable-leq-set (list (leq-negate ineq))))
                   (cond
                     [(internal-sli-trivially-valid? sys*)
                      -top]

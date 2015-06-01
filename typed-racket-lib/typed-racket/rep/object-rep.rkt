@@ -34,6 +34,7 @@
          LExp-has-var?
          LExp->sexp
          LExp-gcd-shrink
+         LExp-const-normalize
          -lexp
          non-empty-obj?
          (rename-out [LExp:* LExp:]
@@ -305,6 +306,22 @@
         (values (*LExp (* n c1) (scale-terms n terms1))
                 (*LExp (* n c2) (scale-terms n terms2)))])]
     [(_ _) (int-err "invalid LExp(s) in LExp-gcd-shrink: ~a ~a" l1 l2)]))
+
+;; LExp-const-normalize
+;; if both sides have a nonzero constant, make one zero
+(define/cond-contract (LExp-const-normalize l1 l2)
+  (-> LExp? LExp? (values LExp? LExp?))
+  (define c1 (LExp-const l1))
+  (define c2 (LExp-const l2))
+  (cond
+    [(or (zero? c1) (zero? c2))
+     (values l1 l2)]
+    [(> c1 c2)
+     (values (LExp-set-const l1 (- c1 c2))
+             (LExp-set-const l2 0))]
+    [else
+     (values (LExp-set-const l1 0)
+             (LExp-set-const l2 (- c2 c1)))]))
 
 (define/cond-contract (LExp-has-var? l x)
   (-> LExp? Path? boolean?)

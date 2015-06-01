@@ -117,8 +117,8 @@
                                  object-name) (-Param -String Univ))
 
    ;; exception handling
-   [tc-e (with-handlers ([void (λ (x) (values 0 0))]) (values  "" ""))
-         #:ret (ret (list (t:Un -Zero -String) (t:Un -Zero -String))
+   [tc-e (with-handlers ([void (λ (x) (values #\a #\a))]) (values  "" ""))
+         #:ret (ret (list (t:Un -Char -String) (t:Un -Char -String))
                     (list -true-filter -true-filter))]
 
    (tc-e (make-temporary-file) -Path)
