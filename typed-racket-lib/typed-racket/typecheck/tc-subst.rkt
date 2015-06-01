@@ -79,16 +79,18 @@
 ;; o-ty is the type of the object that we are substituting in. This allows for restriction/simplification
 ;; of some filters if they conflict with the argument type.
 (define/cond-contract (subst-tc-results res k o polarity o-ty)
-  (-> full-tc-results/c name-ref/c Object? boolean? Type? full-tc-results/c)
+  (-> any/c name-ref/c Object? boolean? Type? any/c)
   (define (st ty) (subst-type ty k o polarity o-ty))
   (define (sr ty fs ob) (subst-tc-result ty fs ob k o polarity o-ty))
   (define (sf f) (subst-filter f k o polarity o-ty))
   (match res
+    [(tc-any-results: (NoFilter:)) res]
     [(tc-any-results: f) (tc-any-results (sf f))]
     [(tc-results: ts fs os)
      (tc-results (map sr ts fs os) #f)]
     [(tc-results: ts fs os dt db)
-     (tc-results (map sr ts fs os) (cons (st dt) db))]))
+     (tc-results (map sr ts fs os) (cons (st dt) db))]
+    [_ (int-err "invalid tc-results! ~a" res)]))
 
 
 ;; Substitution of objects into a tc-result
