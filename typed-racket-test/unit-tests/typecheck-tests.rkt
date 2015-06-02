@@ -541,7 +541,7 @@
                                       (list -true-filter -true-filter)
                                       (list (-int-obj 3) (-int-obj 4)))]
         [tc-e (cons 3 4) (-pair (-int-type 3) (-int-type 4))] ;; TODO(AMK) should cons use the refinements?
-        [tc-e (cons 3 (ann '() : (Listof Integer))) (make-Listof -Integer)]
+        [tc-e (cons "3" (ann '() : (Listof String))) (make-Listof -String)]
         [tc-e (void) -Void]
         [tc-e (void 3 4) -Void]
         [tc-e (void #t #f '(1 2 3)) -Void]
@@ -1063,9 +1063,9 @@
         [tc-e (let ([app apply]
                     [f (lambda: [x : Number *] 3)])
                 (app f (list 1 2 3)))
-              -PosByte]
-        [tc-e ((lambda () (call/cc (lambda: ([k : (Number -> (U))]) (if (read) 5 (k 10))))))
-              -Number]
+              (-int-type 3)]
+        [tc-e ((lambda () (call/cc (lambda: ([k : (String -> (U))]) (if (read) "5" (k "10"))))))
+              -String]
 
         [tc-e (number->string 5) -String]
 
@@ -1890,8 +1890,8 @@
               (make-Union (list -TCP-Listener -Semaphore)))
         (tc-e (sync (thread (λ () 0))) -Thread)
         (tc-e (sync (make-will-executor)) -Will-Executor)
-        (tc-e (sync (make-custodian-box (current-custodian) 0))
-              (make-CustodianBox (-val 0)))
+        (tc-e (sync (make-custodian-box (current-custodian) #t))
+              (make-CustodianBox (-val #t)))
         (tc-e (sync ((inst make-channel String))) -String)
         (tc-e (sync (dynamic-place 'foo 'foo)) Univ)
         (tc-e (let-values ([(in out) (place-channel)])
@@ -2289,7 +2289,7 @@
        [tc-err (let () (: x Number) 3)]
 
        ;; Sets as sequences
-       [tc-e (in-set (set 1 2 3)) (-seq -PosByte)]
+       [tc-e (in-set (set "1" "2" "3")) (-seq -String)]
        [tc-e
         (let ()
           (: lst (Listof Integer))
@@ -2409,7 +2409,7 @@
        [tc-e (assq 3 '((a . 5) (b . 7))) (t:Un (-val #f) (-pair (one-of/c 'a 'b) -PosByte))]
        [tc-e (assv 3 '((a . 5) (b . 7))) (t:Un (-val #f) (-pair (one-of/c 'a 'b) -PosByte))]
        [tc-e (assoc 3 '((a . 5) (b . 7))) (t:Un (-val #f) (-pair (one-of/c 'a 'b) -PosByte))]
-       [tc-e (set-remove (set 1 2 3) 'a) (-set -PosByte)]
+       [tc-e (set-remove (set "1" "2" "3") 'a) (-set -String)]
        ;; don't return HashTableTop
        [tc-e (hash-remove #hash((a . 5) (b . 7)) 3) (-HT -Symbol -Integer)]
        [tc-e (hash-remove #hash((a . 5) (b . 7)) 3) (-HT -Symbol -Integer)]
@@ -3665,6 +3665,19 @@
                      [(number? a) (* -1 a)]
                      [else (not a)])))
           
+          (negate #t))
+        -Boolean]
+       [tc-e 
+        (let ()
+          (: negate (~> ([x : (U Number Boolean)]) 
+                        (Refine [z : (U Number Boolean)]
+                                (or (x z -: Number)
+                                    (x z -: Boolean)))))
+          (define negate
+            (λ (a) (cond
+                     [(number? a) (* -1 a)]
+                     [else (not a)])))
+          
           (: foo (-> (U Number Boolean) Number))
           (define foo 
             (λ (x) (let ([y (negate x)])
@@ -3815,9 +3828,64 @@
           (define v (vector 1 2 3 4))
           (: x Natural)
           (define x (random 42))
-          (if (< x (vector-length v))
-              (sref v x)
-              (ann 42 Natural)))
+          (ann (if (< x (vector-length v))
+                   (sref v x)
+                   (ann 42 Natural))
+               Natural))
+        -Nat]
+       [tc-e
+        (let ()
+          (: sref (All (A)
+                       (~> ([v : (Vectorof A)]
+                            [i : (Refine [j : Natural]
+                                         (< j (len v)))])
+                           A)))
+          (define sref
+            (λ (a b) (vector-ref a b)))
+          (: v (Vectorof Natural))
+          (define v (vector 1 2 3 4))
+          (: x Natural)
+          (define x (random 42))
+          (ann (if (> (vector-length v) x)
+                   (sref v x)
+                   (ann 42 Natural))
+               Natural))
+        -Nat]
+       [tc-e
+        (let ()
+          (: sref (All (A)
+                       (~> ([v : (Vectorof A)]
+                            [i : (Refine [j : Natural]
+                                         (< j (len v)))])
+                           A)))
+          (define sref
+            (λ (a b) (vector-ref a b)))
+          (: v (Vectorof Natural))
+          (define v (vector 1 2 3 4))
+          (: x Natural)
+          (define x (random 42))
+          (ann (if (>= (vector-length v) (+ 1 x))
+                   (sref v x)
+                   (ann 42 Natural))
+               Natural))
+        -Nat]
+       [tc-e
+        (let ()
+          (: sref (All (A)
+                       (~> ([v : (Vectorof A)]
+                            [i : (Refine [j : Natural]
+                                         (< j (len v)))])
+                           A)))
+          (define sref
+            (λ (a b) (vector-ref a b)))
+          (: v (Vectorof Natural))
+          (define v (vector 1 2 3 4))
+          (: x Natural)
+          (define x (random 42))
+          (ann (if (<= (+ 1 x) (vector-length v))
+                   (sref v x)
+                   (ann 42 Natural))
+               Natural))
         -Nat]
        [tc-err
         (let ()

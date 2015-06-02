@@ -134,7 +134,7 @@
         (arr: doms2 rng2 #f #f '() dep2?))
        (cond-let*-values
         ;; if dependent, instantiate & update env for subtyping
-        (or dep1? dep2?) 
+        (or dep1? dep2?)
         ([(ids) (genids (length doms1) 'arg)]
          [(inst-many) (instantiate-many ids)]
          [(doms1 rng1 doms2 rng2) 
@@ -314,11 +314,8 @@
 (define bottom-key (Rep-seq -Bottom))
 (define top-key (Rep-seq Univ))
 
-(define-for-syntax (DEBUG)
-  #f)
-
 (define-syntax (LOG stx)
-  (if (DEBUG)
+  (if #f
       (syntax-case stx ()
         [(_ args ...)
          #'(printf args ...)])
@@ -356,40 +353,79 @@
          [(_ (Error:)) A0]
          [((Error:) _) A0]
          [((Ref: x x-t x-p) super-t)
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n \n\n" A s t)
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A s t obj)
           (cond
-            ;; quick yes, it's a refinement of the parent type
+            ;; quick check, is it a refinement of the parent type?
             [(eq? (unsafe-Rep-seq x-t) st) A0]
             ;; else methodically reason about what's going on
             [else
              (when (not env) (set! env (lexical-env)))
-             (define obj* (cond
-                            [(LExp? obj) (new-obj)]
-                            [(non-empty-obj? obj) obj]
-                            [else (new-obj)]))
-             (define axioms (append
-                             (if (LExp? obj) (list (-eqSLI obj (-lexp (list 1 obj*)))) null)
-                             (list (-filter (subst-type x-t x obj* #t) obj*)
-                                   (subst-filter x-p x obj* #t))))
-             (define goal (-filter super-t obj*))
-             (LOG "\n(-filter ~a ~a) --> ~a\n" super-t obj* goal)
-             (define v (proves A0 env axioms goal))
-             (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n ---> ~a\n\n" A s t env obj v)
-             v])]
+             (define-values (T1 P1 T2 o)
+               (match obj
+                 ;; standard case
+                 [(Path: π (? identifier?))
+                  (values (subst-type x-t x obj #t)
+                          (subst-filter x-p x obj #t)
+                          super-t
+                          obj)]
+                 ;; obj is a debruijn, this shouldn't happen ideally,
+                 ;; but we must be conservative & sound
+                 ;; introduce a new object
+                 [(Path: π (list lvl arg))
+                  (define obj* (-id-path (genid)))
+                  (values (subst-type x-t x obj* #t)
+                          (subst-filter x-p x obj* #t)
+                          (subst-type super-t (list lvl arg) obj* #t)
+                          (-acc-path π obj*))]
+                 ;; it's an LExp or empty object, introduce an object to
+                 ;; stand in for filters, add an equality proposition if an LExp
+                 [_
+                  (define obj* (new-obj))
+                  (values (subst-type x-t x obj* #t)
+                          (if (LExp? obj)
+                              (-and (subst-filter x-p x obj* #t)
+                                    (-eqSLI obj (-lexp (list 1 obj*))))
+                              (subst-filter x-p x obj* #t))
+                          super-t
+                          obj*)]))
+             (define axioms (list P1 (-filter T1 o)))
+             (define goal (-filter T2 o))
+             (proves A0 env axioms goal)])]
          [(sub-t (Ref: x x-t x-p))
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A s t obj)
           (when (not env) (set! env (lexical-env)))
-          (define obj* (cond
-                         [(LExp? obj) (new-obj)]
-                         [(non-empty-obj? obj) obj]
-                         [else (new-obj)]))
-          (define axioms (append
-                          (if (LExp? obj) (list (-eqSLI obj (-lexp (list 1 obj*)))) null)
-                          (list (-filter sub-t obj*))))
-          (define goal (-and (-filter (subst-type x-t x obj* #t) obj*)
-                             (subst-filter x-p x obj* #t)))
-          (define v (proves A0 env axioms goal))
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n env: ~a\n obj: ~a\n ---> ~a\n\n" A s t env obj v)
-          v]
+          (define-values (T1 T2 P2 o)
+            (match obj
+              ;; standard case
+              [(Path: π (? identifier?))
+               (values sub-t
+                       (subst-type x-t x obj #t)
+                       (subst-filter x-p x obj #t)
+                       obj)]
+              ;; obj is a debruijn, this shouldn't happen ideally,
+              ;; but we must be conservative & sound
+              ;; introduce a new object
+              [(Path: π (list lvl arg))
+               (define obj* (-id-path (genid)))
+               (values (subst-type sub-t (list lvl arg) obj* #t)
+                       (subst-type x-t x obj* #t)
+                       (subst-filter x-p x obj* #t)
+                       (-acc-path π obj*))]
+              ;; it's an LExp or empty object, introduce an object to
+              ;; stand in for filters, add an equality proposition if an LExp
+              [_
+               (define obj* (new-obj))
+               (values sub-t
+                       (subst-type x-t x obj* #t)
+                       (subst-filter x-p x obj* #t)
+                       obj*)]))
+          ;; if we had an LExp, the new o is equal to it
+          (define axioms (append (if (LExp? obj)
+                                     (-eqSLI obj (-lexp (list 1 o)))
+                                     '())
+                                 (list (-filter T1 o))))
+          (define goal (-and P2 (-filter T2 o)))
+          (proves A0 env axioms goal)]
          ;; (Un) is bot
          [(_ (Union: (list))) #f]
          ;; value types

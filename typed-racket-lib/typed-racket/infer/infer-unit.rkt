@@ -380,7 +380,7 @@
 (define ((elim-temps elim) cm dm)
   (define (elim-in-c constr)
     (match constr
-      [(c S T) (c (elim S) (elim T))]
+      [(c S T o) (c (elim S) (elim T) o)]
       [#f #f]
       [_ (error 'elim-in-c "unsupported constraint ~a" constr)]))
   
@@ -493,8 +493,8 @@
   ;; this places no constraints on any variables
   (define empty (empty-cset/context context))
   ;; this constrains just x (which is a single var)
-  (define (singleton S x T)
-    (insert empty x S T))
+  (define (singleton S x T obj)
+    (insert empty x S T (and obj (non-empty-obj? obj) obj)))
   ;; FIXME -- figure out how to use parameters less here
   ;;          subtyping doesn't need to use it quite as much
   (define cs (current-seen))
@@ -568,26 +568,6 @@
           [((ListSeq: s-seq) (ListSeq: t-seq))
            (LOG "!!!LisSeq!!!\n")
            (cgen/seq context s-seq t-seq)]
-
-
-          #;[((Ref: x S* _) T)
-           #:when (begin
-                    (LOG "\nREF LOWER CHECK: ~a   --   ~a\n" S T)
-                    (subtype (subst-type S* x (if (non-empty-obj? obj) obj -empty-obj) #t)
-                           S #:obj obj))
-           (define v (cg (subst-type S* x obj #t) T obj))
-           (LOG "\nREF LOWER cgen\nS: ~a\n\nT: ~a\n\nobj: ~a\n\n RESULT: ~a\n\n\n" S T obj v)
-           v]
-
-          #;[(S (Ref: x T* _))
-           #:when (begin
-                    (LOG "\nREF UPPER CHECK: ~a   --   ~a\n" S T)
-                    (subtype (subst-type T* x (if (non-empty-obj? obj) obj -empty-obj) #t)
-                             T
-                             #:obj obj))
-           (define v (cg S (subst-type T* x obj #t) obj))
-           (LOG "\nREF UPPER cgen\nS: ~a\n\nT: ~a\n\nobj: ~a\n\n RESULT: ~a\n\n\n" S T obj v)
-           v]
           
           ;; refinements are erased to their bound
           [((Refinement: S _) T)
@@ -603,7 +583,7 @@
              [_ #f])
            #f
            ;; constrain v to be below T (but don't mention bounds)
-           (singleton (Un) v (var-demote T (context-bounds context)))]
+           (singleton (Un) v (var-demote T (context-bounds context)) obj)]
 
           [(S (F: (? (inferable-var? context) v)))
            #:return-when
@@ -612,7 +592,7 @@
              [_ #f])
            #f
            ;; constrain v to be above S (but don't mention bounds)
-           (singleton (var-promote S (context-bounds context)) v Univ)]
+           (singleton (var-promote S (context-bounds context)) v Univ obj)]
 
           ;; recursive names should get resolved as they're seen
           [(s (? Name? t))
@@ -669,7 +649,12 @@
           ;; pairs are pointwise
           [((Pair: a b) (Pair: a* b*))
            (LOG "cgen Pair! (~a ~a) (~a ~a)  @ ~a\n\n" a b a* b* obj)
-           (% cset-meet (cg a a* (-car-of obj)) (cg b b* (-cdr-of obj)))]
+           (let* ([lhs (cg a a* (-car-of obj))]
+                  [rhs (cg b b* (-cdr-of obj))]
+                  [v (% cset-meet lhs rhs)])
+             (LOG "cs-meet: CS1: ~a\n CS2: ~a\n -->  ~a\n\n"
+                  lhs rhs v)
+             v)]
           ;; sequences are covariant
           [((Sequence: ts) (Sequence: ts*))
            (LOG "\n!!!Seq!!!\n")
@@ -856,7 +841,7 @@
   ;; variance : Variance
   (define (constraint->type v variance)
     (match v
-      [(c S T)
+      [(c S T _)
        (evcase variance
                [Constant S]
                [Covariant S]

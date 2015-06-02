@@ -2,11 +2,13 @@
 
 (require "../utils/utils.rkt" (contract-req))
 
-(require-for-cond-contract (rep type-rep))
+(require-for-cond-contract (rep type-rep object-rep))
 
 ;; S, T types
 ;; represents S <: X <: T (see "Local Type Inference" pg. 12)
-(define-struct/cond-contract c ([S Type/c] [T Type/c]) #:transparent)
+(define-struct/cond-contract c ([S Type/c] [T Type/c] [obj (or/c #f (and/c Object?
+                                                                           (not/c Empty?)
+                                                                           (not/c NoObject?)))]) #:transparent)
 
 ;; fixed : Listof[c]
 ;; rest : option[c]

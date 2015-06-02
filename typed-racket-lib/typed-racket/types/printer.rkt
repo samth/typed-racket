@@ -149,7 +149,7 @@
 (define (id->sexp id)
   (match id
     [(? identifier?) (syntax->datum id)]
-    [(list lvl argn) `(DB [l ,lvl] [a ,argn])]
+    [(list lvl argn) `(var ,lvl ,argn)]
     [_ `(unknown-id ,id)]))
 
 ;; object->sexp : Object -> S-expression

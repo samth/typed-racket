@@ -2,6 +2,7 @@
 
 (require "../utils/utils.rkt"
 	 (types abbrev union subtype)
+         (rep object-rep)
 	 unstable/sequence
          "fail.rkt" "signatures.rkt" "constraint-structs.rkt"
          racket/match
@@ -11,7 +12,7 @@
 (export constraints^)
 
 ;; Widest constraint possible
-(define no-constraint (make-c (Un) Univ))
+(define no-constraint (make-c (Un) Univ #f))
 
 ;; Create an empty constraint map from a set of type variables X and
 ;; index variables Y.  For now, we add the widest constraints for
@@ -23,20 +24,20 @@
 
 
 ;; add the constraints S <: var <: T to every map in cs
-(define (insert cs var S T)
+(define (insert cs var S T obj)
   (match cs
     [(struct cset (maps))
      (make-cset (for/list ([(map dmap) (in-pairs maps)])
-                  (cons (hash-set map var (make-c S T))
+                  (cons (hash-set map var (make-c S T obj))
                         dmap)))]))
 
 ;; meet: Type Type -> Type
 ;; intersect the given types. produces a lower bound on both, but
 ;; perhaps not the GLB
-(define (meet S T)
+(define (meet S T obj)
   (let ([s* (restrict S T)])
-    (if (and (subtype s* S)
-             (subtype s* T))
+    (if (and (subtype s* S #:obj obj)
+             (subtype s* T #:obj obj))
         s*
         (Un))))
 
@@ -44,6 +45,12 @@
 ;; union the given types
 (define (join T U) (Un T U))
 
+(define (join-objs o o*)
+  (cond
+    [(not o*) o]
+    [(not o) o*]
+    [(object-equal? o o*) o]
+    [else #f]))
 
 ;; meet of two variable constraints
 ;; never fails
@@ -53,13 +60,12 @@
 (define (c-meet c1 c2 [var #f])
   ;(printf "c-meet ~a ~a [var ~a]\n\n" c1 c2 var)
   (match*/early (c1 c2)
-    [((struct c (S T)) (struct c (S* T*)))
-     (let ([S (join S S*)] [T (meet T T*)])
-       ;(printf "inside c-meet... \n S: ~a\n T: ~a\n\n" S T)
-       (and (let ([v (subtype S T)])
-                ;(printf "subtype? ~a ~a --->  ~a\n\n" S T v)
-                v)
-            (make-c S T)))]))
+    [((struct c (S T o)) (struct c (S* T* o*)))
+     (let ([S (join S S*)]
+           [T (meet T T* o)]
+           [o (join-objs o o*)])
+       (and (subtype S T #:obj o)
+            (make-c S T o)))]))
 
 
 ;; compute the meet of two constraint sets
