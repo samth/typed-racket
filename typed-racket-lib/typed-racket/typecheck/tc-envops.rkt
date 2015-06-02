@@ -120,7 +120,7 @@
 ;; AMK: We also return the atoms? I'm sure there's a reason
 ;; but from the body of this function it's difficult to
 ;; understand why
-(define (env+props env fs)
+(define (env+props env fs #:ingore-non-identifier-ids? [ingore-non-identifier-ids? #t])
   (let/ec exit*
     (define (exit) (exit* #f empty))
 
@@ -136,12 +136,16 @@
         (for/fold ([Γ (replace-props env (append slis props))]
                    [new-ps '()])
                   ([f (in-list atoms)])
+          (printf "\n<> updating w/ ~a\n" f)
           (match f
             [(or (TypeFilter: ft (Path: _ x)) 
                  (NotTypeFilter: ft (Path: _ x)))
              (cond
                ;; don't update certain vars
-               [(or (is-var-mutated? x) (not (identifier-binding x)))
+               [(or (is-var-mutated? x)
+                    (and ingore-non-identifier-ids?
+                         (not (identifier-binding x))))
+                (printf "\nignore it! ~a\n" f)
                 (values Γ new-ps)]
                ;; otherwise, refine the type
                [else
@@ -149,6 +153,7 @@
                   (parameterize
                       ([current-orig-stx x])
                     (update-env/atom empty Γ f exit)))
+                (printf "\nupdated env with ~a! \n  env: ~a \n  new props: ~a\n" f Γ* newly-exposed-props)
                 (values Γ* (append newly-exposed-props new-ps))])]
             [(TypeFilter: ft (? LExp? l))
              (if (subtype ft -Integer #:obj l)

@@ -30,9 +30,12 @@
        (ret t f o)]
       [(Results: t f o dty dbound)
        (ret t f o dty dbound)]))
-  (for/fold ([res res]) ([(o arg) (in-indexed (in-list os))]
+  (begin
+  (define x (for/fold ([res res]) ([(o arg) (in-indexed (in-list os))]
                          [t (in-list ts)])
     (subst-tc-results res (list 0 arg) o #t t)))
+  (printf ">> ts: ~a\n >> res: ~a\n -> x: ~a\n" ts res x)
+  x))
 
 ;; Restrict the objects in v refering to the current functions arguments to be of the types ts.
 (define (restrict-values v ts)
