@@ -364,7 +364,7 @@
                (match obj
                  ;; standard case
                  [(Path: π (? identifier?))
-                  (values (subst-type t (list 0 0) obj #t)
+                  (values t
                           (subst-filter p (list 0 0) obj #t)
                           super-t
                           obj)]
@@ -373,7 +373,7 @@
                  ;; introduce a new object
                  [(Path: π (list lvl arg))
                   (define obj* (-id-path (genid)))
-                  (values (subst-type t (list 0 0) obj* #t)
+                  (values t
                           (subst-filter p (list 0 0) obj* #t)
                           (subst-type super-t (list lvl arg) obj* #t)
                           (-acc-path π obj*))]
@@ -381,7 +381,7 @@
                  ;; stand in for filters, add an equality proposition if an LExp
                  [_
                   (define obj* (new-obj))
-                  (values (subst-type t (list 0 0) obj* #t)
+                  (values t
                           (if (LExp? obj)
                               (-and (subst-filter p (list 0 0) obj* #t)
                                     (-eqSLI obj (-lexp (list 1 obj*))))
@@ -399,7 +399,7 @@
               ;; standard case
               [(Path: π (? identifier?))
                (values sub-t
-                       (subst-type t (list 0 0) obj #t)
+                       t
                        (subst-filter p (list 0 0) obj #t)
                        obj)]
               ;; obj is a debruijn, this shouldn't happen ideally,
@@ -408,7 +408,7 @@
               [(Path: π (list lvl arg))
                (define obj* (-id-path (genid)))
                (values (subst-type sub-t (list lvl arg) obj* #t)
-                       (subst-type t (list 0 0) obj* #t)
+                       t
                        (subst-filter p (list 0 0) obj* #t)
                        (-acc-path π obj*))]
               ;; it's an LExp or empty object, introduce an object to
@@ -416,7 +416,7 @@
               [_
                (define obj* (new-obj))
                (values sub-t
-                       (subst-type t (list 0 0) obj* #t)
+                       t
                        (subst-filter p (list 0 0) obj* #t)
                        obj*)]))
           ;; if we had an LExp, the new o is equal to it

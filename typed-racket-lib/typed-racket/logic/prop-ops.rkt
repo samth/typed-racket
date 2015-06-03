@@ -81,7 +81,7 @@
       ;; that needs resolved?
       [#:Refine-unsafe type prop (if obj
                                      (begin (save obj (subst-filter prop (list 0 0) obj #t))
-                                            ((sift-t obj) (subst-type type (list 0 0) obj #t)))
+                                            ((sift-t obj) type))
                                      ty)]
       
       [#:Pair t1 t2 (if obj

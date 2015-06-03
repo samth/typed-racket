@@ -7,7 +7,7 @@
          (utils tc-utils)
          racket/match racket/list
          (contract-req)
-         (except-in (types abbrev utils filter-ops path-type)
+         (except-in (types abbrev utils filter-ops path-type refine)
                     -> ->* one-of/c)
          (only-in (infer infer) restrict)
          (rep type-rep object-rep filter-rep rep-utils object-ops))
@@ -148,8 +148,8 @@
                      (map st kws)
                      dep?)]
     [#:Refine-unsafe type prop
-                     (unsafe-make-Ref
-                      (subst-type type (add-scope k) (add-scope/object o) polarity o-ty)
+                     (unsafe-make-Refine*
+                      (subst-type type k o polarity o-ty)
                       (subst-filter prop (add-scope k) (add-scope/object o) polarity o-ty))]))
 
 ;; add-scope : name-ref/c -> name-ref/c

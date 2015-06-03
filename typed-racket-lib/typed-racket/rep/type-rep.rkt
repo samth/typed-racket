@@ -33,7 +33,8 @@
          remove-dups
          sub-t sub-f sub-o sub-pe
          Name/simple: Name/struct:
-         unsafe-make-Ref
+         Refine-type
+         unsafe-make-Refine
          (rename-out [Class:* Class:]
                      [Class* make-Class]
                      [Row* make-Row]
@@ -44,12 +45,11 @@
                      [PolyDots:* PolyDots:]
                      [PolyRow:* PolyRow:]
                      [Mu* make-Mu]
-                     [Ref* make-Ref]
+                     [Ref* make-Refine]
                      [Poly* make-Poly]
                      [PolyDots* make-PolyDots]
                      [PolyRow* make-PolyRow]
                      [Mu-body* Mu-body]
-                     [Refine-type* Refine-type]
                      [Refine-prop* Refine-prop]
                      [Poly-body* Poly-body]
                      [PolyDots-body* PolyDots-body]
@@ -63,7 +63,8 @@
 ;; Ugly hack - should use units
 (lazy-require
   ("../types/union.rkt" (Un))
-  ("../types/resolve.rkt" (resolve-app)))
+  ("../types/resolve.rkt" (resolve-app))
+  ["../types/refine.rkt" (unsafe-make-Refine*)])
 
 (define name-table (make-weak-hasheq))
 
@@ -1032,27 +1033,20 @@
                                (not/c Bot?))]) #:no-provide
   [#:frees (λ (f) (combine-frees (list (f type) 
                                        (f prop))))] ;; TODO(AMK) remove id??
-  [#:fold-rhs (unsafe-make-Ref (type-rec-id type) (filter-rec-id prop))])
+  [#:fold-rhs (unsafe-make-Refine* (type-rec-id type) (filter-rec-id prop))])
 
 ;; the 'smart' constructor
 ;; identifier -> Type/c -> Filter/c -> Type/c
-(define (unsafe-make-Ref t p)
+(define (unsafe-make-Refine t p)
   (cond
     [(Top? p) t]
     [(Bot? p) (Un)]
     [(Bottom? t) t]
-    [else (*Refine  t p)]))
+    [else (*Refine t p)]))
 
-(define (Ref* id type prop)
-  (define t (abstract-ident id type))
+(define (Ref* id t prop)
   (define p (abstract-ident id prop))
-  (unsafe-make-Ref t p))
-
-;; the 'smart' destructor
-;; identifier -> Ref? -> Type/c
-(define (Refine-type* id r)
-  (match-let ([(Refine: t _) r])
-    (instantiate-ident id t)))
+  (unsafe-make-Refine* t p))
 
 ;; identifier -> Ref? -> Filter/c
 (define (Refine-prop* id r)
@@ -1077,7 +1071,7 @@
       [(_ x t p)
        #'(? Refine?
             (app (lambda (ref) (let ([id (datum->syntax #f (freshid))])
-                                 (list id (Refine-type* id ref) (Refine-prop* id ref))))
+                                 (list id (Refine-type ref) (Refine-prop* id ref))))
                  (list x t p)))])))
 
 (define (abstract-ident id a)
@@ -1141,8 +1135,8 @@
               dep?))]
      [#:Refine type prop
       (let ([lvl* (add1 lvl)])
-        (*Refine ((do-type lvl*) type)
-                 ((do-filter lvl*) prop)))]))
+        (unsafe-make-Refine ((do-type lvl) type)
+                            ((do-filter lvl*) prop)))]))
   
   (define ((do-filter lvl) f)
     (filter-case (#:Type (do-type lvl)

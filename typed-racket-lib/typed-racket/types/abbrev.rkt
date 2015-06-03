@@ -46,7 +46,8 @@
          (only-in '#%place place? place-channel?))
 
 (lazy-require
- ["filter-ops.rkt" (-and -or)])
+ ["filter-ops.rkt" (-and -or)]
+ ["refine.rkt" (unsafe-make-Refine*)])
 
 (provide (except-out (all-defined-out) make-Base)
          (all-from-out "base-abbrev.rkt" "match-expanders.rkt"))
@@ -401,12 +402,13 @@
 
 (define-syntax -refine
   (syntax-rules ()
-    [(_ x t p) (let ([x #'x])
-                 (make-Ref x t p))]))
+    [(_ x t p) (let ([x #'x]
+                     [t* t])
+                 (make-Refine x t* p))]))
 
 (define-syntax -unsafe-refine
   (syntax-rules ()
-    [(_ t p) (unsafe-make-Ref t p)]))
+    [(_ t p) (unsafe-make-Refine* t p)]))
 
 (define-syntax -SLI
   (syntax-rules ()

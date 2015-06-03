@@ -419,17 +419,16 @@
     (-refine x Univ (-or (-filter -Integer x)
                          (-filter -String x)))]
    ;; x in type
-   [(Refine [y : (Refine [x : Number] (x y -! Integer))] Top)
+   [(Refine [y : (Refine [x : Number] (x -! Integer))] Top)
     (-refine y (-refine x -Number
-                         (-and (-not-filter -Integer x)
-                               (-not-filter -Integer y)))
+                         (-not-filter -Integer x))
              -top)]
 
    ;; paths
-   [(Refine [y : (Refine [x : (Pairof Any Any)] ((car x) (cdr y) -: Integer))] Top)
+   [(Refine [y : (Refine [x : (Pairof Any Any)] ((car x) (cdr x) -: Integer))] Top)
     (-refine y (-refine x (-pair Univ Univ)
                          (-and (-filter -Integer (-car-of (-id-path x)))
-                               (-filter -Integer (-cdr-of (-id-path y)))))
+                               (-filter -Integer (-cdr-of (-id-path x)))))
              -top)]
 
    ;; basic linear inequalities 

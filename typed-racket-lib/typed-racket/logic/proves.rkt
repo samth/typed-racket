@@ -194,11 +194,11 @@
   (c:-> any/c env? (or/c TypeFilter? NotTypeFilter?)
         any/c)
   (match goal
-    [(TypeFilter: ft (and o (Path: π x)))
+    [(TypeFilter: ft (and o (Path: π (? identifier? x))))
      (let ([ty (lookup-id-type x env #:fail (λ (_) Univ))])
        (subtype (path-type π ty) ft #:A A #:env (env-erase-type+ env x) #:obj o))]
     
-    [(NotTypeFilter: ft (and o (Path: π x)))
+    [(NotTypeFilter: ft (and o (Path: π (? identifier? x))))
      (let ([x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))]
            [x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom))]
            [goal-x-ty- (path-type π ft)]
@@ -239,7 +239,7 @@
         (values (c:or/c env? #f) (c:listof Filter?)))
   ;(printf "update-env/type+ \n o: ~a\n t: ~a\n" o t)
   (match o
-    [(Path: π x)
+    [(Path: π (? identifier? x))
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ)))
      ;(printf "update-env/type+ x-ty+: ~a\n" x-ty+)
      (define x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom)))
@@ -260,7 +260,7 @@
         (match new-x-ty+
           [(Refine-unsafe: r-t r-p)
            (values (naive-extend/not-type (env-erase-type+ env x) x new-x-ty-)
-                   (list (-filter (subst-type r-t (list 0 0) xobj #t) xobj) 
+                   (list (-filter r-t xobj) 
                          (subst-filter r-p (list 0 0) xobj #t)))]
           [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
                      '())])])]
@@ -268,13 +268,14 @@
      ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
      (if (with-lexical-env env (not (overlap (integer-type) t)))
          (values (contra-env) '())
-         (values env '()))]))
+         (values env '()))]
+    [_ (int-err "invalid object for updating the environment! ~a" o)]))
 
 (define/cond-contract (update-env/type- A env t o contra-env)
   (c:-> any/c env? Type? Object? (c:or/c #f procedure?)
         (values (c:or/c env? #f) (c:listof Filter?)))
   (match o
-    [(Path: π x)
+    [(Path: π (? identifier? x))
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))) ;; x is of type T
      (define new-x-ty+
        (with-lexical-env env (update x-ty+ t #f π))) ;; combine new type-, x is now of type T'
@@ -291,7 +292,7 @@
         (match new-x-ty+
           [(Refine-unsafe: r-t r-p)
            (values (naive-extend/not-type (env-erase-type+ env x) x new-x-ty-)
-                   (list (-filter (subst-type r-t (list 0 0) xobj #t) xobj) 
+                   (list (-filter r-t xobj) 
                          (subst-filter r-p (list 0 0) xobj #t)))]
           [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
                      '())])])]
@@ -299,7 +300,8 @@
      ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
      (if (subtype (integer-type) t #:A A #:env env #:obj o)
          (contra-env)
-         env)]))
+         env)]
+    [_ (int-err "invalid object for updating the environment! ~a" o)]))
 
 
 ;; update-env/atom
