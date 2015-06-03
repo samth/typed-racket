@@ -38,15 +38,15 @@
      (build-type -pair (update t ft pos? rst) s)]
     [((Pair: t s) (list rst ... (CdrPE:)))
      (build-type -pair t (update s ft pos? rst))]
-
+    
     ;; syntax ops
     [((Syntax: t) (list rst ... (SyntaxPE:)))
      (build-type -Syntax (update t ft pos? rst))]
-
+    
     ;; promise op
     [((Promise: t) (list rst ... (ForcePE:)))
      (build-type -Promise (update t ft pos? rst))]
-
+    
     ;; struct ops
     [((Struct: nm par flds proc poly pred)
       (list rst ... (StructPE: (? (lambda (s) (subtype t s)) s) idx)))
@@ -60,9 +60,9 @@
                                     (values (update ty ft pos? rst) acc-id)]
                                    [_ (int-err "update on mutable struct field")])]) 
        (cond 
-        [(Bottom? ty*) ty*]
-        [else (let ([flds* (append lhs (cons (make-fld ty* acc-id #f) (cdr rhs)))])
-                (make-Struct nm par flds* proc poly pred))]))]
+         [(Bottom? ty*) ty*]
+         [else (let ([flds* (append lhs (cons (make-fld ty* acc-id #f) (cdr rhs)))])
+                 (make-Struct nm par flds* proc poly pred))]))]
     ;; length ops
     [(vt (list rst ... (LengthPE:)))
      (cond
@@ -71,7 +71,7 @@
              (overlap ft -Nat))
         vt]
        [else -Bottom])]
-
+    
     ;; class field ops
     ;;
     ;; A refinement of a private field in a class is really a refinement of the
@@ -84,7 +84,7 @@
       (list rst ... (FieldPE:)))
      (make-Function
       (list (make-arr* doms (update rng ft pos? rst))))]
-
+    
     ;; otherwise
     [(t '())
      (if pos?
