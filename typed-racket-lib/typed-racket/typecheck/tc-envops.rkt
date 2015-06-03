@@ -136,7 +136,6 @@
         (for/fold ([Γ (replace-props env (append slis props))]
                    [new-ps '()])
                   ([f (in-list atoms)])
-          (printf "\n<> updating w/ ~a\n" f)
           (match f
             [(or (TypeFilter: ft (Path: _ x)) 
                  (NotTypeFilter: ft (Path: _ x)))
@@ -145,7 +144,6 @@
                [(or (is-var-mutated? x)
                     (and ingore-non-identifier-ids?
                          (not (identifier-binding x))))
-                (printf "\nignore it! ~a\n" f)
                 (values Γ new-ps)]
                ;; otherwise, refine the type
                [else
@@ -153,7 +151,6 @@
                   (parameterize
                       ([current-orig-stx x])
                     (update-env/atom empty Γ f exit)))
-                (printf "\nupdated env with ~a! \n  env: ~a \n  new props: ~a\n" f Γ* newly-exposed-props)
                 (values Γ* (append newly-exposed-props new-ps))])]
             [(TypeFilter: ft (? LExp? l))
              (if (subtype ft -Integer #:obj l)

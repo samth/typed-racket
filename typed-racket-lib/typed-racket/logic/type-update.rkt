@@ -82,7 +82,6 @@
   (match f-type
     [(Function: (list (and arrs (arr: domss rngs rests drests kwss dep?s)) ...)) 
      #:when (ormap values dep?s)
-     (printf "IN UPDATE FUNCTION MATCH!\n\n")
      (define new-arrs 
        (for/list ([arr (in-list arrs)]
                   [doms (in-list domss)]
@@ -119,7 +118,6 @@
                          [ty (in-list arg-tys)]) ;; was doms*
                 (-filter ty (or o (-id-path tmp-id)))))
             ;; update the lexical environment with domain types
-            (printf "updating env w/ domain props:\n  env: ~a\n  domain props: ~a" (lexical-env) dom-ty-props)
             (define-values (env* _)
               (env+props (lexical-env) dom-ty-props #:ingore-non-identifier-ids? #f))
             
@@ -131,14 +129,9 @@
                                     kws
                                     dep?)]
               [else
-               (printf ">>> updating domain/range w/ env: ~a\n\n" env*)
                (define updated-doms (for/list ([d (in-list doms*)])
-                                      (define d* (type-update d env*))
-                                      (printf "  <> OLD D: ~a\n  <> NEW D: ~a\n\n" d d*)
-                                      (abstract-idents tmp-ids d*)))
-               (define rng** (type-update rng* env*))
-               (printf "  <> OLD RNG: ~a\n  <> NEW RNG: ~a\n\n" rng* rng**)
-               (define updated-rng (abstract-idents tmp-ids rng**))
+                                      (abstract-idents tmp-ids (type-update d env*))))
+               (define updated-rng (abstract-idents tmp-ids (type-update rng* env*)))
                (make-arr updated-doms updated-rng rest drest kws dep?)])])))
      (make-Function new-arrs)]
     [_ f-type]))

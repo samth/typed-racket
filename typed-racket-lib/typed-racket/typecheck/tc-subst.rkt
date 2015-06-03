@@ -30,12 +30,9 @@
        (ret t f o)]
       [(Results: t f o dty dbound)
        (ret t f o dty dbound)]))
-  (begin
-  (define x (for/fold ([res res]) ([(o arg) (in-indexed (in-list os))]
+  (for/fold ([res res]) ([(o arg) (in-indexed (in-list os))]
                          [t (in-list ts)])
     (subst-tc-results res (list 0 arg) o #t t)))
-  (printf ">> ts: ~a\n >> res: ~a\n -> x: ~a\n" ts res x)
-  x))
 
 ;; Restrict the objects in v refering to the current functions arguments to be of the types ts.
 (define (restrict-values v ts)
@@ -150,10 +147,10 @@
                      (and drest (cons (st (car drest)) (cdr drest)))
                      (map st kws)
                      dep?)]
-    [#:InstdRef type prop
-                (make-InstdRef
-                 (subst-type type (add-scope k) (add-scope/object o) polarity o-ty)
-                 (subst-filter prop (add-scope k) (add-scope/object o) polarity o-ty))]))
+    [#:Ref-unsafe type prop
+                  (unsafe-make-Ref
+                   (subst-type type (add-scope k) (add-scope/object o) polarity o-ty)
+                   (subst-filter prop (add-scope k) (add-scope/object o) polarity o-ty))]))
 
 ;; add-scope : name-ref/c -> name-ref/c
 ;; Add a scope to an index name-ref
@@ -236,45 +233,3 @@
            (if polarity -top -bot)
            (maker (subst-type t k o polarity o-ty) ;; TODO(AMK) Where do we check/handle non-integer type case?
                   l*)))]))
-
-;; Determine if the object k occurs free in the given type
-;(define (index-free-in? k a)
-;  (let/ec
-;   return
-;   (define (for-object o)
-;     (object-case (#:Type for-type)
-;                  o
-;                  [#:Path p i
-;                          (if (name-ref=? i k)
-;                              (return #t)
-;                              o)]))
-;   (define (for-type t)
-;     (type-case (#:Type for-type #:Object for-object #:Filter for-filter)
-;       t
-;       [#:arr dom rng rest drest kws dep?
-;              (let* ([st* (if (pair? k)
-;                              (λ (t) (index-free-in? (add-scope k) t))
-;                              for-type)])
-;                (for-each for-type dom)
-;                (st* rng)
-;                (and rest (for-type rest))
-;                (and drest (for-type (car drest)))
-;                (for-each for-type kws)
-;                ;; dummy return value
-;                (make-arr* null Univ #:dep? dep?))]
-;       [#:InstdRef type prop
-;              (let* ([st* (if (pair? k)
-;                              (λ (t) (index-free-in? (add-scope k) t))
-;                              for-type)]
-;                     [sf* (if (pair? k)
-;                              (λ (f) (index-free-in? (add-scope k) f))
-;                              for-filter)])
-;                (st* type)
-;                (sf* prop))]))
-;    (define (for-filter f)
-;      (filter-case (#:Type for-type #:Object for-object #:Filter for-filter)
-;                   f))
-;   (if (Type? a)
-;       (for-type a)
-;       (for-filter a))
-;    #f))

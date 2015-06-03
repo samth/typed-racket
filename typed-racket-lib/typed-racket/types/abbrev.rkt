@@ -404,9 +404,9 @@
     [(_ x t p) (let ([x #'x])
                  (make-Ref x t p))]))
 
-(define-syntax -irefine
+(define-syntax -unsafe-refine
   (syntax-rules ()
-    [(_ t p) (make-InstdRef t p)]))
+    [(_ t p) (unsafe-make-Ref t p)]))
 
 (define-syntax -SLI
   (syntax-rules ()

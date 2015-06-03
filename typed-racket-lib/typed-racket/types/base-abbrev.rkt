@@ -221,6 +221,23 @@
     [(_ dom rst rng _:c filters : object)
      #'(make-Function (list (make-arr* dom rng #:rest rst #:filters filters #:object object)))]))
 
+(define-syntax (dep->* stx)
+  (define-syntax-class c
+    (pattern x:id #:fail-unless (eq? ': (syntax-e #'x)) #f))
+  (syntax-parse stx
+    [(_ dom rng)
+     #'(make-Function (list (make-arr* dom rng #:dep? #t)))]
+    [(_ dom rst rng)
+     #'(make-Function (list (make-arr* dom rng #:rest rst #:dep? #t)))]
+    [(_ dom rng :c filters)
+     #'(make-Function (list (make-arr* dom rng #:filters filters #:dep? #t)))]
+    [(_ dom rng _:c filters _:c object)
+     #'(make-Function (list (make-arr* dom rng #:filters filters #:object object #:dep? #t)))]
+    [(_ dom rst rng _:c filters)
+     #'(make-Function (list (make-arr* dom rng #:rest rst #:filters filters #:dep? #t)))]
+    [(_ dom rst rng _:c filters : object)
+     #'(make-Function (list (make-arr* dom rng #:rest rst #:filters filters #:object object #:dep? #t)))]))
+
 (define-syntax (~> stx)
   (define (valid-formal-params? xs-syntax)
     (let ([xs (syntax->datum xs-syntax)])
@@ -291,6 +308,17 @@
      #'(->* (list dom ...) rng : filters)]
     [(_ dom ... rng)
      #'(->* (list dom ...) rng)]))
+
+(define-syntax (dep-> stx)
+  (define-syntax-class c
+    (pattern x:id #:fail-unless (eq? ': (syntax-e #'x)) #f))
+  (syntax-parse stx
+    [(_ dom ... rng _:c filters _:c objects)
+     #'(dep->* (list dom ...) rng : filters : objects)]
+    [(_ dom ... rng :c filters)
+     #'(dep->* (list dom ...) rng : filters)]
+    [(_ dom ... rng)
+     #'(dep->* (list dom ...) rng)]))
 
 (define-syntax ->...
   (syntax-rules (:)

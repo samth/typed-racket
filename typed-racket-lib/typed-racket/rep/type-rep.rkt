@@ -33,13 +33,13 @@
          remove-dups
          sub-t sub-f sub-o sub-pe
          Name/simple: Name/struct:
+         unsafe-make-Ref
          (rename-out [Class:* Class:]
                      [Class* make-Class]
                      [Row* make-Row]
                      [Mu:* Mu:]
                      [Ref:* Ref:]
-                     [Ref: InstdRef:]
-                     [IRef* make-InstdRef]
+                     [Ref: Ref-unsafe:]
                      [Poly:* Poly:]
                      [PolyDots:* PolyDots:]
                      [PolyRow:* PolyRow:]
@@ -1032,11 +1032,11 @@
                             (not/c Bot?))]) #:no-provide
   [#:frees (λ (f) (combine-frees (list (f type) 
                                        (f prop))))] ;; TODO(AMK) remove id??
-  [#:fold-rhs (IRef* (type-rec-id type) (filter-rec-id prop))])
+  [#:fold-rhs (unsafe-make-Ref (type-rec-id type) (filter-rec-id prop))])
 
 ;; the 'smart' constructor
 ;; identifier -> Type/c -> Filter/c -> Type/c
-(define (IRef* t p)
+(define (unsafe-make-Ref t p)
   (cond
     [(Top? p) t]
     [(Bot? p) (Un)]
@@ -1046,7 +1046,7 @@
 (define (Ref* id type prop)
   (define t (abstract-ident id type))
   (define p (abstract-ident id prop))
-  (IRef* t p))
+  (unsafe-make-Ref t p))
 
 ;; the 'smart' destructor
 ;; identifier -> Ref? -> Type/c

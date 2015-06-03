@@ -19,7 +19,7 @@
          (for-syntax racket/base syntax/parse))
 
 ;; printer-type: (one-of/c 'custom 'debug)
-(define-for-syntax printer-type 'debug)
+(define-for-syntax printer-type 'custom)
 
 (define-syntax (provide-printer stx)
   (if (eq? printer-type 'debug)

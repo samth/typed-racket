@@ -577,8 +577,8 @@
        (-pair (parse-type #'fst) (parse-type #'rst))]
       [(:Refine^ [x:id :colon^ t:non-keyword-ty] ps:expr ...)
        (define ids* (cons #'x ids))
-       (-irefine (abstract-ident #'x ((parse-type/ids ids*) #'t))
-                 (abstract-ident #'x (apply -and (stx-map (parse-prop/ids ids*) #'(ps ...)))))]
+       (-unsafe-refine (abstract-ident #'x ((parse-type/ids ids*) #'t))
+                       (abstract-ident #'x (apply -and (stx-map (parse-prop/ids ids*) #'(ps ...)))))]
       [(:Class^ e ...)
        (parse-class-type stx)]
       [(:Object^ e ...)
