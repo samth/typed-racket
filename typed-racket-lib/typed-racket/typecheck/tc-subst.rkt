@@ -147,10 +147,10 @@
                      (and drest (cons (st (car drest)) (cdr drest)))
                      (map st kws)
                      dep?)]
-    [#:Ref-unsafe type prop
-                  (unsafe-make-Ref
-                   (subst-type type (add-scope k) (add-scope/object o) polarity o-ty)
-                   (subst-filter prop (add-scope k) (add-scope/object o) polarity o-ty))]))
+    [#:Refine-unsafe type prop
+                     (unsafe-make-Ref
+                      (subst-type type (add-scope k) (add-scope/object o) polarity o-ty)
+                      (subst-filter prop (add-scope k) (add-scope/object o) polarity o-ty))]))
 
 ;; add-scope : name-ref/c -> name-ref/c
 ;; Add a scope to an index name-ref

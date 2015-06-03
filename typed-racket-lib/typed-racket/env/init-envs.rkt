@@ -88,7 +88,7 @@
                    (quote-syntax ,pred-id))]
     [(App: rator rands stx) `(make-App ,(sub rator) ,(sub rands) (quote-syntax ,stx))]
     [(Opaque: pred) `(make-Opaque (quote-syntax ,pred))]
-    [(Ref-unsafe: type prop) `(unsafe-make-Ref ,(sub type) ,(sub prop))]
+    [(Refine-unsafe: type prop) `(unsafe-make-Refine ,(sub type) ,(sub prop))]
     [(Refinement: parent pred) `(make-Refinement ,(sub parent)
                                                  (quote-syntax ,pred))]
     [(Mu-name: n b) `(make-Mu ,(sub n) ,(sub b))]

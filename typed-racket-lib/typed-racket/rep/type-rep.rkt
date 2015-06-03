@@ -20,7 +20,7 @@
          Type-seq
          Mu-unsafe: Poly-unsafe:
          PolyDots-unsafe:
-         Mu? Poly? PolyDots? PolyRow? Ref?
+         Mu? Poly? PolyDots? PolyRow? Refine?
          Filter? Object?
          Type/c Type/c?
          Values/c SomeValues/c
@@ -38,8 +38,8 @@
                      [Class* make-Class]
                      [Row* make-Row]
                      [Mu:* Mu:]
-                     [Ref:* Ref:]
-                     [Ref: Ref-unsafe:]
+                     [Refine:* Refine:]
+                     [Refine: Refine-unsafe:]
                      [Poly:* Poly:]
                      [PolyDots:* PolyDots:]
                      [PolyRow:* PolyRow:]
@@ -49,8 +49,8 @@
                      [PolyDots* make-PolyDots]
                      [PolyRow* make-PolyRow]
                      [Mu-body* Mu-body]
-                     [Ref-type* Ref-type]
-                     [Ref-prop* Ref-prop]
+                     [Refine-type* Refine-type]
+                     [Refine-prop* Refine-prop]
                      [Poly-body* Poly-body]
                      [PolyDots-body* PolyDots-body]
                      [PolyRow-body* PolyRow-body])
@@ -1026,10 +1026,10 @@
       [(_) #'(Name: _ _ #t)]
       [(_ name-pat) #'(Name: name-pat _ #t)])))
 
-(def-type Ref ([type Type/c]
-               [prop (and/c Filter/c
-                            (not/c Top?)
-                            (not/c Bot?))]) #:no-provide
+(def-type Refine ([type Type/c]
+                  [prop (and/c Filter/c
+                               (not/c Top?)
+                               (not/c Bot?))]) #:no-provide
   [#:frees (λ (f) (combine-frees (list (f type) 
                                        (f prop))))] ;; TODO(AMK) remove id??
   [#:fold-rhs (unsafe-make-Ref (type-rec-id type) (filter-rec-id prop))])
@@ -1041,7 +1041,7 @@
     [(Top? p) t]
     [(Bot? p) (Un)]
     [(Bottom? t) t]
-    [else (*Ref  t p)]))
+    [else (*Refine  t p)]))
 
 (define (Ref* id type prop)
   (define t (abstract-ident id type))
@@ -1050,13 +1050,13 @@
 
 ;; the 'smart' destructor
 ;; identifier -> Ref? -> Type/c
-(define (Ref-type* id r)
-  (match-let ([(Ref: t _) r])
+(define (Refine-type* id r)
+  (match-let ([(Refine: t _) r])
     (instantiate-ident id t)))
 
 ;; identifier -> Ref? -> Filter/c
-(define (Ref-prop* id r)
-  (match-let ([(Ref: _ p) r])
+(define (Refine-prop* id r)
+  (match-let ([(Refine: _ p) r])
     (instantiate-ident id p)))
 
 (define freshid
@@ -1071,13 +1071,13 @@
              (string->unreadable-symbol
               (format "~a.~a" var counter))))))
 
-(define-match-expander Ref:*
+(define-match-expander Refine:*
   (lambda (stx)
     (syntax-case stx ()
       [(_ x t p)
-       #'(? Ref?
+       #'(? Refine?
             (app (lambda (ref) (let ([id (datum->syntax #f (freshid))])
-                                 (list id (Ref-type* id ref) (Ref-prop* id ref))))
+                                 (list id (Refine-type* id ref) (Refine-prop* id ref))))
                  (list x t p)))])))
 
 (define (abstract-ident id a)
@@ -1139,10 +1139,10 @@
                   #f)
               (map (do-type lvl*) kws)
               dep?))]
-     [#:Ref type prop
+     [#:Refine type prop
       (let ([lvl* (add1 lvl)])
-        (*Ref ((do-type lvl*) type)
-              ((do-filter lvl*) prop)))]))
+        (*Refine ((do-type lvl*) type)
+                 ((do-filter lvl*) prop)))]))
   
   (define ((do-filter lvl) f)
     (filter-case (#:Type (do-type lvl)

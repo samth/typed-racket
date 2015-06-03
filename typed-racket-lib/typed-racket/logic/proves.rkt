@@ -258,10 +258,10 @@
        [else
         (define xobj (-id-path x))
         (match new-x-ty+
-          [(Ref: y y-t y-p)
+          [(Refine-unsafe: r-t r-p)
            (values (naive-extend/not-type (env-erase-type+ env x) x new-x-ty-)
-                   (list (-filter (subst-type y-t y xobj #t) xobj) 
-                         (subst-filter y-p y xobj #t)))]
+                   (list (-filter (subst-type r-t (list 0 0) xobj #t) xobj) 
+                         (subst-filter r-p (list 0 0) xobj #t)))]
           [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
                      '())])])]
     [(? LExp?)
@@ -289,10 +289,10 @@
        [else
         (define xobj (-id-path x))
         (match new-x-ty+
-          [(Ref: y y-t y-p)
+          [(Refine-unsafe: r-t r-p)
            (values (naive-extend/not-type (env-erase-type+ env x) x new-x-ty-)
-                   (list (-filter (subst-type y-t y xobj #t) xobj) 
-                         (subst-filter y-p y xobj #t)))]
+                   (list (-filter (subst-type r-t (list 0 0) xobj #t) xobj) 
+                         (subst-filter r-p (list 0 0) xobj #t)))]
           [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
                      '())])])]
     [(? LExp?)

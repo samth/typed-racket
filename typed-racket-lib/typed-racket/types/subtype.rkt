@@ -352,11 +352,11 @@
          ;; error is top and bot
          [(_ (Error:)) A0]
          [((Error:) _) A0]
-         [((Ref: x x-t x-p) super-t)
+         [((Refine-unsafe: t p) super-t)
           (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A s t obj)
           (cond
             ;; quick check, is it a refinement of the parent type?
-            [(eq? (unsafe-Rep-seq x-t) st) A0]
+            [(eq? (unsafe-Rep-seq t) st) A0]
             ;; else methodically reason about what's going on
             [else
              (when (not env) (set! env (lexical-env)))
@@ -364,8 +364,8 @@
                (match obj
                  ;; standard case
                  [(Path: π (? identifier?))
-                  (values (subst-type x-t x obj #t)
-                          (subst-filter x-p x obj #t)
+                  (values (subst-type t (list 0 0) obj #t)
+                          (subst-filter p (list 0 0) obj #t)
                           super-t
                           obj)]
                  ;; obj is a debruijn, this shouldn't happen ideally,
@@ -373,25 +373,25 @@
                  ;; introduce a new object
                  [(Path: π (list lvl arg))
                   (define obj* (-id-path (genid)))
-                  (values (subst-type x-t x obj* #t)
-                          (subst-filter x-p x obj* #t)
+                  (values (subst-type t (list 0 0) obj* #t)
+                          (subst-filter p (list 0 0) obj* #t)
                           (subst-type super-t (list lvl arg) obj* #t)
                           (-acc-path π obj*))]
                  ;; it's an LExp or empty object, introduce an object to
                  ;; stand in for filters, add an equality proposition if an LExp
                  [_
                   (define obj* (new-obj))
-                  (values (subst-type x-t x obj* #t)
+                  (values (subst-type t (list 0 0) obj* #t)
                           (if (LExp? obj)
-                              (-and (subst-filter x-p x obj* #t)
+                              (-and (subst-filter p (list 0 0) obj* #t)
                                     (-eqSLI obj (-lexp (list 1 obj*))))
-                              (subst-filter x-p x obj* #t))
+                              (subst-filter p (list 0 0) obj* #t))
                           super-t
                           obj*)]))
              (define axioms (list P1 (-filter T1 o)))
              (define goal (-filter T2 o))
              (proves A0 env axioms goal)])]
-         [(sub-t (Ref: x x-t x-p))
+         [(sub-t (Refine-unsafe: t p))
           (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A s t obj)
           (when (not env) (set! env (lexical-env)))
           (define-values (T1 T2 P2 o)
@@ -399,8 +399,8 @@
               ;; standard case
               [(Path: π (? identifier?))
                (values sub-t
-                       (subst-type x-t x obj #t)
-                       (subst-filter x-p x obj #t)
+                       (subst-type t (list 0 0) obj #t)
+                       (subst-filter p (list 0 0) obj #t)
                        obj)]
               ;; obj is a debruijn, this shouldn't happen ideally,
               ;; but we must be conservative & sound
@@ -408,16 +408,16 @@
               [(Path: π (list lvl arg))
                (define obj* (-id-path (genid)))
                (values (subst-type sub-t (list lvl arg) obj* #t)
-                       (subst-type x-t x obj* #t)
-                       (subst-filter x-p x obj* #t)
+                       (subst-type t (list 0 0) obj* #t)
+                       (subst-filter p (list 0 0) obj* #t)
                        (-acc-path π obj*))]
               ;; it's an LExp or empty object, introduce an object to
               ;; stand in for filters, add an equality proposition if an LExp
               [_
                (define obj* (new-obj))
                (values sub-t
-                       (subst-type x-t x obj* #t)
-                       (subst-filter x-p x obj* #t)
+                       (subst-type t (list 0 0) obj* #t)
+                       (subst-filter p (list 0 0) obj* #t)
                        obj*)]))
           ;; if we had an LExp, the new o is equal to it
           (define axioms (append (if (LExp? obj)

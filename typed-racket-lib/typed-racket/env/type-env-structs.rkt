@@ -40,12 +40,12 @@
   [env-extract-props (env? . -> . (values env? (listof Filter/c)))]
   [naive-extend/type (env? identifier? (and/c Type?
                                               (not/c Bottom?)
-                                              (not/c Ref?))
+                                              (not/c Refine?))
                            . -> . env?)]
   [naive-extend/not-type (env? identifier? Type? . -> . env?)]
   [naive-extend/types (env? (listof (cons/c identifier? (and/c Type?
                                                                (not/c Bottom?)
-                                                               (not/c Ref?)))) 
+                                                               (not/c Refine?)))) 
                             . -> . env?)]
   [extend/aliases (env? (listof (cons/c identifier? (and/c Object?
                                                            (not/c Empty?)))) 

@@ -72,37 +72,37 @@
   
   (define ((sift-t obj) ty)
     (type-case 
-     (#:Type (sift-t #f) #:Filter (sift-f #f) #:Object values)
-     ty
-     [#:arr dom rng rest drest kws dep?   ty]
-     [#:Union elems   ty]
-     ;; TODO(AMK) Any other types we have to ignore the inside of?
-     ;; Listof should get covered by union... right? maybe ignore Mu? or any
-     ;; that needs resolved?
-     [#:Ref x type prop (if obj
-                            (begin (save obj (subst-filter prop x obj #t))
-                                   ((sift-t obj) (subst-type type x obj #t)))
-                            ty)]
-     
-     [#:Pair t1 t2 (if obj
-                       (-pair ((sift-t (-car-of obj)) t1)
-                              ((sift-t (-cdr-of obj)) t2))
-                       ty)]
-     
-     [#:MPair t1 t2 (if obj
-                        (-mpair ((sift-t (-car-of obj)) t1)
-                                ((sift-t (-cdr-of obj)) t2))
+        (#:Type (sift-t #f) #:Filter (sift-f #f) #:Object values)
+      ty
+      [#:arr dom rng rest drest kws dep?   ty]
+      [#:Union elems   ty]
+      ;; TODO(AMK) Any other types we have to ignore the inside of?
+      ;; Listof should get covered by union... right? maybe ignore Mu? or any
+      ;; that needs resolved?
+      [#:Refine-unsafe type prop (if obj
+                                     (begin (save obj (subst-filter prop (list 0 0) obj #t))
+                                            ((sift-t obj) (subst-type type (list 0 0) obj #t)))
+                                     ty)]
+      
+      [#:Pair t1 t2 (if obj
+                        (-pair ((sift-t (-car-of obj)) t1)
+                               ((sift-t (-cdr-of obj)) t2))
                         ty)]
-     ;;TODO(amk) support these
-     #;[#:Syntax t (if obj
-                     (-syntax ((sift-t (-syntax-of obj)) t))
-                     ty)]
-     
-     #;[#:Promise t (if obj
-                      (-promise ((sift-t (-force-of obj)) t))
-                      ty)]
-     ;; TODO(amk) recurse into each struct field w/ approp path?
-     #;[#:Struct ]))
+      
+      [#:MPair t1 t2 (if obj
+                         (-mpair ((sift-t (-car-of obj)) t1)
+                                 ((sift-t (-cdr-of obj)) t2))
+                         ty)]
+      ;;TODO(amk) support these
+      #;[#:Syntax t (if obj
+                        (-syntax ((sift-t (-syntax-of obj)) t))
+                        ty)]
+      
+      #;[#:Promise t (if obj
+                         (-promise ((sift-t (-force-of obj)) t))
+                         ty)]
+      ;; TODO(amk) recurse into each struct field w/ approp path?
+      #;[#:Struct ]))
   (define ((sift-f obj) f)
     
     (filter-case (#:Type values #:Filter (sift-f obj) #:Object values)
