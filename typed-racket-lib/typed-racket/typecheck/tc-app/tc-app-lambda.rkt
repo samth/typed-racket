@@ -23,6 +23,11 @@
 
 (define-tc/app-syntax-class (tc/app-lambda expected)
   #:literal-sets (kernel-literals)
+  #:literals (call-with-continuation-barrier)
+  ;; c-w-c-b
+  ;; important because c-w-c-b is used to avoid mutable vars from letrecs
+  (pattern (call-with-continuation-barrier (#%plain-lambda () body ...))
+   (tc/let-values #'() #'() #'(body ...) expected))
   ;; let loop
   (pattern ((letrec-values ([(lp) (~and lam (#%plain-lambda (args ...) . body))]) lp*:id) . actuals)
     #:when expected

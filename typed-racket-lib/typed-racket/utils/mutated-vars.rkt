@@ -1,13 +1,31 @@
 #lang racket/base
 
-(require racket/pretty racket/dict syntax/parse syntax/id-table unstable/sequence)
+(require racket/pretty racket/dict syntax/parse syntax/id-table unstable/sequence
+         (for-template racket/base))
 
 (define-syntax-class simple
   #:literal-sets (kernel-literals)
+  #:literals (values call-with-continuation-barrier)
+  [pattern (begin e:simple ...)]
+  [pattern (begin0 e:simple ...)]
   [pattern _:id]
   [pattern (quote _)]
+  [pattern (quote-syntax . _)]
   [pattern (#%plain-lambda . _)]
-  [pattern (case-lambda . _)])
+  [pattern (case-lambda . _)]
+  [pattern (#%plain-app values e:simple ...)]
+  [pattern (#%plain-app call-with-continuation-barrier (#%plain-lambda () _ ...))
+           #:when (printf "c-w-c-b: ~a\n" (syntax->datum this-syntax))])
+
+(define-syntax-class letrec-clause
+  #:attributes ([mutated-vars 1])
+  #:literal-sets (kernel-literals)
+  #:literals (values call-with-continuation-barrier)
+  [pattern [(v ...) (#%plain-app call-with-continuation-barrier (#%plain-lambda () _ ...))]
+           #:with (mutated-vars ...) #'()]
+  [pattern [(v ...) e]
+           #:with (mutated-vars ...) #'(v ...)])
+
 
 ;; find and add to mapping all the set!'ed variables in form
 ;; if the supplied mapping is mutable, mutates it
@@ -56,10 +74,8 @@
       [(if . es) (fmv/list #'es)]
       [(with-continuation-mark . es) (fmv/list #'es)]
       [(let-values ([_ e] ...) b ...) (fmv/list #'(b ... e ...))]
-      [(letrec-values ([(v ...) e:simple] ... [(v2 ...) e2] ...) b ...)
-       (add-list (fmv/list #'(b ... e2 ... e ...)) (syntax->list #'(v2 ... ...)))]
-      [(letrec-syntaxes+values _ ([(v ...) e:simple] ... [(v2 ...) e2] ...) b ...)
-       (add-list (fmv/list #'(b ... e2 ... e ...)) (syntax->list #'(v2 ... ...)))]
+      [(letrec-values ([(v ...) e:simple] ... (~and lc:letrec-clause [(v2 ...) e2]) ...) b ...)
+       (add-list (fmv/list #'(b ... e ... e2 ...)) (syntax->list #'(lc.mutated-vars ... ...)))]
       [(#%plain-module-begin . forms) (fmv/list #'forms)]
       ;; all the other forms don't have any expression subforms (like #%top)
       [_ tbl])))

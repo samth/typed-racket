@@ -43,6 +43,7 @@ the typed racket language.
          define-typed-struct/exec
          ann inst
          :
+         define*
          (rename-out [define-typed-struct define-struct:]
                      [define-typed-struct define-struct]
                      [-struct struct]
@@ -916,3 +917,5 @@ the typed racket language.
 (define-syntax-rule (for*/extflvector: e ...)
   (base-for/flvector: for*: ExtFlonum extflvector make-extflvector unsafe-extflvector-ref
                       unsafe-extflvector-set! extflvector-copy e ...))
+
+(define-syntax-rule (define* x e) (define x (call-with-continuation-barrier (λ () e))))
