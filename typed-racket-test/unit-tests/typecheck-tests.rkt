@@ -597,7 +597,7 @@
                 (-int-type 5 -PosIndex)
                 (-int-obj 5)]
         [tc-e (let-values ([(x y) (values 3 #t)]) (and (= x 1) (not y)))
-              #:ret (ret -Boolean -false-filter)]
+              #:ret (ret -False -false-filter)]
         [tc-e/t (values 3) (-int-type 3) (-int-obj 3)]
         [tc-e (values) #:ret (ret null)]
         [tc-e (values 3 #f) #:ret
@@ -788,7 +788,7 @@
         [tc-e/t (let* ([sym 'squarf]
                        [x (if (= 1 2) 3 sym)])
                   x)
-                (t:Un (-val 'squarf) (-int-type 3))]
+                (-val 'squarf)]
 
         [tc-e/t (if #t 1 2) (-int-type 1) (-int-obj 1)]
 
@@ -815,11 +815,11 @@
         [tc-e (let* ([sym 'squarf]
                      [x (if (= 1 2) 3 sym)])
                 (if (eq? x sym) 3 x))
-              #:ret (ret (t:Un -PosByte (-int-type 3)) -true-filter)]
+              #:ret (ret (-int-type 3) -true-filter (-int-obj 3))]
         [tc-e (let* ([sym 'squarf]
                      [x (if (= 1 2) 3 sym)])
                 (if (eq? sym x) 3 x))
-              #:ret (ret (t:Un -PosByte (-int-type 3)) -true-filter)]
+              #:ret (ret (-int-type 3) -true-filter (-int-obj 3))]
         ;; equal? as predicate for symbols
         [tc-e/t (let: ([x : (Un 'foo Number) 'foo])
                       (if (equal? x 'foo) 3 x))
@@ -831,11 +831,11 @@
         [tc-e (let* ([sym 'squarf]
                      [x (if (= 1 2) 3 sym)])
                 (if (equal? x sym) 3 x))
-              #:ret (ret (t:Un -PosByte (-int-type 3)) -true-filter)]
+              #:ret (ret (-int-type 3) -true-filter (-int-obj 3))]
         [tc-e (let* ([sym 'squarf]
                      [x (if (= 1 2) 3 sym)])
                 (if (equal? sym x) 3 x))
-              #:ret (ret (t:Un -PosByte (-int-type 3)) -true-filter)]
+              #:ret (ret (-int-type 3) -true-filter (-int-obj 3))]
 
         [tc-e/t (let: ([x : (Listof Symbol)'(a b c)])
                       (cond [(memq 'a x) => car]
@@ -3916,6 +3916,63 @@
               (ann (random 42) Natural)))
         #:ret (ret -Nat)
         #:msg #rx"`sref' could not be applied to arguments"]
+       ;; integer comparison dead code tests
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Integer] (< i 10)) Integer))
+          (define foo
+            (λ (x) (if (< x 11)
+                       42
+                       "dead code")))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Integer] (< i 10)) Integer))
+          (define foo
+            (λ (x) (if (> 11 x)
+                       42
+                       "dead code")))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Integer] (< i 10)) Integer))
+          (define foo
+            (λ (x) (if (<= x 10)
+                       42
+                       "dead code")))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Integer] (< i 10)) Integer))
+          (define foo
+            (λ (x) (if (>= 10 x)
+                       42
+                       "dead code")))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Integer] (< i 10)) Integer))
+          (define foo
+            (λ (x) (if (= 10 x)
+                       "dead code"
+                       42)))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> Integer Integer Integer))
+          (define (foo x y)
+            (if (< x y)
+                (if (< y x)
+                    "dead code"
+                    42)
+                42))
+          (void))
+        -Void]
        )
 
   (test-suite

@@ -79,7 +79,11 @@
   (define (commutative-equality/filter general specific)
     ;; if we're comparing integers, use the linear equality -FS constructor
     ;; so we know the two objects are equal
-    (let ([-FS (if (and (int-type? general) (int-type? specific)) -FSb= -FS)])
+    (let ([-FS (if (or (int-type? general)
+                       (and (type-equal? -ExactNumber general)
+                            (int-type? specific)))
+                   -FSb=
+                   -FS)])
       (list (-> general specific B : (-FS (-filter specific 0) -top))
             (-> specific general B : (-FS (-filter specific 1) -top)))))
 
@@ -880,6 +884,7 @@
              -PosInt -Nat -NegInt -NonPosInt -Int
              -PosRat -NonNegRat -NegRat -NonPosRat -Rat
              -ExactNumber))
+  (-> -Int -Int B : (-FSb= -top -top))
   ;; For all real types: the filters give sign information, and the exactness information is preserved
   ;; from the original types.
   (map (lambda (t) (commutative-equality/filter -Real t))
@@ -937,6 +942,7 @@
      ;; since we'd keep track of the representation knowledge we'd already have,
      ;; and the Real cases are enough to give us sign information.
      ;; In the meantime, repetition is hard to avoid.
+     (-> -Int -Int B : (-FSb< -top -top))
      (<-type-pattern -Int -PosInt -Nat -NegInt -NonPosInt -Zero)
      (<-type-pattern -Rat -PosRat -NonNegRat -NegRat -NonPosRat -Zero)
      (<-type-pattern -Flonum -PosFlonum -NonNegFlonum -NegFlonum -NonPosFlonum)
@@ -989,6 +995,7 @@
                                      (-filter (Un -InexactRealNan -NegInfinity) 0)))
      (-> -Real -PosInfinity B : -false-filter)
      (-> -NegInfinity -Real B : -false-filter)
+     (-> -Int -Int B : (-FSb> -top -top))
      (>-type-pattern -Int -PosInt -Nat -NegInt -NonPosInt -Zero)
      (>-type-pattern -Rat -PosRat -NonNegRat -NegRat -NonPosRat -Zero)
      (>-type-pattern -Flonum -PosFlonum -NonNegFlonum -NegFlonum -NonPosFlonum)
@@ -1041,6 +1048,7 @@
      (-> -NegInfinity -Real B : (-FS (-not-filter -InexactRealNan 1) (-filter -InexactRealNan 1)))
      (-> -PosInfinity -Real B : (-FS (-filter -PosInfinity 1) (-not-filter -PosInfinity 1)))
      (-> -Real -NegInfinity B : (-FS (-filter -NegInfinity 0) (-not-filter -NegInfinity 0)))
+     (-> -Int -Int B : (-FSb<= -top -top))
      (<=-type-pattern -Int -PosInt -Nat -NegInt -NonPosInt -Zero)
      (<=-type-pattern -Rat -PosRat -NonNegRat -NegRat -NonPosRat -Zero)
      (<=-type-pattern -Flonum -PosFlonum -NonNegFlonum -NegFlonum -NonPosFlonum)
@@ -1094,6 +1102,7 @@
      (-> -Real -NegInfinity B : (-FS (-not-filter -InexactRealNan 0) (-filter -InexactRealNan 0)))
      (-> -Real -PosInfinity B : (-FS (-filter -PosInfinity 0) (-not-filter -PosInfinity 0)))
      (-> -NegInfinity -Real B : (-FS (-filter -NegInfinity 1) (-not-filter -NegInfinity 1)))
+     (-> -Int -Int B : (-FSb>= -top -top))
      (>=-type-pattern -Int -PosInt -Nat -NegInt -NonPosInt -Zero)
      (>=-type-pattern -Rat -PosRat -NonNegRat -NegRat -NonPosRat -Zero)
      (>=-type-pattern -Flonum -PosFlonum -NonNegFlonum -NegFlonum -NonPosFlonum)

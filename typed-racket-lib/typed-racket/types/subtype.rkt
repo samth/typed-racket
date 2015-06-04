@@ -421,7 +421,7 @@
                        obj*)]))
           ;; if we had an LExp, the new o is equal to it
           (define axioms (append (if (LExp? obj)
-                                     (-eqSLI obj (-lexp (list 1 o)))
+                                     (list (-eqSLI obj (-lexp (list 1 o))))
                                      '())
                                  (list (-filter T1 o))))
           (define goal (-and P2 (-filter T2 o)))

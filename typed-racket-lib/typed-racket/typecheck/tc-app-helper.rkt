@@ -20,7 +20,7 @@
      (#:check boolean?)
      . ->* . full-tc-results/c)])
 (define (tc/funapp1 f-stx args-stx ftype0 args-res expected #:check [check? #t])
-  #;(printf ">>tc/funapp1<<\n f-stx: ~a\n args-stx: ~a\n ftype0: ~a\n args-res: ~a\n expected: ~a\n check: ~a\n\n"
+  #;(printf "<tc/funapp1>\n f-stx: ~a\n\n args-stx: ~a\n\n ftype0: ~a\n\n args-res: ~a\n\n expected: ~a\n\n check: ~a\n</tc/funapp1>\n\n"
           f-stx args-stx ftype0 args-res expected check?)
   (match* (ftype0 args-res)
     [((arr: dom rng rest #f (and kws (list (Keyword: _ _ #f) ...)) dep?)

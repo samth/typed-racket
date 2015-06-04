@@ -4,6 +4,7 @@
 (provide (all-defined-out))
 
 (define safe-vector-ref unsafe-vector-ref)
+(define safe-vector-set! unsafe-vector-set!)
 
 ;; (define safe-car unsafe-car)
 ;; (define safe-cdr unsafe-cdr)

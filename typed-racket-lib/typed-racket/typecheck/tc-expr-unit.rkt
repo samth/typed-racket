@@ -78,7 +78,8 @@
     ;; typecheck form
     ;(printf "TC START!\n  STX: ~a\n  TYPE: ?\n  EXPD: ~a\n\n" form expected)
     (define t (tc-expr/check/internal form expected))
-    ;(printf "TC DONE!\n  STX: ~a\n  TYPE: ~a\n  EXPD: ~a\n\n" form t expected)
+    ;;(printf "<TC DONE>\n  STX: ~a\n  ENV: ~a\n\n TYPE: ~a\n\n  EXPD: ~a\n</TC DONE>\n\n"
+    ;;        form (lexical-env) t expected)
     (add-typeof-expr form t)
     (cond-check-below t expected)))
 
