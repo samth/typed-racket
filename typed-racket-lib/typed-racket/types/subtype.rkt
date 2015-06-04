@@ -353,7 +353,7 @@
          [(_ (Error:)) A0]
          [((Error:) _) A0]
          [((Refine-unsafe: t p) super-t)
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A s t obj)
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A s super-t obj)
           (cond
             ;; quick check, is it a refinement of the parent type?
             [(eq? (unsafe-Rep-seq t) st) A0]
@@ -392,7 +392,7 @@
              (define goal (-filter T2 o))
              (proves A0 env axioms goal)])]
          [(sub-t (Refine-unsafe: t p))
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A s t obj)
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A sub-t s obj)
           (when (not env) (set! env (lexical-env)))
           (define-values (T1 T2 P2 o)
             (match obj

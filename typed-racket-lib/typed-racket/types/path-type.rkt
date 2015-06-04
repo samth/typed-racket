@@ -96,17 +96,17 @@
     
     ;; pair ops
     [(list rst ... (CarPE:))
-     (unpath-type rst (-pair t Univ) fail-type)]
+     (-pair (unpath-type rst t fail-type) Univ)]
     [(list rst ... (CdrPE:))
-     (unpath-type rst (-pair Univ t) fail-type)]
+     (-pair Univ (unpath-type rst t fail-type))]
     
     ;; syntax ops
     [(list rst ... (SyntaxPE:))
-     (unpath-type rst (-Syntax Univ) fail-type)]
+     (-Syntax (unpath-type rst t fail-type))]
     
     ;; promise op
     [(list rst ... (ForcePE:))
-     (unpath-type rst (-Promise Univ) fail-type)]
+     (-Promise (unpath-type rst t fail-type))]
     
     ;; struct ops
     #;[(list rst ... (StructPE: (? (λ (s) (subtype t s)) s) idx))

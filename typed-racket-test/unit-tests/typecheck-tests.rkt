@@ -576,9 +576,19 @@
         [tc-e (range 0.0 4/2 0.5) (-lst -Flonum)]
         [tc-e/t '(#t #f) (-lst* (-val #t) (-val #f))]
         [tc-e/t (plambda: (a) ([l : (Listof a)]) (car l))
-                (make-Poly '(a) (t:-> (make-Listof (-v a)) (-v a)))]
+                (make-Poly '(a) (->* (list (make-Listof (-v a))) (-v a)
+                                       : (-FS (-not-filter (-val #f)
+                                                           (make-Path (list -car) (list 0 0)))
+                                              (-filter (-val #f)
+                                                       (make-Path (list -car) (list 0 0))))
+                                       : (make-Path (list -car) (list 0 0))))]
         [tc-e/t (plambda: (a) ([l : (Listof a)]) (car l))
-                (make-Poly '(a) (t:-> (make-Listof (-v a)) (-v a)))]
+                (make-Poly '(a) (->* (list (make-Listof (-v a))) (-v a)
+                                       : (-FS (-not-filter (-val #f)
+                                                           (make-Path (list -car) (list 0 0)))
+                                              (-filter (-val #f)
+                                                       (make-Path (list -car) (list 0 0))))
+                                       : (make-Path (list -car) (list 0 0))))]
         [tc-e/t (case-lambda: [([a : Number] [b : Number]) (+ a b)]) (t:-> -Number -Number -Number)]
         [tc-e/t (tr:case-lambda [([a : Number] [b : Number]) (+ a b)])
                 (t:-> -Number -Number -Number)]
@@ -644,11 +654,12 @@
                             [(null? x) 1]))
               (-int-type 1)
               (-int-obj 1)]
-        [tc-e/t (lambda: ([x : Number] . [y : Number *]) (car y))
-                (->* (list -Number) -Number -Number)]
-        [tc-e ((lambda: ([x : Number] . [y : Number *]) (car y)) 3) -Number]
-        [tc-e ((lambda: ([x : Number] . [y : Number *]) (car y)) 3 4 5) -Number]
-        [tc-e ((lambda: ([x : Number] . [y : Number *]) (car y)) 3 4) -Number]
+        [tc-e (lambda: ([x : Number] . [y : Number *]) (car y))
+                #:ret (ret (->* (list -Number) -Number -Number : -true-filter)
+                           -true-filter)]
+        [tc-e/t ((lambda: ([x : Number] . [y : Number *]) (car y)) 3) -Number]
+        [tc-e/t ((lambda: ([x : Number] . [y : Number *]) (car y)) 3 4 5) -Number]
+        [tc-e/t ((lambda: ([x : Number] . [y : Number *]) (car y)) 3 4) -Number]
         [tc-e (apply (lambda: ([x : Number] . [y : Number *]) (car y)) 3 '(4)) -Number]
         [tc-e (apply (lambda: ([x : Number] . [y : Number *]) (car y)) 3 '(4 6 7)) -Number]
         [tc-e (apply (lambda: ([x : Number] . [y : Number *]) (car y)) 3 '()) -Number]
@@ -853,7 +864,7 @@
                       'foo))
                 (t:Un (-val 'foo) (-pair Univ (-lst Univ)))]
 
-        [tc-e (cadr (cadr (list 1 (list 1 2 3) 3))) -PosByte]
+        [tc-e (cadr (cadr (list 1 (list 1 2 3) 3))) (-int-type 2)]
 
 
 

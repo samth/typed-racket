@@ -20,6 +20,8 @@
      (#:check boolean?)
      . ->* . full-tc-results/c)])
 (define (tc/funapp1 f-stx args-stx ftype0 args-res expected #:check [check? #t])
+  #;(printf ">>tc/funapp1<<\n f-stx: ~a\n args-stx: ~a\n ftype0: ~a\n args-res: ~a\n expected: ~a\n check: ~a\n\n"
+          f-stx args-stx ftype0 args-res expected check?)
   (match* (ftype0 args-res)
     [((arr: dom rng rest #f (and kws (list (Keyword: _ _ #f) ...)) dep?)
       (list (tc-result1: t-a phi-a o-a) ...))
@@ -51,7 +53,6 @@
                           [oa (in-sequence-forever (in-list o-a) -empty-obj)]
                           [ta (in-sequence-forever (in-list t-a) Univ)])
                          (values oa ta))])
-         ;(printf "\n\nGuten Tag!\n\n")
          (values->tc-results rng o-a t-a)))]
     
     ;; this case should only match if the function type has mandatory keywords

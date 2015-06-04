@@ -80,7 +80,7 @@
          [(list-no-order (? Mu? t) s) 
           (overlap* A* (unfold t) s)]
          ;; TODO(AMK) more detail here
-         [(list-no-order (Refine: x t* _) s) (overlap* A* t* s)]
+         [(list-no-order (Refine-unsafe: t* _) s) (overlap* A* t* s)]
          [(list-no-order (Refinement: t _) s) (overlap* A* t s)]
          [(list-no-order (Union: ts) s)
           (let loop ([ts ts] [A* A*]) 
