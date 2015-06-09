@@ -10,6 +10,7 @@
          (path-up "rep/type-rep.rkt" "rep/filter-rep.rkt" "rep/object-rep.rkt"
                   "rep/object-ops.rkt" "rep/rep-utils.rkt" "types/subtype.rkt"
                   "types/match-expanders.rkt"
+                  "types/numeric-tower.rkt"
                   "types/kw-types.rkt"
                   "types/utils.rkt"
                   "types/resolve.rkt"
@@ -539,7 +540,20 @@
     [(MPair: s t) `(MPairof ,(t->s s) ,(t->s t))]
     [(Refinement: parent p?)
      `(Refinement ,(t->s parent) ,(syntax-e p?))]
-    [(Refine: z t p) `(Refine [,(syntax->datum z) : ,(type->sexp t)] ,(filter->sexp p))]
+    [(? Refine? r)
+     (cond
+       [(not use-subtyping?)
+        (match-let ([(Refine-unsafe: t p) r])
+          `(Refine,(type->sexp t) ,(filter->sexp p)))]
+       [else
+        (match-let ([(Refine: z t p) r])
+          (cond
+            ;; print singleton integer type refinements as the integer
+            [(and (subtype t -Int)
+                  (equals-constant-SLI? p))
+             => (λ (n) n)]
+            [else
+             `(Refine [,(syntax->datum z) : ,(type->sexp t)] ,(filter->sexp p))]))])]
     [(Sequence: ts)
      `(Sequenceof ,@(map t->s ts))]
     [(Error:) 'Error]

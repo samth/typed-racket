@@ -1,8 +1,7 @@
 #lang racket/base
 (require "test-utils.rkt"
          (for-syntax racket/base)
-         (r:infer infer)
-         (types abbrev numeric-tower subtype union remove-intersect)
+         (types abbrev numeric-tower subtype union remove-intersect restrict)
          rackunit)
 (provide tests)
 (gen-test-main)

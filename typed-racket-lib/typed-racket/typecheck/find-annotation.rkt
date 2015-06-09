@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require "../utils/utils.rkt" syntax/parse
+(require "../utils/utils.rkt" syntax/parse racket/match
          (contract-req)
          (env lexical-env)
          (private type-annotation)
@@ -45,6 +45,13 @@
 (define-literal-set find-annotation-literals #:for-label
     (reverse))
 
+(define (unrefine t)
+  (and t
+       (let loop ([t t])
+         (match t
+           [(Refine-unsafe: t _) (loop t)]
+           [_ t]))))
+
 ;; expr id -> type or #f
 ;; if there is a binding in stx of the form:
 ;; (let ([x (reverse name)]) e) or
@@ -59,12 +66,12 @@
        #:with n:id #'c.e
        #:with (v) #'(c.v ...)
        #:fail-unless (free-identifier=? name #'n) #f
-       (or (type-annotation #'v) (lookup-type/lexical #'v #:fail (lambda _ #f)))]
+       (unrefine (or (type-annotation #'v) (lookup-type/lexical #'v #:fail (lambda _ #f))))]
       [c:lv-clause
        #:with (#%plain-app reverse n:id) #'c.e
        #:with (v) #'(c.v ...)
        #:fail-unless (free-identifier=? name #'n) #f
-       (or (type-annotation #'v) (lookup-type/lexical #'v #:fail (lambda _ #f)))]
+       (unrefine (or (type-annotation #'v) (lookup-type/lexical #'v #:fail (lambda _ #f))))]
       [_ #f]))
   (syntax-parse stx
     #:literal-sets (kernel-literals)

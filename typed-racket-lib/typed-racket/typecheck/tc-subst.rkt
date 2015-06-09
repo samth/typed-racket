@@ -7,9 +7,8 @@
          (utils tc-utils)
          racket/match racket/list
          (contract-req)
-         (except-in (types abbrev utils filter-ops path-type refine)
+         (except-in (types abbrev utils filter-ops type-ref-path refine restrict)
                     -> ->* one-of/c)
-         (only-in (infer infer) restrict)
          (rep type-rep object-rep filter-rep rep-utils object-ops))
 
 (provide add-scope subst-type subst-filter subst-object subst-result subst-tc-results)
@@ -84,8 +83,10 @@
   (define (sr ty fs ob) (subst-tc-result ty fs ob k o polarity o-ty))
   (define (sf f) (subst-filter f k o polarity o-ty))
   (match res
-    [(tc-any-results: (NoFilter:)) res]
-    [(tc-any-results: f) (tc-any-results (sf f))]
+    [(tc-any-results: (NoFilter:))
+     res]
+    [(tc-any-results: f)
+     (tc-any-results (sf f))]
     [(tc-results: ts fs os)
      (tc-results (map sr ts fs os) #f)]
     [(tc-results: ts fs os dt db)
@@ -100,16 +101,15 @@
   (define argument-side
     (match r-o
       [(Path: p (? (lambda (nm) (name-ref=? nm k))))
-       (path-type p t)]
+       (type-ref/path t p)]
       [_ Err]))
 
-  (tc-result
-    (if (equal? argument-side Err)
-        (subst-type r-t k o polarity t)
-        (restrict argument-side
-                  (subst-type r-t k o polarity t)))
-    (subst-filter-set r-fs k o polarity t)
-    (subst-object r-o k o polarity)))
+  (let ([t (if (equal? argument-side Err)
+               (subst-type r-t k o polarity t)
+               (restrict argument-side (subst-type r-t k o polarity t)))]
+        [fs (subst-filter-set r-fs k o polarity t)]
+        [o (subst-object r-o k o polarity)])
+    (tc-result t fs o)))
 
 ;; Substitution of objects into a filter set
 ;; This is essentially ψ+|ψ- [o/x] from the paper
@@ -215,13 +215,12 @@
           [_
            ;; `ty` alone doesn't account for the path, so
            ;; first traverse it with the path to match `t`
-           (define ty/path (path-type p o-ty))
+           (define path-type (type-ref/path o-ty p))
            (maker
             ;; don't restrict if the path doesn't match the type
-            (if (equal? ty/path Err)
+            (if (equal? path-type Err)
                 (subst-type t k o polarity o-ty)
-                (restrict ty/path
-                          (subst-type t k o polarity o-ty)))
+                (restrict path-type (subst-type t k o polarity o-ty)))
             (-acc-path p o))])]
        ;[(index-free-in? k t) (if polarity -top -bot)] this line is wrong -amk
        [else f])]

@@ -23,9 +23,6 @@
    [cond-contracted cset-join ((listof cset?) . -> . cset?)]
    [cond-contracted c-meet ((c? c?) (symbol?) . ->* . (or/c #f c?))]))
 
-(define-signature restrict^
-  ([cond-contracted restrict ((Type/c Type/c) ((or/c 'new 'orig)) . ->* . Type/c)]))
-
 (define-signature infer^
   ([cond-contracted infer ((;; variables from the forall
                             (listof symbol?)

@@ -3795,14 +3795,7 @@
                                 (-ltSLI (-lexp 0)
                                         (-lexp (list 1 (-lvl-arg-obj 0 0))))))
                      -bot))]
-#|
-((AndFilter
-      (Byte @ (0 0))
-      (OrFilter (Positive-Byte @ (0 0)) ((≤ (DB (l 0) (a 0)) 0)))
-      (OrFilter (Zero @ (0 0)) ((< 0 (DB (l 0) (a 0))))))
-     |
-     Bot))
-|#
+
        [tc-e/t ((inst values Any) "a") -String]
        [tc-e ((inst second Any Any Any) (list "a" "b")) -String]
        [tc-e/t (abs 4) (-int-type 4) (-int-obj 4)]

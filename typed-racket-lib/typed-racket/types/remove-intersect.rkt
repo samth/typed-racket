@@ -1,9 +1,9 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
+         (utils tc-utils)
          (rep type-rep rep-utils)
-         (types union subtype resolve utils)
-         (only-in (types numeric-tower) -Int)
+         (types union subtype resolve utils numeric-tower)
          racket/match racket/unsafe/ops)
 
 (provide (rename-out [*remove remove]) overlap integer-overlap?)
@@ -156,7 +156,13 @@
 
 ;; also not yet correct
 ;; produces old without the contents of rem
-(define (*remove old rem)
+(define (*remove old rem [obj+obj-int-update #f])
+  (define-values (obj obj-int-update)
+    (match obj+obj-int-update
+      [#f (values #f #f)]
+      [(cons obj f) (values (and f obj) f)]
+      [_ (int-err "invalid obj+obj-int-update: ~a" obj+obj-int-update)]))
+  
   (define initial
     (if (subtype old rem)
         (Un) ;; the empty type

@@ -4,11 +4,21 @@
  "../utils/utils.rkt"
  (for-template racket/base racket/list racket/unsafe/ops racket/flonum racket/extflonum racket/fixnum)
  (utils tc-utils) 
- (rename-in (types union abbrev numeric-tower) [-Number N] [-Boolean B] [-Symbol Sym]))
+ (rename-in (types union abbrev numeric-tower)
+            [-Number N] [-Boolean B] [-Symbol Sym])
+ (types filter-ops)
+ (rep object-rep))
 
 (provide indexing)
 
 (define-syntax-rule (make-env* [i t] ...) (make-env [i (λ () t)] ...))
+
+(define (nonneg-range-int-type dom [rng dom])
+  (~> ([x : dom])
+      (-lst (-refine y rng (-and (-ltSLI (-lexp (list 1 (-id-path y)))
+                                         (-lexp (list 1 (-id-path x))))
+                                 (-leqSLI (-lexp 0)
+                                          (-lexp (list 1 (-id-path y)))))))))
 
 (define-syntax-rule (indexing index-type)
   (make-env*
@@ -217,9 +227,10 @@
 
    [range (cl->* (-> -NonPosReal -Null)
                  (-> -One (-lst* -Zero))
-                 (-> -Byte (-lst -Byte))
-                 (-> -Index (-lst -Index))
-                 (-> -Fixnum (-lst -NonNegFixnum))
+                 (nonneg-range-int-type -Byte)
+                 (nonneg-range-int-type -Index)
+                 (nonneg-range-int-type -Fixnum -NonNegFixnum)
+                 (nonneg-range-int-type -Int -Nat)
                  (-> -Real (-lst -Nat))
                  (->opt -PosInt -Byte [-Int] (-lst -PosByte))
                  (->opt -Nat -Byte [-Int] (-lst -Byte))

@@ -1,18 +1,18 @@
 #lang racket/base
 
-(require (rename-in "../utils/utils.rkt" [infer infer-in])
+(require (rename-in "../utils/utils.rkt")
          (rep type-rep object-rep filter-rep rep-utils)
          (prefix-in c: (contract-req))
          (types subtype base-abbrev)
-         racket/match racket/lazy-require
-         (infer-in infer))
+         racket/match racket/lazy-require)
 
 (provide unsafe-make-Refine*)
 
 (lazy-require
  ["../typecheck/tc-subst.rkt" (subst-type subst-filter)]
+ ["restrict.rkt" (restrict)]
  ["filter-ops.rkt" (-and)]
- ;["../infer/restrict.rkt" (restrict)]
+ ;["../infer/restrict.rkt" (infer)]
  ["remove-intersect.rkt" (remove)])
 ;; separates out obvious types (list 0 0) is and is not from other props
 ;; so refinement type can be restricted/updated with types it's directly

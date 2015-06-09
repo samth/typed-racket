@@ -33,6 +33,7 @@
                                  LExp->sexp
                                  LExp-gcd-shrink
                                  LExp-const-normalize
+                                 LExp-simple?
                                  object-equal?)]
               ["../types/filter-ops.rkt" (-or)])
 
@@ -57,6 +58,7 @@
          SLI-negate
          SLI-leq-pairs:
          *Top
+         equals-constant-SLI?
          (rename-out [SLI:* SLI:]))
 
 (define (Filter/c-predicate? e)
@@ -444,28 +446,24 @@
                                 pgtleqs)
              nopleqs))
 
-(define satisfiability-cache (make-hash))
+;(define satisfiability-cache (make-hash))
 
 ;; sli-satisfiable?
 (define/cond-contract (internal-sli-sat? sli)
   (-> immutable-leq-set? boolean?)
-  (cond
-    [(hash-has-key? satisfiability-cache sli)
-     (hash-ref satisfiability-cache sli)]
-    [else
-     (define paths (internal-sli-path-set sli))
-     ;; build a system where all variables are eliminated
-     (define simplified-system
-       (for/fold ([s sli]) 
-                 ([p (in-set paths)])
-         (internal-sli-elim-path s p)))
-     ;; if all are trivially valid, then the system
-     ;; is satisfiable
-     (define result
-       (for/and ([ineq (in-set simplified-system)])
-         (leq-trivially-valid? ineq)))
-     (hash-set! satisfiability-cache sli result)
-     result]))
+  (define paths (internal-sli-path-set sli))
+  ;; build a system where all variables are eliminated
+  (define simplified-system
+    (for/fold ([s sli]) 
+              ([p (in-set paths)])
+      (internal-sli-elim-path s p)))
+  ;; if all are trivially valid, then the system
+  ;; is satisfiable
+  (define result
+    (for/and ([ineq (in-set simplified-system)])
+      (leq-trivially-valid? ineq)))
+  ;(hash-set! satisfiability-cache sli result)
+  result)
 
 (define/cond-contract (SLI-satisfiable? sli)
   (-> SLI? boolean?)
@@ -496,6 +494,25 @@
   (and not-s1-implies-s2
        (or (Bot? not-s2)
            (and (SLI? not-s2) (SLI-implies? not-s2 s1)))))
+
+;; tests if the SLI is stating some Path is
+;; equal to some exact integer, returning #f
+;; if not or the exact integer if it is
+(define/cond-contract (equals-constant-SLI? s)
+  (-> SLI? (or/c #f exact-integer?))
+  (cond
+    [(not (= 2 (set-count (SLI-system s))))
+     #f]
+    [(not (= 1 (set-count (SLI-paths s))))
+     #f]
+    [else
+     (match (set->list (SLI-system s))
+       [(list-no-order (leq: (? LExp-simple? lhs1)
+                             (app constant-LExp? (? exact-integer? n1)))
+                       (leq: (app constant-LExp? (? exact-integer? n2))
+                             (? LExp-simple? rhs2)))
+        (and (= n1 n2) n1)]
+       [_ #f])]))
 
 ;;**********************************************************************
 ;; Logical Implication for Integer Linear Inequalities

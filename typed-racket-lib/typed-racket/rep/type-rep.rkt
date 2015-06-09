@@ -1031,6 +1031,7 @@
                   [prop (and/c Filter/c
                                (not/c Top?)
                                (not/c Bot?))]) #:no-provide
+  [#:intern (list (Rep-seq type) (Rep-seq prop))]
   [#:frees (λ (f) (combine-frees (list (f type) 
                                        (f prop))))] ;; TODO(AMK) remove id??
   [#:fold-rhs (unsafe-make-Refine* (type-rec-id type) (filter-rec-id prop))])

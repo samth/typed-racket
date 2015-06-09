@@ -5,11 +5,10 @@
          racket/match (prefix-in - (contract-req))
          "signatures.rkt"
          "check-below.rkt" "../types/kw-types.rkt"
-         (types utils abbrev union subtype type-table path-type
-                filter-ops remove-intersect resolve generalize)
+         (types utils abbrev union subtype type-table
+                filter-ops remove-intersect resolve generalize restrict)
          (private-in syntax-properties)
          (rep type-rep filter-rep object-rep object-ops)
-         (only-in (infer infer) restrict)
          (utils tc-utils)
          (env lexical-env)
          racket/list
@@ -78,8 +77,8 @@
     ;; typecheck form
     ;(printf "TC START!\n  STX: ~a\n  TYPE: ?\n  EXPD: ~a\n\n" form expected)
     (define t (tc-expr/check/internal form expected))
-    ;;(printf "<TC DONE>\n  STX: ~a\n  ENV: ~a\n\n TYPE: ~a\n\n  EXPD: ~a\n</TC DONE>\n\n"
-    ;;        form (lexical-env) t expected)
+    #;(printf "<TC DONE>\n  STX: ~a\n  ENV: ~a\n\n TYPE: ~a\n\n  EXPD: ~a\n</TC DONE>\n\n"
+            form (lexical-env) t expected)
     (add-typeof-expr form t)
     (cond-check-below t expected)))
 
@@ -356,18 +355,18 @@
 (define (find-stx-type datum-stx [expected #f])
   (match datum-stx
     [(? syntax? (app syntax-e stx-e))
-     (match (and expected (resolve (restrict expected (-Syntax Univ) 'orig)))
+     (match (and expected (resolve (restrict (-Syntax Univ) expected)))
        [(Syntax: t) (-Syntax (find-stx-type stx-e t))]
        [_ (-Syntax (find-stx-type stx-e))])]
     [(or (? symbol?) (? null?) (? number?) (? extflonum?) (? boolean?) (? string?) (? char?)
          (? bytes?) (? regexp?) (? byte-regexp?) (? keyword?))
      (tc-literal #`#,datum-stx expected)]
     [(cons car cdr)
-     (match (and expected (resolve (restrict expected (-pair Univ Univ) 'orig)))
+     (match (and expected (resolve (restrict (-pair Univ Univ) expected)))
        [(Pair: car-t cdr-t) (-pair (find-stx-type car car-t) (find-stx-type cdr cdr-t))]
        [_ (-pair (find-stx-type car) (find-stx-type cdr))])]
     [(vector xs ...)
-     (match (and expected (resolve (restrict expected -VectorTop 'orig)))
+     (match (and expected (resolve (restrict -VectorTop expected)))
        [(Vector: t)
         (make-Vector
          (check-below
@@ -383,11 +382,11 @@
        [_ (make-HeterogeneousVector (for/list ([x (in-list xs)])
                                       (generalize (find-stx-type x #f))))])]
     [(box x)
-     (match (and expected (resolve (restrict expected -BoxTop 'orig)))
+     (match (and expected (resolve (restrict -BoxTop expected)))
        [(Box: t) (-box (check-below (find-stx-type x t) t))]
        [_ (-box (generalize (find-stx-type x)))])]
     [(? hash? h)
-     (match (and expected (resolve (restrict expected -HashTop 'orig)))
+     (match (and expected (resolve (restrict -HashTop expected)))
        [(Hashtable: kt vt)
         (define kts (hash-map h (lambda (x y) (find-stx-type x kt))))
         (define vts (hash-map h (lambda (x y) (find-stx-type y vt))))

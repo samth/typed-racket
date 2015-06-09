@@ -10,9 +10,10 @@
  (for-template (only-in racket/private/kw kw-expander-proc kw-expander-impl)
                racket/base racket/file racket/port racket/path racket/list)
  (env init-envs)
- (rename-in (types abbrev numeric-tower union) [make-arr* make-arr])
+ (rename-in (types abbrev numeric-tower union filter-ops) [make-arr* make-arr])
  (for-syntax racket/base syntax/parse
-             (only-in racket/syntax syntax-local-eval)))
+             (only-in racket/syntax syntax-local-eval))
+ (rep object-rep))
 
 (define (make-template-identifier what where)
   (let ([name (module-path-index-resolve (module-path-index-join where #f))])
@@ -25,6 +26,12 @@
       (namespace-require `(for-template ,name))
       (namespace-syntax-introduce (datum->syntax #f what)))))
 
+(define (nonneg-in-range-int-type dom [rng dom])
+  (~> ([x : dom])
+      (-seq (-refine y rng (-and (-ltSLI (-lexp (list 1 (-id-path y)))
+                                         (-lexp (list 1 (-id-path x))))
+                                 (-leqSLI (-lexp 0)
+                                          (-lexp (list 1 (-id-path y)))))))))
 
 (define-initial-env initialize-special
   ;; make-promise
@@ -67,9 +74,10 @@
              (-> Univ (-seq a b) (seq-vals (list a b))))))]
   ;; in-range
   [(make-template-identifier 'in-range 'racket/private/for)
-   (cl->* (-> -Byte (-seq -Byte))
-          (-> -Index (-seq -Index))
-          (-> -Fixnum (-seq -NonNegFixnum))
+   (cl->* (nonneg-in-range-int-type -Byte)
+          (nonneg-in-range-int-type -Index)
+          (nonneg-in-range-int-type -Fixnum -NonNegFixnum)
+          (nonneg-in-range-int-type -Int -Nat)
           (-> -Real (-seq -Nat))
           (->opt -PosInt -Byte [-Int] (-seq -PosByte))
           (->opt -Nat -Byte [-Int] (-seq -Byte))

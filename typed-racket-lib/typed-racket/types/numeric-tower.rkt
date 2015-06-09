@@ -4,8 +4,10 @@
          (rename-in (types numeric-predicates base-abbrev)
                     [simple-Un *Un])
          (rename-in (rep type-rep) [make-Base make-Base*])
+         (only-in (rep rep-utils)
+                  Type? Rep-seq)
          unstable/function
-         racket/extflonum
+         racket/extflonum racket/dict racket/set racket/match
          ;; For base type contracts
          (for-template racket/base racket/contract/base racket/extflonum (types numeric-predicates)))
 
@@ -24,9 +26,19 @@
          (rename-out (-Int -Integer))
          -ExtFlonumPosZero -ExtFlonumNegZero -ExtFlonumZero -ExtFlonumNan
          -PosExtFlonum -NonNegExtFlonum -NegExtFlonum -NonPosExtFlonum -ExtFlonum
-         integer-type)
+         integer-type int-type-bounds bounded-int-type?)
 
 (define (integer-type) -Int)
+
+(define-custom-hash-types type-hash
+    #:key? Type?
+    type-equal?
+    Rep-seq)
+
+(define-custom-set-types type-set
+  #:elem? Type?
+  type-equal?
+  Rep-seq)
 
 ;; all the types defined here are numeric (except 80-bit flonums)
 (define (make-Base name contract predicate)
@@ -338,3 +350,36 @@
 (define/decl -NegExtFlonum (*Un -NegExtFlonumNoNan -ExtFlonumNan))
 (define/decl -NonPosExtFlonum (*Un -NegExtFlonum -ExtFlonumZero))
 (define/decl -ExtFlonum (*Un -NegExtFlonumNoNan -ExtFlonumNegZero -ExtFlonumPosZero -PosExtFlonumNoNan -ExtFlonumNan))
+
+
+(define int-type-bounds
+  (let ([leq-bounds-hash
+         (make-immutable-type-hash
+          (list (cons -Zero (cons 0 0))
+                (cons -One (cons 1 1))
+                (cons -Byte (cons 0 255))
+                (cons -PosByte (cons 1 255))
+                (cons -Byte>1 (cons 2 255))
+                (cons -Index (cons 0 #f))
+                (cons -PosIndex (cons 1 #f))
+                (cons -PosFixnum (cons 1 #f))
+                (cons -NonNegFixnum (cons 0 #f))
+                (cons -NonPosFixnum (cons #f 0))
+                (cons -NegFixnum (cons #f -1))
+                (cons -PosInt (cons 1 #f))
+                (cons -Nat (cons 0 #f))
+                (cons -NonPosInt (cons #f 0))
+                (cons -NegInt (cons #f -1))))]
+        [default (cons #f #f)])
+    (λ (t)
+      (let ([bounds (dict-ref leq-bounds-hash t default)])
+        (values (car bounds) (cdr bounds))))))
+
+(define all-bounded-int-types
+  (make-immutable-type-set
+   (list -Zero -One -PosByte -Byte>1 -Byte -PosIndex -Index
+         -PosFixnum -NonNegFixnum -NegFixnum -NonPosFixnum
+         -PosInt -Nat -NegInt -NonPosInt)))
+
+(define (bounded-int-type? t)
+  (set-member? all-bounded-int-types t))

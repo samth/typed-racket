@@ -4,8 +4,7 @@
          racket/list racket/match
          (prefix-in c: (contract-req))
          (rep type-rep filter-rep object-rep rep-utils)
-         (only-in (infer infer) restrict)
-         (types union subtype remove-intersect abbrev tc-result))
+         (types union subtype remove-intersect abbrev tc-result restrict))
 
 (provide/cond-contract
   [-and (c:->* () #:rest (c:listof Filter/c) Filter/c)]

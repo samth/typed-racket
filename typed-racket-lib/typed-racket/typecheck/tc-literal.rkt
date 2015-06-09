@@ -4,9 +4,8 @@
          racket/match
          (typecheck signatures check-below)
          (types abbrev numeric-tower resolve subtype union generalize
-                prefab)
+                prefab restrict)
          (rep type-rep)
-         (only-in (infer infer) restrict)
          (utils stxclass-util)
          syntax/parse
          unstable/function
@@ -89,7 +88,7 @@
     [i:regexp  -Regexp]
     [() -Null]
     [(i . r)
-     (match (and expected (resolve (restrict expected (-pair Univ Univ) 'orig)))
+     (match (and expected (resolve (restrict (-pair Univ Univ) expected)))
        [(Pair: a-ty d-ty)
         (-pair
          (tc-literal #'i a-ty)
@@ -97,7 +96,7 @@
        [t 
         (-pair (tc-literal #'i) (tc-literal #'r))])]
     [(~var i (3d vector?))
-     (match (and expected (resolve (restrict expected -VectorTop 'orig)))
+     (match (and expected (resolve (restrict -VectorTop expected)))
        [(Vector: t)
         (make-Vector
           (check-below
@@ -113,7 +112,7 @@
        [_ (make-HeterogeneousVector (for/list ([l (in-vector (syntax-e #'i))])
                                       (generalize (tc-literal l #f))))])]
     [(~var i (3d hash?))
-     (match (and expected (resolve (restrict expected -HashTop 'orig)))
+     (match (and expected (resolve (restrict -HashTop expected)))
        [(Hashtable: k v)
         (let* ([h (syntax-e #'i)]
                [ks (hash-map h (lambda (x y) (tc-literal x k)))]

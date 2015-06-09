@@ -1,14 +1,14 @@
 #lang racket/unit
 
 (require "../utils/utils.rkt"
-	 (types abbrev union subtype)
+	 (types abbrev union subtype restrict)
          (rep object-rep)
 	 unstable/sequence
          "fail.rkt" "signatures.rkt" "constraint-structs.rkt"
          racket/match
          racket/list)
 
-(import restrict^ dmap^)
+(import dmap^)
 (export constraints^)
 
 ;; Widest constraint possible

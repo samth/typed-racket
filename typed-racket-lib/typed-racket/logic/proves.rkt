@@ -14,10 +14,10 @@
 
 (lazy-require
  ("../types/remove-intersect.rkt" (overlap))
- ("../types/path-type.rkt" (path-type unpath-type))
+ ("../types/type-ref-path.rkt" (type-ref/path type-unref/path))
  ("../types/filter-ops.rkt" (-and -or))
- ("../types/numeric-tower.rkt" (integer-type))
- ("../typecheck/tc-envops.rkt" (update))
+ ("../types/numeric-tower.rkt" (integer-type int-type-bounds bounded-int-type?)) 
+ ("type-update.rkt" (update-type))
  ("../types/subtype.rkt" (subtype))
  ("../types/union.rkt" (Un)))
 
@@ -61,7 +61,7 @@
         any/c)
   (LOG! (DIVE!))
 
-  (LOG "proves(~a) START!\n A: ~a\n env: ~a\n new-props: ~a\n goal: ~a\n\n"
+  #;(LOG "proves(~a) START!\n A: ~a\n env: ~a\n new-props: ~a\n goal: ~a\n\n"
        DEPTH A env new-props goal)
   
   (define v
@@ -73,7 +73,7 @@
                        (env-props+SLIs env)
                        exit))
 
-      (LOG "proves(~a) combined props!\n compound-props: ~a\n atoms: ~a\n slis: ~a\n\n"
+      #;(LOG "proves(~a) combined props!\n compound-props: ~a\n atoms: ~a\n slis: ~a\n\n"
            DEPTH compound-props atoms slis)
       
       ;; update the environment based on all the known atoms
@@ -92,10 +92,10 @@
             ;; [(SLI? sli) ] TODO(AMK) slis update types!
             [_ (values Γ new-props)])))
 
-      (LOG "proves(~a) goal updating...\n goal: ~a\n\n"
+      #;(LOG "proves(~a) goal updating...\n goal: ~a\n\n"
            DEPTH goal)
       (define goal* (apply -and (logical-reduce A env* goal)))
-      (LOG "proves(~a) goal updated!\n new goal: ~a\n\n"
+      #;(LOG "proves(~a) goal updated!\n new goal: ~a\n\n"
            DEPTH goal*)
       (define remaining-props (append new-exposed-props compound-props))
       (cond
@@ -105,11 +105,11 @@
          ;; simplified w/ this knowledge. Start reasoning about the complex 
          ;; propositions (e.g. and/or), newly exposed propositions, etc...
          ;; to see if we can prove the goal
-         (LOG "proves(~a) working with remaining props and goal!\n remaining props: ~a\n goal: ~a\n\n"
+         #;(LOG "proves(~a) working with remaining props and goal!\n remaining props: ~a\n goal: ~a\n\n"
               DEPTH remaining-props goal*)
          (and (full-proves A env* remaining-props goal*) A)])))
 
-  (LOG "proves(~a) END! ~a\n\n"
+  #;(LOG "proves(~a) END! ~a\n\n"
        DEPTH (and v #t))
   (LOG! (RISE!))
   v)
@@ -127,13 +127,13 @@
     [(Top:) null]
     
     [(or (? TypeFilter?) (? NotTypeFilter?))
-     (LOG "proves:logical-reduce(~a) will env witness atomic goal?\n env: ~a\n goal: ~a\n\n"
+     #;(LOG "proves:logical-reduce(~a) will env witness atomic goal?\n env: ~a\n goal: ~a\n\n"
           DEPTH env goal)
      (define v
        (if (witnesses A env goal)
            null
            (list goal)))
-     (LOG "proves:logical-reduce(~a) witness atomic goal: ~a\n\n"
+     #;(LOG "proves:logical-reduce(~a) witness atomic goal: ~a\n\n"
           DEPTH (null? v))
      v]
     
@@ -196,12 +196,12 @@
   (match goal
     [(TypeFilter: ft (and o (Path: π (? identifier? x))))
      (let ([ty (lookup-id-type x env #:fail (λ (_) Univ))])
-       (subtype (path-type π ty) ft #:A A #:env (env-erase-type+ env x) #:obj o))]
+       (subtype (type-ref/path ty π) ft #:A A #:env (env-erase-type+ env x) #:obj o))]
     
     [(NotTypeFilter: ft (and o (Path: π (? identifier? x))))
      (let ([x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))]
            [x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom))]
-           [goal-x-ty- (path-type π ft)]
+           [goal-x-ty- (type-ref/path ft π)]
            [env* (env-erase-type+ env x)])
        (with-lexical-env
         env*
@@ -234,21 +234,82 @@
 (define (update-env/obj-type env o t contra-env)
   (update-env/type+ null env t o contra-env))
 
+#|
+(Type/c ;; old type
+   Type/c ;; new type
+   boolean? ;; #t if positive fact, #f if negative
+   (listof PathElem?) ;; path down which to update
+   (c:-> Type/c Type/c boolean?) ;; should we notify?
+   (c:-> Type/c Type/c (listof PathElem?) Type/c) ;; notification function
+   . c:-> . Type/c)
+|#
+
+(define/cond-contract (make-positive-notifier x new-props-box)
+  (c:-> identifier? (box/c (listof Filter?))
+        (c:-> Type/c Type/c (or/c #f (listof PathElem?))
+              Type/c))
+  (λ (old-t new-t path-stack)
+    (cond
+      ;; we're in a context where we shouldn't assume things (e.g. nested in a union type)
+      [(not path-stack) new-t]
+      ;; we are now a more specific int type w/ bounds -- go ahead and add the bounds!
+      [(and (bounded-int-type? new-t)
+            (not (type-equal? new-t old-t)))
+       (define-values (old-low old-high) (int-type-bounds old-t))
+       (define-values (new-low new-high) (int-type-bounds new-t))
+       (define obj (make-Path (reverse path-stack) x))
+       (when (and new-low (not (eqv? old-low new-low)))
+         (set-box! new-props-box
+                   (cons (-leqSLI (-lexp new-low) (-lexp (list 1 obj)))
+                         (unbox new-props-box))))
+       (when (and new-high (not (eqv? old-high new-high)))
+         (set-box! new-props-box (cons (-leqSLI (-lexp (list 1 obj)) (-lexp new-high))
+                                       (unbox new-props-box))))
+       new-t]
+      ;; we used to be a union and now we're not --- check if there are props
+      ;; nested inside the union we can now assume to be true!
+      [(and (Union? old-t) (not (Union? new-t)))
+       (define obj (make-Path (reverse path-stack) x))
+       (define-values (t* nested-props) (extract-props-from-type obj new-t))
+       (when (not (null? nested-props))
+         (set-box! new-props-box (append nested-props (unbox new-props-box))))
+       ((make-positive-notifier x new-props-box) new-t t* path-stack)]
+      [else
+       (match new-t
+         ;; if we're now a refinement, assume the refining proposition and just return
+         ;; the refined type (recursively, of course)
+         [(Refine-unsafe: t p)
+          (define obj (make-Path (reverse path-stack) x))
+          (define prop (subst-filter p (list 0 0) obj #t))
+          (when (not (Top? p))
+            (set-box! new-props-box (cons p (unbox new-props-box))))
+          ((make-positive-notifier x new-props-box) old-t t path-stack)]
+         [_ new-t])])))
+
+(define ((make-negative-notifier x new-props-box) old-t new-t path-stack)
+  new-t)
+
 (define/cond-contract (update-env/type+ A env t o contra-env)
   (c:-> any/c env? Type? Object? procedure?
-        (values (c:or/c env? #f) (c:listof Filter?)))
+        (values (c:or/c env? #f) ;; updated environment
+                (c:listof Filter?))) ;; new derived filters
+  (LOG "update-env/type+ of ~a with ~a\n" o t)
+  (define new-props-box (box '()))
   (match o
     [(Path: π (? identifier? x))
+     (define notify+ (make-positive-notifier x new-props-box))
+     (define notify- (make-negative-notifier x new-props-box))
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ)))
      (LOG "update-env/type+ x-ty+: ~a\n" x-ty+)
      (define x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom)))
      (LOG "update-env/type+ x-ty-: ~a\n" x-ty-)
      (define new-x-ty+
-       (with-lexical-env env (update (update x-ty+ (unpath-type π t Univ) #t '()) x-ty- #f null)))
+       (with-lexical-env env (update-type (update-type x-ty+ t #t π notify+) x-ty- #f π notify-)))
      (LOG "update-env/type+ new-x-ty+: ~a\n" new-x-ty+)
      (define new-x-ty-
        (with-lexical-env env (update-negative-type new-x-ty+ x-ty-)))
      (LOG "update-env/type+ new-x-ty-: ~a\n" new-x-ty-)
+     
      (cond
        [(Bottom? new-x-ty+)
         (values (contra-env) '())]
@@ -273,14 +334,19 @@
 (define/cond-contract (update-env/type- A env t o contra-env)
   (c:-> any/c env? Type? Object? (c:or/c #f procedure?)
         (values (c:or/c env? #f) (c:listof Filter?)))
+  (define new-props-box (box '()))
   (match o
     [(Path: π (? identifier? x))
+     (define notify+ (make-positive-notifier x new-props-box))
+     (define notify- (make-negative-notifier x new-props-box))
+     
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))) ;; x is of type T
      (define new-x-ty+
-       (with-lexical-env env (update x-ty+ t #f π))) ;; combine new type-, x is now of type T'
+       (with-lexical-env env (update-type x-ty+ t #f π notify+))) ;; combine new type-, x is now of type T'
      (define x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom))) ;; env says x is not of type T-
      (define new-x-ty-
-       (with-lexical-env env (update-negative-type new-x-ty+ (Un x-ty- (unpath-type π t Bottom)))))
+       (with-lexical-env env (update-negative-type new-x-ty+
+                                                   (Un x-ty- (type-unref/path t π Bottom)))))
      (cond
        [(Bottom? new-x-ty+)
         (values (contra-env) '())]
