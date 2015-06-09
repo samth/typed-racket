@@ -567,9 +567,17 @@
         [tc-e (build-vector 4 (lambda (x) 1)) (-vec -Integer)]
         [tc-e (range 0) -Null]
         [tc-e (range 1) (-lst* -Zero)]
-        [tc-e (range 4) (-lst -Byte)]
-        [tc-e (range (ann 10 : Index)) (-lst -Index)]
-        [tc-e (range (ann 10 : Fixnum)) (-lst -NonNegFixnum)]
+        [tc-e (range 4) (-lst (-refine x -Byte
+                                       (-and (-leqSLI (-lexp 0) (-lexp (list 1 (-id-path x))))
+                                             (-leqSLI (-lexp (list 1 (-id-path x))) (-lexp 3)))))]
+        [tc-e (range (ann 10 : Index))
+              (-lst (-refine x -Index
+                             (-and (-leqSLI (-lexp 0) (-lexp (list 1 (-id-path x))))
+                                   (-leqSLI (-lexp (list 1 (-id-path x))) (-lexp 9)))))]
+        [tc-e (range (ann 10 : Fixnum))
+              (-lst (-refine x -NonNegFixnum
+                             (-and (-leqSLI (-lexp 0) (-lexp (list 1 (-id-path x))))
+                                   (-leqSLI (-lexp (list 1 (-id-path x))) (-lexp 9)))))]
         [tc-e (range (ann 10.0 : Real)) (-lst -Nat)]
         [tc-e (range 2 4 1) (-lst -PosByte)]
         [tc-e (range 0 4 1) (-lst -Byte)]

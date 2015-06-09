@@ -402,9 +402,8 @@
 
 (define-syntax -refine
   (syntax-rules ()
-    [(_ x t p) (let ([x #'x]
-                     [t* t])
-                 (make-Refine x t* p))]))
+    [(_ x t p) (let ([x (datum->syntax #f (gensym 'x))])
+                 (make-Refine x t p))]))
 
 (define-syntax -unsafe-refine
   (syntax-rules ()

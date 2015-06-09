@@ -140,7 +140,7 @@
     (test-form-exn #rx"exactly one argument"
       (:type #:verbose))
 
-    (test-form #rx"Positive-Index"
+    (test-form #rx"2"
       (:print-type (+ 1 1)))
     (test-form (regexp-quote "(values String String)")
       (:print-type (values "A" "B")))

@@ -99,5 +99,5 @@
     (check-tooltip (class object% (super-new) (field [x : Integer 0]) x (set! x 3))
                    (has-types-at? (list (list "^Integer$" 74 75))))
     (check-tooltip (values 1 2)
-                   (has-types-at? (list (list #rx"Value 1:.*One.*Value 2:.*Positive-Byte"
+                   (has-types-at? (list (list #rx"Value 1:.*1.*Value 2:.*2"
                                               23 24))))))
