@@ -130,6 +130,21 @@
                u.form
                (ret -Bottom))))]))
 
+(define (get-int-bound-props id new-t)
+  (cond
+    [(bounded-int-type? new-t)
+     (define-values (new-low new-high) (int-type-bounds new-t))
+     (define obj (-id-path id))
+     (cond
+       [(and new-low new-high)
+        (list (-leqSLI (-lexp new-low) (-lexp (list 1 obj)))
+              (-leqSLI (-lexp (list 1 obj)) (-lexp new-high)))]
+       [new-low
+        (list (-leqSLI (-lexp new-low) (-lexp (list 1 obj))))]
+       [else ;;new-high!
+        (list (-leqSLI (-lexp (list 1 obj)) (-lexp new-high)))])]
+    [else (list)]))
+
 ;; run code in an extended env and with replaced props. Requires the body to return a tc-results.
 ;; TODO make this only add the new prop instead of the entire environment once tc-id is fixed to
 ;; include the interesting props in its filter.
@@ -144,7 +159,7 @@
            (for/lists (ids/ts ps) 
              ([id (in-list ids)] [t (in-list types)])
              (let-values ([(t* ps) (extract-props-from-type id t)])
-               (values (cons id t*) ps))))
+               (values (cons id t*) (append (get-int-bound-props id t*) ps)))))
          (cond
            [(for/or ([id/t (in-list ids/ts*)]) 
               (type-equal? (cdr id/t) -Bottom))
@@ -187,13 +202,13 @@
                     ;; no alias, so just record the type and props as usual
                     (values `((,id . ,t*) . ,ids/ts) 
                             ids/als
-                            (cons ps* pss))]
+                            (cons (append (get-int-bound-props id t*) ps*) pss))]
                    [(Path: '() id*)
                     ;; id is aliased to an identifier
                     ;; record the alias relation *and* type of that alias id along w/ props
                     (values `((,id* . ,t*) . ,ids/ts) 
                             `((,id . ,o) . ,ids/als)
-                            (cons ps* pss))]
+                            (cons (append (get-int-bound-props id* t*) ps*) pss))]
                    ;; standard aliasing, just record the type and the alias
                    [(or (? Path? o) (? LExp? o)) 
                     (values ids/ts
