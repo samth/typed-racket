@@ -139,6 +139,8 @@
     [(? Rep? rep)
      `(,(gen-constructor (vector-ref (struct->vector rep) 0))
        ,@(map sub (Rep-values rep)))]
+    [(list (? exact-integer? lvl) (? exact-integer? arg))
+     `(,lvl ,arg)]
     [_ (basic v)]))
 
 (define (bound-in-this-module id)

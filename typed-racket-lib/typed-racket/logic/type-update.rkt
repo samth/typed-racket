@@ -18,7 +18,8 @@
   ("../types/subtype.rkt" (subtype))
   ("../types/filter-ops.rkt" (-and -or)))
 
-(provide update-type/env update-function/arg-types update-type)
+(provide update-type/env update-function/arg-types update-type
+         unabstract-doms/arg-objs unabstract-rng/arg-objs unabstract-expected/arg-objs)
 
 
 ;; update-type   (formerly simply 'update')
@@ -273,3 +274,34 @@
                (make-arr updated-doms updated-rng rest drest kws dep?)])])))
      (make-Function new-arrs)]
     [_ f-type]))
+
+
+;; unabstract-arg-objs : (listof Type) (listof Object)
+;; replaces DeBruijn index variables in 'doms' with
+;; the objects given in 'objs'
+;; -- this allows type inference to more accurately reason about
+;; subtyping information since the environment contains type information
+;; only about realized objects (no DeBruijns)
+(define (unabstract-doms/arg-objs doms objs argtys)
+  ;;TODO(AMK) if would be nice to do this subst in one pass with
+  ;; a multi-substitution instead of repeaded single substitutions
+  (for/list ([dom (in-list doms)])
+    (for/fold ([dom dom])
+              ([(obj arg-num) (in-indexed (in-list objs))]
+               [ty (in-list argtys)])
+      (subst-type dom (list 0 arg-num) obj #t ty))))
+
+(define (unabstract-rng/arg-objs rng objs argtys)
+  ;;TODO(AMK) if would be nice to do this subst in one pass with
+  ;; a multi-substitution instead of repeaded single substitutions
+  (for/fold ([rng rng])
+            ([(obj arg-num) (in-indexed (in-list objs))]
+             [ty (in-list argtys)])
+    (subst-result rng (list 0 arg-num) obj #t ty)))
+
+(define (unabstract-expected/arg-objs exptd objs argtys)
+  (for/fold ([exptd exptd])
+            ([(obj arg-num) (in-indexed (in-list objs))]
+             [ty (in-list argtys)])
+    (subst-tc-results exptd (list 0 arg-num) obj #t ty)))
+

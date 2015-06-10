@@ -35,52 +35,55 @@
                         #:name (and (identifier? f-stx) f-stx)
                         #:expected expected))))]))
 
-;; unabstract-arg-objs : (listof Type) (listof Object)
-;; replaces DeBruijn index variables in 'doms' with
-;; the objects given in 'objs'
-;; -- this allows type inference to more accurately reason about
-;; subtyping information since the environment contains type information
-;; only about realized objects (no DeBruijns)
-(define (unabstract-doms/arg-objs doms objs argtys)
-  ;;TODO(AMK) if would be nice to do this subst in one pass with
-  ;; a multi-substitution instead of repeaded single substitutions
-  (for/list ([dom (in-list doms)])
-    (for/fold ([dom dom])
-              ([(obj arg-num) (in-indexed (in-list objs))]
-               [ty (in-list argtys)])
-      (subst-type dom (list 0 arg-num) obj #t ty))))
-
-(define (unabstract-rng/arg-objs rng objs argtys)
-  ;;TODO(AMK) if would be nice to do this subst in one pass with
-  ;; a multi-substitution instead of repeaded single substitutions
-  (for/fold ([rng rng])
-            ([(obj arg-num) (in-indexed (in-list objs))]
-             [ty (in-list argtys)])
-    (subst-result rng (list 0 arg-num) obj #t ty)))
-
-(define (unabstract-expected/arg-objs exptd objs argtys)
-  (for/fold ([exptd exptd])
-            ([(obj arg-num) (in-indexed (in-list objs))]
-             [ty (in-list argtys)])
-    (subst-tc-results exptd (list 0 arg-num) obj #t ty)))
-
 (define (tc/funapp f-stx args-stx f-type* args-res expected)
+  ;; TODO(AMK) this call to update-function/arg-types should probably be removed
+  ;; if we simply extend the environment w/ the arg/type filters
+  ;; for the subtyping and/or tc/funapp1 calls that should be equivalent/better
+  (define f-type
+    (update-function/arg-types args-res f-type*))
   (match-define (list (tc-result1: argtys _ argobjs) ...) args-res)
-  (define f-type (update-function/arg-types args-res f-type*))
   (match f-type
     ;; we special-case this (no case-lambda) for improved error messages
     ;; tc/funapp1 currently cannot handle drest arities
     [(Function: (list (and a (arr: _ _ _ #f _ dep?))))
+     ;; non-dependent case
      (tc/funapp1 f-stx args-stx a args-res expected)]
+    #;[(Function: (list (and a (arr: dom rng rest #f kw #t))))
+     ;; dependent case
+     (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
+            [dom (unabstract-doms/arg-objs dom argobjs argtys)]
+            [rng (unabstract-rng/arg-objs rng argobjs argtys)]
+            [expected (and expected
+                           (unabstract-expected/arg-objs
+                            expected argobjs argtys))]
+            [a (make-arr dom rng rest #f kw #t)])
+       (tc/funapp1 f-stx args-stx a args-res expected))]
     [(Function/arrs: doms rngs rests (and drests #f) kws deps? #:arrs arrs)
      (or
       ;; find the first function where the argument types match
-      (for/first ([dom (in-list doms)] [rng (in-list rngs)] [rest (in-list rests)] [a (in-list arrs)]
-                  #:when (subtypes/varargs argtys argobjs dom rest)) ;; TODO(AMK)? subtypes/varargs needs deps?
-        ;; then typecheck here
-        ;; we call the separate function so that we get the appropriate
-        ;; filters/objects
-        (tc/funapp1 f-stx args-stx a args-res expected #:check #f))
+      (for/or ([dom (in-list doms)]
+               [rng (in-list rngs)]
+               [rest (in-list rests)]
+               [kw (in-list kws)]
+               [a (in-list arrs)]
+               [dep? (in-list deps?)])
+        (cond-let*
+         #f #;dep?
+         ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
+          [dom (unabstract-doms/arg-objs dom argobjs argtys)]
+          [rng (unabstract-rng/arg-objs rng argobjs argtys)]
+          [expected (and expected
+                         (unabstract-expected/arg-objs
+                          expected argobjs argtys))])
+         (cond
+           [(subtypes/varargs argtys argobjs dom rest)
+            ;; then typecheck here
+            ;; we call the separate function so that we get the appropriate
+            ;; filters/objects
+            (cond-let*
+             #f #;dep? ([a (make-arr dom rng rest #f kw #t)])
+             (tc/funapp1 f-stx args-stx a args-res expected #:check #f))]
+           [else #f])))
       ;; if nothing matched, error
       (domain-mismatches
        f-stx args-stx f-type doms rests drests rngs args-res #f #f
@@ -110,6 +113,7 @@
              fixed-vars dotted-var argtys dom (car drest) rng (fv rng)
              #:expected (and expected (tc-results->values expected)))]
            [rest
+            ;; TODO(AMK) we can just do this on dependent functions
             (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
                    [dom* (unabstract-doms/arg-objs dom argobjs argtys)]
                    [rng* (unabstract-rng/arg-objs rng argobjs argtys)]
@@ -139,7 +143,9 @@
       ;; Only try to infer the free vars of the rng (which includes the vars
       ;; in filters/objects).
       (λ (dom rng rest kw? a)
-        (extend-tvars vars
+        (extend-tvars
+         vars
+         ;; TODO(AMK) we can just do this on dependent functions
          (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
                 [dom* (unabstract-doms/arg-objs dom argobjs argtys)]
                 [rng* (unabstract-rng/arg-objs rng argobjs argtys)]

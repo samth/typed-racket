@@ -224,4 +224,3 @@
 (define-syntax-rule (with-lexical-env/naive-extend-types ids types . b)
   (with-lexical-env (naive-extend/types (lexical-env) (map cons ids types)) . b))
 
-

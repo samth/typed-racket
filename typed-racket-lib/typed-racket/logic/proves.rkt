@@ -61,7 +61,7 @@
         any/c)
   (LOG! (DIVE!))
 
-  #;(LOG "proves(~a) START!\n A: ~a\n env: ~a\n new-props: ~a\n goal: ~a\n\n"
+  (LOG "proves(~a) START!\n A: ~a\n env: ~a\n new-props: ~a\n goal: ~a\n\n"
        DEPTH A env new-props goal)
   
   (define v
@@ -73,7 +73,7 @@
                        (env-props+SLIs env)
                        exit))
 
-      #;(LOG "proves(~a) combined props!\n compound-props: ~a\n atoms: ~a\n slis: ~a\n\n"
+      (LOG "proves(~a) combined props!\n compound-props: ~a\n atoms: ~a\n slis: ~a\n\n"
            DEPTH compound-props atoms slis)
       
       ;; update the environment based on all the known atoms
@@ -92,10 +92,10 @@
             ;; [(SLI? sli) ] TODO(AMK) slis update types!
             [_ (values Γ new-props)])))
 
-      #;(LOG "proves(~a) goal updating...\n goal: ~a\n\n"
+      (LOG "proves(~a) goal updating...\n goal: ~a\n\n"
            DEPTH goal)
       (define goal* (apply -and (logical-reduce A env* goal)))
-      #;(LOG "proves(~a) goal updated!\n new goal: ~a\n\n"
+      (LOG "proves(~a) goal updated!\n new goal: ~a\n\n"
            DEPTH goal*)
       (define remaining-props (append new-exposed-props compound-props))
       (cond
@@ -105,11 +105,11 @@
          ;; simplified w/ this knowledge. Start reasoning about the complex 
          ;; propositions (e.g. and/or), newly exposed propositions, etc...
          ;; to see if we can prove the goal
-         #;(LOG "proves(~a) working with remaining props and goal!\n remaining props: ~a\n goal: ~a\n\n"
+         (LOG "proves(~a) working with remaining props and goal!\n remaining props: ~a\n goal: ~a\n\n"
               DEPTH remaining-props goal*)
          (and (full-proves A env* remaining-props goal*) A)])))
 
-  #;(LOG "proves(~a) END! ~a\n\n"
+  (LOG "proves(~a) END! ~a\n\n"
        DEPTH (and v #t))
   (LOG! (RISE!))
   v)
@@ -140,7 +140,7 @@
     [(? SLI? s)
      (if (SLIs-imply? (env-SLIs env) s)
          null
-         (list goal))]
+         (list s))]
     
     [(AndFilter: fs)
      (let* ([fs* (apply append (map (curry logical-reduce A env) fs))]
@@ -253,16 +253,14 @@
       ;; we're in a context where we shouldn't assume things (e.g. nested in a union type)
       [(not path-stack) new-t]
       ;; we are now a more specific int type w/ bounds -- go ahead and add the bounds!
-      [(and (bounded-int-type? new-t)
-            (not (type-equal? new-t old-t)))
-       (define-values (old-low old-high) (int-type-bounds old-t))
+      [(bounded-int-type? new-t)
        (define-values (new-low new-high) (int-type-bounds new-t))
        (define obj (make-Path (reverse path-stack) x))
-       (when (and new-low (not (eqv? old-low new-low)))
+       (when new-low
          (set-box! new-props-box
                    (cons (-leqSLI (-lexp new-low) (-lexp (list 1 obj)))
                          (unbox new-props-box))))
-       (when (and new-high (not (eqv? old-high new-high)))
+       (when new-high
          (set-box! new-props-box (cons (-leqSLI (-lexp (list 1 obj)) (-lexp new-high))
                                        (unbox new-props-box))))
        new-t]
@@ -320,10 +318,11 @@
         (match new-x-ty+
           [(Refine-unsafe: r-t r-p)
            (values (naive-extend/not-type (env-erase-type+ env x) x new-x-ty-)
-                   (list (-filter r-t xobj) 
-                         (subst-filter r-p (list 0 0) xobj #t)))]
+                   (list* (-filter r-t xobj) 
+                          (subst-filter r-p (list 0 0) xobj #t)
+                          (unbox new-props-box)))]
           [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
-                     '())])])]
+                     (unbox new-props-box))])])]
     [(? LExp?)
      ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
      (if (with-lexical-env env (not (overlap (integer-type) t)))
@@ -357,10 +356,11 @@
         (match new-x-ty+
           [(Refine-unsafe: r-t r-p)
            (values (naive-extend/not-type (env-erase-type+ env x) x new-x-ty-)
-                   (list (-filter r-t xobj) 
-                         (subst-filter r-p (list 0 0) xobj #t)))]
+                   (list* (-filter r-t xobj) 
+                          (subst-filter r-p (list 0 0) xobj #t)
+                          (unbox new-props-box)))]
           [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
-                     '())])])]
+                     (unbox new-props-box))])])]
     [(? LExp?)
      ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
      (if (subtype (integer-type) t #:A A #:env env #:obj o)

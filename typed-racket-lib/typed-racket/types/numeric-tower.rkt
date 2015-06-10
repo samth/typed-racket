@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
+         (utils tc-utils)
          (rename-in (types numeric-predicates base-abbrev)
                     [simple-Un *Un])
          (rename-in (rep type-rep) [make-Base make-Base*])
@@ -26,7 +27,7 @@
          (rename-out (-Int -Integer))
          -ExtFlonumPosZero -ExtFlonumNegZero -ExtFlonumZero -ExtFlonumNan
          -PosExtFlonum -NonNegExtFlonum -NegExtFlonum -NonPosExtFlonum -ExtFlonum
-         integer-type int-type-bounds bounded-int-type?)
+         integer-type int-type-bounds bounded-int-type? has-int-provable-range? int-type->provable-range)
 
 (define (integer-type) -Int)
 
@@ -352,28 +353,49 @@
 (define/decl -ExtFlonum (*Un -NegExtFlonumNoNan -ExtFlonumNegZero -ExtFlonumPosZero -PosExtFlonumNoNan -ExtFlonumNan))
 
 
-(define int-type-bounds
-  (let ([leq-bounds-hash
+(define int-type->provable-range
+  (let ([provable-bounds-hash
          (make-immutable-type-hash
           (list (cons -Zero (cons 0 0))
                 (cons -One (cons 1 1))
                 (cons -Byte (cons 0 255))
                 (cons -PosByte (cons 1 255))
                 (cons -Byte>1 (cons 2 255))
-                (cons -Index (cons 0 #f))
-                (cons -PosIndex (cons 1 #f))
-                (cons -PosFixnum (cons 1 #f))
-                (cons -NonNegFixnum (cons 0 #f))
-                (cons -NonPosFixnum (cons #f 0))
-                (cons -NegFixnum (cons #f -1))
                 (cons -PosInt (cons 1 #f))
                 (cons -Nat (cons 0 #f))
                 (cons -NonPosInt (cons #f 0))
                 (cons -NegInt (cons #f -1))))]
-        [default (cons #f #f)])
+        [failure-default (cons #f #f)])
     (λ (t)
-      (let ([bounds (dict-ref leq-bounds-hash t default)])
-        (values (car bounds) (cdr bounds))))))
+      (match (dict-ref provable-bounds-hash t failure-default)
+        [(cons low high) (values low high)]
+        [x (int-err 'int-type->provable-range "invalid bound! ~a" x)]))))
+
+(define (has-int-provable-range? t)
+  (let-values ([(low high) (int-type->provable-range t)])
+    (cond
+      [(or low high) #t]
+      [else #f])))
+
+(define int-type-bounds
+  (let ([leq-bounds-hash
+         (make-immutable-type-hash
+          (list (cons -Index (cons 0 #f))
+                (cons -PosIndex (cons 1 #f))
+                (cons -PosFixnum (cons 1 #f))
+                (cons -NonNegFixnum (cons 0 #f))
+                (cons -NonPosFixnum (cons #f 0))
+                (cons -NegFixnum (cons #f -1))))]
+        [failure-default (cons #f #f)])
+    (λ (t)
+      (match (dict-ref leq-bounds-hash t #f)
+        [#f (int-type->provable-range t)]
+        [(cons low high) (values low high)]
+        [x (int-err 'int-type-bounds "invalid bound! ~a" x)]))))
+
+;; Zero -> Int = 0
+;; One -> Int = 1
+;; Byte -> Int [0,255]
 
 (define all-bounded-int-types
   (make-immutable-type-set
@@ -383,3 +405,5 @@
 
 (define (bounded-int-type? t)
   (set-member? all-bounded-int-types t))
+
+

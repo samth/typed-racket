@@ -77,15 +77,12 @@
   ;; simple case useful with equality predicates.
   ;; if the equality is true, we know that general arg is in fact of specific type.
   (define (commutative-equality/filter general specific)
-    ;; if we're comparing integers, use the linear equality -FS constructor
-    ;; so we know the two objects are equal
-    (let ([-FS (if (or (int-type? general)
-                       (and (type-equal? -ExactNumber general)
-                            (int-type? specific)))
-                   -FSb=
-                   -FS)])
-      (list (-> general specific B : (-FS (-filter specific 0) -top))
-            (-> specific general B : (-FS (-filter specific 1) -top)))))
+   (list (-> general specific B : (-FS (-filter specific 0) -top))
+          (-> specific general B : (-FS (-filter specific 1) -top))))
+
+  (define (commutative-equality-int/filter general specific)
+    (list (-> general specific B : (-FSb= (-filter specific 0) -top))
+            (-> specific general B : (-FSb= (-filter specific 1) -top))))
 
   ;; if in addition if the equality is false, we know that general arg is not of the specific type.
   (define (commutative-equality/strict-filter general specific)
@@ -876,15 +873,17 @@
 
 [=
  (from-cases
+  (commutative-equality-int/filter -Zero -Int)
   (-> -Real -RealZero B : (-FS (-filter -RealZeroNoNan 0) (-not-filter -RealZeroNoNan 0)))
   (-> -RealZero -Real B : (-FS (-filter -RealZeroNoNan 1) (-not-filter -RealZeroNoNan 1)))
-  (map (lambda (t) (commutative-equality/filter -ExactNumber t))
+  (map (lambda (t) (commutative-equality-int/filter -ExactNumber t))
        (list -One -PosByte -Byte -PosIndex -Index
              -PosFixnum -NonNegFixnum -NegFixnum -NonPosFixnum -Fixnum
-             -PosInt -Nat -NegInt -NonPosInt -Int
-             -PosRat -NonNegRat -NegRat -NonPosRat -Rat
-             -ExactNumber))
+             -PosInt -Nat -NegInt -NonPosInt -Int))
   (-> -Int -Int B : (-FSb= -top -top))
+  (map (lambda (t) (commutative-equality/filter -ExactNumber t))
+       (list -PosRat -NonNegRat -NegRat -NonPosRat -Rat
+             -ExactNumber))
   ;; For all real types: the filters give sign information, and the exactness information is preserved
   ;; from the original types.
   (map (lambda (t) (commutative-equality/filter -Real t))
@@ -1062,9 +1061,9 @@
 [>= (from-cases
      (-> -One -Int B : (-FSb>= (-filter (Un -One -NonPosInt) 1) (-filter -PosInt 1)))
      (-> -Int -One B : (-FSb>= (-filter -PosInt 0) (-filter -NonPosInt 0)))
-     (-> -Int -Zero B : (-FS (-filter -Nat 0) (-filter -NegInt 0))) ;; new
+     (-> -Int -Zero B : (-FSb>= (-filter -Nat 0) (-filter -NegInt 0))) ;; new
      (-> -Real -Zero B : (-FS (-filter -NonNegReal 0) (-filter -NegReal 0)))
-     (-> -Zero -Int B : (-FS (-filter -NonPosInt 1) (-filter -PosInt 1))) ;; new
+     (-> -Zero -Int B : (-FSb>= (-filter -NonPosInt 1) (-filter -PosInt 1))) ;; new
      (-> -Zero -Real B : (-FS (-filter -NonPosReal 1) (-filter -PosReal 1)))
      (-> -Real -RealZero B : (-FS (-filter -NonNegReal 0) -top)) ;; False says nothing because of NaN
      (-> -RealZero -Real B : (-FS (-filter -NonPosReal 0) -top)) ;; False says nothing because of NaN

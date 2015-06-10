@@ -2,11 +2,15 @@
 
 (require "../utils/utils.rkt"
          racket/match (prefix-in - (contract-req))
-         racket/format
+         racket/format racket/lazy-require
          (types utils union subtype filter-ops abbrev)
          (utils tc-utils)
+         (env lexical-env)
          (rep type-rep object-rep filter-rep)
          (typecheck error-message))
+
+(lazy-require
+ ["../logic/proves.rkt" (proves)])
 
 (provide/cond-contract
  [check-below (-->i ([s (-or/c Type/c full-tc-results/c)]
@@ -90,8 +94,8 @@
       [(f f) #t]
       [(f (NoFilter:)) #t]
       [((FilterSet: f1+ f1-) (FilterSet: f2+ f2-))
-       (and (implied-atomic? f2+ f1+)
-            (implied-atomic? f2- f1-))]
+       (and (proves null (lexical-env) (list f1+) f2+)
+            (proves null (lexical-env) (list f1-) f2-))]
       [(_ _) #f]))
   (define (object-better? o1 o2)
     (match* (o1 o2)
@@ -100,7 +104,7 @@
       [(_ _) #f]))
   (define (filter-better? f1 f2)
     (or (NoFilter? f2)
-        (implied-atomic? f2 f1)))
+        (proves null (lexical-env) (list f1) f2)))
 
   (match* (tr1 expected)
     ;; This case has to be first so that bottom (exceptions, etc.) can be allowed in cases
@@ -111,7 +115,7 @@
 
     [((tc-any-results: f1) (tc-any-results: f2))
      (unless (filter-better? f1 f2)
-       (type-mismatch f2 f1 "mismatch in filter"))
+       (type-mismatch f2 f1 "mismatch in filter!"))
      (tc-any-results (fix-filter f2 f1))]
 
     [((or (tc-results: _ (list (FilterSet: fs+ fs-) ...) _)
@@ -119,7 +123,7 @@
       (tc-any-results: f2))
      (define merged-filter (apply -and (map -or fs+ fs-)))
      (unless (filter-better? merged-filter f2)
-       (type-mismatch f2 merged-filter "mismatch in filter"))
+       (type-mismatch f2 merged-filter "mismatch in filter!"))
      (tc-any-results (fix-filter f2 merged-filter))]
 
 

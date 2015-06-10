@@ -11,7 +11,9 @@
                     -> ->* one-of/c)
          (rep type-rep object-rep filter-rep rep-utils object-ops))
 
-(provide add-scope subst-type subst-filter subst-object subst-result subst-tc-results)
+(provide add-scope subst-type subst-filter
+         subst-object subst-result subst-tc-results
+         subst-filter-set)
 
 (provide/cond-contract
   [restrict-values (-> SomeValues/c (listof Type/c) SomeValues/c)]
@@ -77,8 +79,9 @@
 ;; results.
 ;; o-ty is the type of the object that we are substituting in. This allows for restriction/simplification
 ;; of some filters if they conflict with the argument type.
-(define/cond-contract (subst-tc-results res k o polarity o-ty)
-  (-> any/c name-ref/c Object? boolean? Type? any/c)
+(define/cond-contract (subst-tc-results res k o polarity [o-ty Univ])
+  (->* (any/c name-ref/c Object? boolean?) (Type?)
+       any/c)
   (define (st ty) (subst-type ty k o polarity o-ty))
   (define (sr ty fs ob) (subst-tc-result ty fs ob k o polarity o-ty))
   (define (sf f) (subst-filter f k o polarity o-ty))

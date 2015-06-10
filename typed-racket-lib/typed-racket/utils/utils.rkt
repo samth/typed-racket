@@ -18,6 +18,7 @@ at least theoretically.
  show-input?
  ;; provide macros
  rep utils typecheck infer env private types static-contracts
+ cond-let* cond-let*-values
  ;; general id generation
  genids genid)
 
@@ -33,6 +34,25 @@ at least theoretically.
 (do-contract-req)
 
 (define show-input? (make-parameter #f))
+
+;; acts like let*, but only performs
+;; the bindings if the test is true
+(define-syntax cond-let*
+  (syntax-rules ()
+    [(_ test ([x exp] ...) body ...)
+     (if test 
+         (let* ([x exp] ...) body ...)
+         (begin body ...))]))
+
+;; acts like let*-values, but only performs
+;; the bindings if the test is true
+(define-syntax cond-let*-values
+  (syntax-rules ()
+    [(_ test ([(x ...) exp] ...) body ...)
+     (if test 
+         (let*-values ([(x ...) exp] ...) body ...)
+         (begin body ...))]))
+
 
 ;; fancy require syntax
 (define-syntax (define-requirer stx)

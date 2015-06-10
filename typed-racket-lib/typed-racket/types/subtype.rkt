@@ -17,7 +17,7 @@
   ("../logic/proves.rkt" (proves))
   ("../logic/prop-ops.rkt" (extract-props-from-type))
   ("../typecheck/tc-envops.rkt" (env-extend-types))
-  ("../types/abbrev.rkt" (-car-of -cdr-of -eqSLI))
+  ("../types/abbrev.rkt" (-car-of -cdr-of -eqSLI -leqSLI))
   ; TODO(AMK) subst should not be in typecheck
   ("../typecheck/tc-subst.rkt" (subst-type subst-filter))
   ("filter-ops.rkt" (-and))
@@ -114,15 +114,6 @@
        [(_ '()) (and (andmap (match-lambda [(Keyword: _ _ rs) (not rs)]) s) A)]
        ;; we failed to satisfy all the keyword
        [(_ _) #f]))))
-
-;; acts like let*-values, but only performs
-;; the bindings if the test is true
-(define-syntax cond-let*-values
-  (syntax-rules ()
-    [(_ test ([(x ...) exp] ...) body ...)
-     (if test 
-         (let*-values ([(x ...) exp] ...) body ...)
-         (begin body ...))]))
 
 ;; The usage of restrict-values is in order to restrict the objects refering to the current
 ;; functions arguments (TR PR 15025)
@@ -302,7 +293,7 @@
           [(Struct: _ (? Struct? p) _ _ _ _) (in-hierarchy? p par)]
           [(Struct: _ (Poly: _ p) _ _ _ _) (in-hierarchy? p par)]
           [(Struct: _ #f _ _ _ _) #f]
-          [_ (int-err "wtf is this? ~a" s)])))
+          [_ (int-err "what on earth is this? ~a" s)])))
   (not (or (in-hierarchy? s1 s2) (in-hierarchy? s2 s1))))
 
 (define/cond-contract (type-equiv? A0 s t env obj)
@@ -353,7 +344,8 @@
          [(_ (Error:)) A0]
          [((Error:) _) A0]
          [((Refine-unsafe: t p) super-t)
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A s super-t obj)
+          (LOG "<<subtype>> ref below\n A: ~a\n rt: ~a\n rp: ~a\n t: ~a\n obj: ~a\n\n"
+               A t p super-t obj)
           (cond
             ;; quick check, is it a refinement of the parent type?
             [(eq? (unsafe-Rep-seq t) st) A0]
@@ -390,9 +382,13 @@
                           obj*)]))
              (define axioms (list P1 (-filter T1 o)))
              (define goal (-filter T2 o))
-             (proves A0 env axioms goal)])]
+             (define v (proves A0 env axioms goal))
+             (LOG "<<subtype>>\n A: ~a\n rt: ~a\n rp: ~a\n t: ~a\n obj: ~a\n\n ===> ~a\n\n"
+                  A t p super-t obj v)
+             v])]
          [(sub-t (Refine-unsafe: t p))
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A sub-t s obj)
+          (LOG "<<subtype>> ref above\n A: ~a\n s: ~a\n rt: ~a\n rp: ~a\n obj: ~a\n\n"
+               A sub-t t p obj)
           (when (not env) (set! env (lexical-env)))
           (define-values (T1 T2 P2 o)
             (match obj
@@ -425,7 +421,50 @@
                                      '())
                                  (list (-filter T1 o))))
           (define goal (-and P2 (-filter T2 o)))
-          (proves A0 env axioms goal)]
+          (define v (proves A0 env axioms goal))
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n rt: ~a\n rp: ~a\n obj: ~a\n\n ====> ~a\n\n"
+               A sub-t t p obj v)
+          v]
+         ;; integer w/ bounds that imply membership
+         ;; (e.g. Byte -> [0,255], Nat -> [0,*) etc)
+         [(sub-t (? has-int-provable-range? I))
+          #:when obj
+          (LOG "<<subtype>> int provable\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A sub-t I obj)
+          (when (not env) (set! env (lexical-env)))
+          (define-values (axioms obj*)
+            (match obj
+              ;; standard case
+              [(Path: π (? identifier?))
+               (values (list (-filter sub-t obj)) obj)]
+              ;; obj is a debruijn, this shouldn't happen ideally,
+              ;; but we must be conservative & sound
+              ;; introduce a new object
+              [(Path: π (list lvl arg))
+               (define id-obj* (-id-path (genid)))
+               (define obj* (-acc-path π id-obj*))
+               (values (list (-filter (subst-type sub-t (list lvl arg) id-obj* #t) obj*))
+                       obj*)]
+              ;; it's an LExp or empty object, introduce an object to
+              ;; stand in for filters, add an equality proposition if an LExp
+              [_
+               (define obj* (new-obj))
+               (values (append (if (LExp? obj)
+                                   (list (-eqSLI obj (-lexp (list 1 obj*))))
+                                   '())
+                               (list (-filter sub-t obj*)))
+                       obj*)]))
+          (define-values (lower-bound upper-bound)
+            (int-type->provable-range I))
+          (define goal
+            (apply -and (append (or (and lower-bound (list (-leqSLI (-lexp lower-bound)
+                                                                    (-lexp (list 1 obj*)))))
+                                    '())
+                                (or (and upper-bound (list (-leqSLI (-lexp (list 1 obj*))
+                                                                    (-lexp upper-bound))))
+                                    '()))))
+          (define v (proves A0 env axioms goal))
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n ====> ~a\n\n" A sub-t I obj v)
+          v]
          ;; (Un) is bot
          [(_ (Union: (list))) #f]
          ;; value types

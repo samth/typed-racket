@@ -19,7 +19,9 @@
                      [make-MListof -mlst]))
 
 (lazy-require
- ("remove-intersect.rkt" (integer-overlap?)))
+ ("remove-intersect.rkt" (integer-overlap?))
+ ("filter-ops.rkt" (-or invert-filter))
+ ("../typecheck/tc-subst.rkt" (subst-filter)))
 
 ;; This table maps types (or really, the sequence number of the type)
 ;; to identifiers that are those types. This allows us to avoid
@@ -178,6 +180,10 @@
     [(Empty? o) -top]
     [(equal? -Bottom t) -top]
     [(equal? Univ t) -bot]
+    [(Refine? t)
+     (match-define (Refine-unsafe: rt rp) t)
+     (-or (-not-filter rt o)
+          (invert-filter (subst-filter rp (list 0 0) o #t)))]
     [else (make-NotTypeFilter t o)]))
 
 
