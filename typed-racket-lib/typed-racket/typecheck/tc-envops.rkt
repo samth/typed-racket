@@ -105,7 +105,9 @@
          ;; we found some new propositions when we updated a type and it became
          ;; a refinement! we have to start over making sure to incorporate
          ;; the new facts
-         (update-env/props Γ* (append atoms new-exposed-props))]))
+         (define-values (Γ** new-atoms)
+           (update-env/props Γ* new-exposed-props))
+         (values Γ** (append atoms new-atoms))]))
 
     (update-env/props env fs)))
 
@@ -130,20 +132,7 @@
                u.form
                (ret -Bottom))))]))
 
-(define (get-int-bound-props id new-t)
-  (cond
-    [(bounded-int-type? new-t)
-     (define-values (new-low new-high) (int-type-bounds new-t))
-     (define obj (-id-path id))
-     (cond
-       [(and new-low new-high)
-        (list (-leqSLI (-lexp new-low) (-lexp (list 1 obj)))
-              (-leqSLI (-lexp (list 1 obj)) (-lexp new-high)))]
-       [new-low
-        (list (-leqSLI (-lexp new-low) (-lexp (list 1 obj))))]
-       [else ;;new-high!
-        (list (-leqSLI (-lexp (list 1 obj)) (-lexp new-high)))])]
-    [else (list)]))
+
 
 ;; run code in an extended env and with replaced props. Requires the body to return a tc-results.
 ;; TODO make this only add the new prop instead of the entire environment once tc-id is fixed to
@@ -159,7 +148,7 @@
            (for/lists (ids/ts ps) 
              ([id (in-list ids)] [t (in-list types)])
              (let-values ([(t* ps) (extract-props-from-type id t)])
-               (values (cons id t*) (append (get-int-bound-props id t*) ps)))))
+               (values (cons id t*) ps))))
          (cond
            [(for/or ([id/t (in-list ids/ts*)]) 
               (type-equal? (cdr id/t) -Bottom))
@@ -195,25 +184,34 @@
            ([(ids/ts* ids/als pss)
              (for/fold ([ids/ts null] [ids/als null] [pss null]) 
                        ([id (in-list ids)] [t (in-list types)] [o (in-list aliases)])
-               (let-values
-                   ([(t* ps*) (extract-props-from-type id t)])
-                 (match o
-                   [(Empty:)
-                    ;; no alias, so just record the type and props as usual
-                    (values `((,id . ,t*) . ,ids/ts) 
-                            ids/als
-                            (cons (append (get-int-bound-props id t*) ps*) pss))]
-                   [(Path: '() id*)
-                    ;; id is aliased to an identifier
-                    ;; record the alias relation *and* type of that alias id along w/ props
-                    (values `((,id* . ,t*) . ,ids/ts) 
-                            `((,id . ,o) . ,ids/als)
-                            (cons (append (get-int-bound-props id* t*) ps*) pss))]
-                   ;; standard aliasing, just record the type and the alias
-                   [(or (? Path? o) (? LExp? o)) 
-                    (values ids/ts
-                            `((,id . ,o) . ,ids/als)
-                            (cons ps* pss))])))])
+               (match o
+                 [(Empty:)
+                  ;; no alias, so just record the type and props as usual
+                  (define-values (t* ps*) (extract-props-from-type id t))
+                  (values `((,id . ,t*) . ,ids/ts) 
+                          ids/als
+                          (cons ps* pss))]
+                 [(? LExp? l)
+                  ;; no alias, but record linear equality!
+                  (define-values (t* ps*) (extract-props-from-type id t))
+                  (values `((,id . ,t*) . ,ids/ts) 
+                          ids/als
+                          (cons (cons (-eqSLI l (-lexp (list 1 (-id-path id)))) ps*)
+                                pss))]
+                 [(Path: '() id*)
+                  ;; id is aliased to an identifier
+                  ;; record the alias relation *and* type of that alias id along w/ props
+                  (define-values (t* ps*) (extract-props-from-type id* t))
+                  (values `((,id* . ,t*) . ,ids/ts) 
+                          `((,id . ,o) . ,ids/als)
+                          (cons ps* pss))]
+                 ;; standard aliasing, just record the type and the alias
+                 [(? Path? o)
+                  (define-values (t* ps*) (extract-props-from-type o t))
+                  (values ids/ts
+                          `((,id . ,o) . ,ids/als)
+                          (cons ps* pss))]
+                 [_ (int-err "unrecognized object! ~a" o)]))])
          (cond
            [(for/or ([id/t (in-list ids/ts*)]) (type-equal? (cdr id/t) -Bottom))
             ;; unreachable, bail out

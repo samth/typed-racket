@@ -45,6 +45,7 @@
    (c:-> Type/c Type/c (or/c #f (listof PathElem?)) Type/c) ;; notification function
    . c:-> .
    Type/c)
+  
   ;; build-type: build a type while propogating bottom
   (define (build-type constructor . args)
     (if (memf Bottom? args) -Bottom (apply constructor args)))
@@ -64,18 +65,10 @@
       [(Pair: a d)
        #:when (CarPE? path-elem)
        (define a* (update a ft rst (push)))
-       (when (not (Type? d))
-         (error 'restrict* "WTF NOT A TYPE 3!!! ~a" a))
-       (when (not (Type? a*))
-         (error 'restrict* "WTF NOT A TYPE 4!!! ~a" a))
        (build-type -pair a* d)]
       [(Pair: a d)
        #:when (CdrPE? path-elem)
        (define d* (update d ft rst (push)))
-       (when (not (Type? a))
-         (error 'restrict* "WTF NOT A TYPE 5!!! ~a" a))
-       (when (not (Type? d*))
-         (error 'restrict* "WTF NOT A TYPE 6!!! ~a" a))
        (build-type -pair a d*)]
 
       ;; struct ops
@@ -155,10 +148,6 @@
 
 
 
-
-
-
-
 (define (update-type/env ty env)
   ;(define new-props '())
   
@@ -205,8 +194,10 @@
 
 
 
+
+
 (define (update-function/arg-types args-res f-type)
-  ;; TODO support polymorphic functions
+ ;; TODO support polymorphic functions
   ;; e.g. match-define: no matching clause for (All (a) (-> (Listof a) Index))
   ;; if match-define (Function: (list (arr: domss rngs rests drests kwss dep?s) ...))
   ;; grab objects for the arguments if there is one

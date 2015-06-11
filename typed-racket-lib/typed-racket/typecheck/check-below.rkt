@@ -89,13 +89,18 @@
 ;;                   (Type Results -> Type)
 ;;                   (Type Type -> Type))
 (define (check-below tr1 expected [obj #f])
+  #;(printf "check-below\n tr1: ~a\n\n expected: ~a\n\n [obj: ~a]\n\n\n"
+          tr1 expected obj)
   (define (filter-set-better? f1 f2)
+    
     (match* (f1 f2)
       [(f f) #t]
       [(f (NoFilter:)) #t]
       [((FilterSet: f1+ f1-) (FilterSet: f2+ f2-))
-       (and (proves null (lexical-env) (list f1+) f2+)
-            (proves null (lexical-env) (list f1-) f2-))]
+       (define v (and (proves null (lexical-env) (list f1+) f2+)
+                      (proves null (lexical-env) (list f1-) f2-)))
+       #;(printf "Proved??? ~a\n\n" v)
+       v]
       [(_ _) #f]))
   (define (object-better? o1 o2)
     (match* (o1 o2)

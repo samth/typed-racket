@@ -98,7 +98,11 @@
     (env tys* ntys ps als sli)))
 
 ;; extend that works on single arguments
-(define (naive-extend/type e id type)
+(define/cond-contract (naive-extend/type e id type)
+  (-> env? identifier? (and/c Type?
+                              (not/c Bottom?)
+                              (not/c Refine?)) 
+      env?)
   (naive-extend/types e (list (cons id type))))
 
 ;; not-type extend that works on single arguments
@@ -112,10 +116,16 @@
 
 ;; extends an environment with types (no aliases)
 ;; DOES NOT FLATTEN NESTED REFINEMENT TYPE PROPS
-(define (naive-extend/types e ids/types)
+(define/cond-contract (naive-extend/types e ids/types)
+  (-> env? (listof (cons/c identifier? (and/c Type?
+                                              (not/c Bottom?)
+                                              (not/c Refine?)))) 
+      env?)
   (match-let* ([(env tys ntys ps als sli) e]
                [tys* (for/fold ([tys tys]) 
                                ([id/ty (in-list ids/types)])
+                       (when (Refine? (cdr id/ty))
+                         (error 'naive-extend/types ">>>Refinement<<<  ~a @ ~a" (cdr id/ty) (car id/ty)))
                        (free-id-table-set tys (car id/ty) (cdr id/ty)))])
     (env tys* ntys ps als sli)))
 

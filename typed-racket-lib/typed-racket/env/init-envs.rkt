@@ -130,8 +130,8 @@
                                `(quote-syntax ,i)
                                `(list ,(car i) ,(cadr i))))]
     [(LExp: c ps/cs)
-     `(apply -lexp ,(cons c (for/list ([p/c (in-list ps/cs)])
-                              (list (car p/c) (sub (cdr p/c))))))]
+     `(apply -lexp ,c ,@(for/list ([p/c (in-list ps/cs)])
+                          `(list ,(sub (cdr p/c)) ,(sub (car p/c)))))]
     [(SLI-leq-pairs: leqs)
      `(apply -and (leqs->SLIs ,(map (λ (p) `(leq ,(sub (car p))
                                                  ,(sub (cdr p))))
@@ -139,8 +139,6 @@
     [(? Rep? rep)
      `(,(gen-constructor (vector-ref (struct->vector rep) 0))
        ,@(map sub (Rep-values rep)))]
-    [(list (? exact-integer? lvl) (? exact-integer? arg))
-     `(list ,lvl ,arg)]
     [_ (basic v)]))
 
 (define (bound-in-this-module id)

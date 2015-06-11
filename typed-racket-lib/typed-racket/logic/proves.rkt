@@ -295,17 +295,31 @@
   (define new-props-box (box '()))
   (match o
     [(Path: π (? identifier? x))
+     (define env-w/o-x+ (env-erase-type+ env x))
      (define notify+ (make-positive-notifier x new-props-box))
      (define notify- (make-negative-notifier x new-props-box))
-     (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ)))
-     (LOG "update-env/type+ x-ty+: ~a\n" x-ty+)
+     (define x-ty+
+       (let ([env-type (lookup-id-type x env #:fail (λ (_) Univ))])
+         (let loop ([env-type env-type])
+           (match env-type
+             [(Refine-unsafe: rt rp)
+              (set-box! new-props-box (cons (subst-filter rp (list 0 0) (-id-path x) #t)
+                                            (unbox new-props-box)))
+              (loop rt)]
+             [_ env-type]))))
+     ;;TODO lookup-id-type can get global 
+     (LOG "update-env/type+ x-ty+: ~a\n refine? ~a\n" x-ty+ (Refine? x-ty+))
      (define x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom)))
      (LOG "update-env/type+ x-ty-: ~a\n" x-ty-)
      (define new-x-ty+
-       (with-lexical-env env (update-type (update-type x-ty+ t #t π notify+) x-ty- #f π notify-)))
+       (with-lexical-env
+        env-w/o-x+
+        (update-type (update-type x-ty+ t #t π notify+) x-ty- #f π notify-)))
      (LOG "update-env/type+ new-x-ty+: ~a\n" new-x-ty+)
      (define new-x-ty-
-       (with-lexical-env env (update-negative-type new-x-ty+ x-ty-)))
+       (with-lexical-env
+        env-w/o-x+
+        (update-negative-type new-x-ty+ x-ty-)))
      (LOG "update-env/type+ new-x-ty-: ~a\n" new-x-ty-)
      
      (cond
@@ -323,16 +337,27 @@
                           (unbox new-props-box)))]
           [_ (values (naive-extend/not-type (naive-extend/type env x new-x-ty+) x new-x-ty-)
                      (unbox new-props-box))])])]
-    [(? LExp?)
-     ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
-     (if (with-lexical-env env (not (overlap (integer-type) t)))
-         (values (contra-env) '())
-         (values env '()))]
+    [(? LExp? olexp)
+     (cond
+       [(with-lexical-env env (not (overlap (integer-type) t)))
+        (values (contra-env) '())]
+       [(bounded-int-type? t)
+        (define-values (new-low new-high) (int-type-bounds t))
+        (when new-low
+          (set-box! new-props-box
+                    (cons (-leqSLI (-lexp new-low) olexp)
+                          (unbox new-props-box))))
+        (when new-high
+          (set-box! new-props-box (cons (-leqSLI olexp (-lexp new-high))
+                                        (unbox new-props-box))))
+        (values env (unbox new-props-box))]
+       [else (values env '())])]
     [_ (int-err "invalid object for updating the environment! ~a" o)]))
 
 (define/cond-contract (update-env/type- A env t o contra-env)
   (c:-> any/c env? Type? Object? (c:or/c #f procedure?)
         (values (c:or/c env? #f) (c:listof Filter?)))
+  (LOG "update-env/type-\n")
   (define new-props-box (box '()))
   (match o
     [(Path: π (? identifier? x))
@@ -340,12 +365,19 @@
      (define notify- (make-negative-notifier x new-props-box))
      
      (define x-ty+ (lookup-id-type x env #:fail (λ (_) Univ))) ;; x is of type T
-     (define new-x-ty+
-       (with-lexical-env env (update-type x-ty+ t #f π notify+))) ;; combine new type-, x is now of type T'
+     (LOG "update-env/type- x-ty+: ~a\n" x-ty+)
      (define x-ty- (lookup-id-not-type x env #:fail (λ (_) Bottom))) ;; env says x is not of type T-
+     (LOG "update-env/type- x-ty-: ~a\n" x-ty-)
+     
+     (define new-x-ty+
+       (with-lexical-env (env-erase-type+ env x)
+                         (update-type x-ty+ t #f π notify+))) ;; combine new type-, x is now of type T'
+     (LOG "update-env/type- new-x-ty+: ~a\n" new-x-ty+)
      (define new-x-ty-
-       (with-lexical-env env (update-negative-type new-x-ty+
-                                                   (Un x-ty- (type-unref/path t π Bottom)))))
+       (with-lexical-env (env-erase-type+ env x)
+                         (update-negative-type new-x-ty+
+                                               (Un x-ty- (type-unref/path t π Bottom)))))
+     (LOG "update-env/type- new-x-ty-: ~a\n" new-x-ty-)
      (cond
        [(Bottom? new-x-ty+)
         (values (contra-env) '())]

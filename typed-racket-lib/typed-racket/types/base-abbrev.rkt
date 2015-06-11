@@ -158,10 +158,6 @@
     [(Empty? o) -top]
     [(equal? Univ t) -top]
     [(equal? -Bottom t) -bot]
-    ;; TODO(amk) this could be different / smarter...
-    [(LExp? o) (if (integer-overlap? t)
-                   -top
-                   -bot)]
     [else (make-TypeFilter t o)]))
 
 

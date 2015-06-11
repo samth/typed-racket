@@ -4,7 +4,7 @@
          (except-in racket/contract ->* -> one-of/c)
          (prefix-in c: (contract-req))
          (rep type-rep filter-rep object-rep rep-utils)
-         (types utils abbrev filter-ops)
+         (types utils abbrev filter-ops numeric-tower)
          (utils tc-utils))
 
 (lazy-require
@@ -12,6 +12,26 @@
 
 
 (provide flatten-nested-props extract-props-from-type)
+
+(define/cond-contract (get-int-bound-props obj new-t)
+  (c:-> (or/c Path? LExp?) Type? (listof Filter?))
+  (cond
+    [(bounded-int-type? new-t)
+     (define obj-lexp
+       (cond
+         [(Path? obj) (-lexp (list 1 obj))]
+         [(LExp? obj) obj]
+         [else (int-err 'get-int-bound-props "unsupported obj ~a" obj)]))
+     (define-values (new-low new-high) (int-type-bounds new-t))
+     (cond
+       [(and new-low new-high)
+        (list (-leqSLI (-lexp new-low) obj-lexp)
+              (-leqSLI obj-lexp (-lexp new-high)))]
+       [new-low
+        (list (-leqSLI (-lexp new-low) obj-lexp))]
+       [else ;;new-high!
+        (list (-leqSLI obj-lexp (-lexp new-high)))])]
+    [else (list)]))
 
 ;; recursively descend into filters/types extracting info
 ;; that should be propogated to the top level but is
@@ -107,9 +127,14 @@
     
     (filter-case (#:Type values #:Filter (sift-f obj) #:Object values)
                  f
-                 [#:TypeFilter t obj* (if (debruijn-path? obj*)
-                                          f
-                                          (-filter ((sift-t obj*) t) obj*))]
+                 [#:TypeFilter
+                  t obj*
+                  (match obj*
+                    [(Path: π (list lvl arg)) f]
+                    [else
+                     (apply -and
+                            (-filter ((sift-t obj*) t) obj*)
+                            (get-int-bound-props obj* t))])]
                  [#:AndFilter
                   fs
                   (apply -and (map (sift-f obj) fs))]
@@ -125,8 +150,3 @@
     [(Filter? a) ((sift-f obj) a)]
     [(Type? a) ((sift-t obj) a)]
     [else (int-err "invalid flatten-nested-props argument ~a" a)]))
-
-(define (debruijn-path? o)
-  (match o 
-    [(Path: _ x) (list? x)]
-    [_ #f]))
