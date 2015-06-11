@@ -152,21 +152,32 @@
 
 ;; constructor for LExps
 (define/cond-contract (-lexp . terms)
-  (->* () () #:rest (listof (or/c exact-integer? (list/c exact-integer? Path?))) 
+  (->* () () #:rest (listof (or/c exact-integer?
+                                  name-ref/c
+                                  Path?
+                                  (list/c exact-integer? Path?))) 
       LExp?)
-  (define coef car)
-  (define var cdr)
-  (let loop ([c 0]
+  (let loop ([const 0]
              [h empty-path-table]
              [terms terms])
     (match terms
-      [`() (*LExp c h)]
-      [`((,a ,p) . ,terms*)
-       (loop c 
-             (hash-set-coeff h p (+ a (hash-get-coeff h p)))
-             terms*)]
-      [`(,a . ,terms*) 
-       (loop (+ a c) h terms*)]
+      [(list) (*LExp const h)]
+      [(cons (list (? exact-integer? coeff) (? Path? p))
+             rst)
+       (loop const 
+             (hash-set-coeff h p (+ coeff (hash-get-coeff h p)))
+             rst)]
+      [(cons (? exact-integer? new-const) rst)
+       (loop (+ new-const const) h rst)]
+      [(cons (? name-ref/c var) rst)
+       (define p (make-Path null var))
+       (loop const 
+             (hash-set-coeff h p (add1 (hash-get-coeff h p)))
+             rst)]
+      [(cons (? Path? p) rst)
+       (loop const 
+             (hash-set-coeff h p (add1 (hash-get-coeff h p)))
+             rst)]
       [_ (int-err "invalid terms in list->Lexp ~a" terms)])))
 
 (define/cond-contract (LExp-set-const l c)

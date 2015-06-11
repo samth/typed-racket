@@ -59,6 +59,8 @@
          SLI-leq-pairs:
          *Top
          equals-constant-SLI?
+         leq-lhs
+         leq-rhs
          (rename-out [SLI:* SLI:]))
 
 (define (Filter/c-predicate? e)
@@ -485,15 +487,19 @@
 ;; (i.e. just prove the Or of the two is a tautology)
 (define/cond-contract (complementary-SLIs? s1 s2)
   (-> SLI? SLI? boolean?)
-  (define not-s1 (SLI-negate s1))
-  (define not-s2 (SLI-negate s2))
-  (define not-s1-implies-s2
-    (or (Bot? not-s1)
-        (and (SLI? not-s1) (SLI-implies? not-s1 s2))))
+  (define sys1 (SLI-system s1))
+  (define sys2 (SLI-system s2))
   
-  (and not-s1-implies-s2
-       (or (Bot? not-s2)
-           (and (SLI? not-s2) (SLI-implies? not-s2 s1)))))
+  (and
+   ;; ~s1 --> s2?
+   (for/and ([leq1 (in-set sys1)])
+     (define sys* (make-immutable-leq-set (list (leq-negate leq1))))
+     (internal-sli-imp? sys* sys2))
+   ;; ~s2 --> s1
+   (for/and ([leq2 (in-set sys2)])
+     (define sys* (make-immutable-leq-set (list (leq-negate leq2))))
+     (internal-sli-imp? sys* sys1))
+   #t))
 
 ;; tests if the SLI is stating some Path is
 ;; equal to some exact integer, returning #f

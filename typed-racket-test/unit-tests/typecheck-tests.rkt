@@ -540,7 +540,7 @@
                                             (-int-type 4))
                                       (list -true-filter -true-filter)
                                       (list (-int-obj 3) (-int-obj 4)))]
-        [tc-e (cons 3 4) (-pair (-int-type 3) (-int-type 4))] ;; TODO(AMK) should cons use the refinements?
+        [tc-e (cons 3 4) (-pair (-int-type 3) (-int-type 4))]
         [tc-e (cons "3" (ann '() : (Listof String))) (make-Listof -String)]
         [tc-e (void) -Void]
         [tc-e (void 3 4) -Void]

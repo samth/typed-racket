@@ -133,8 +133,8 @@
      `(apply -lexp ,c ,@(for/list ([p/c (in-list ps/cs)])
                           `(list ,(sub (cdr p/c)) ,(sub (car p/c)))))]
     [(SLI-leq-pairs: leqs)
-     `(apply -and (leqs->SLIs ,(map (λ (p) `(leq ,(sub (car p))
-                                                 ,(sub (cdr p))))
+     `(apply -and (leqs->SLIs ,(map (λ (p) `(leq ,(sub (leq-lhs p))
+                                                 ,(sub (leq-rhs p))))
                                     leqs)))]
     [(? Rep? rep)
      `(,(gen-constructor (vector-ref (struct->vector rep) 0))
