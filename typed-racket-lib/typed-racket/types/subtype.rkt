@@ -344,8 +344,8 @@
          [(_ (Error:)) A0]
          [((Error:) _) A0]
          [((Refine-unsafe: t p) super-t)
-          (LOG "<<subtype>> ref below\n A: ~a\n rt: ~a\n rp: ~a\n t: ~a\n obj: ~a\n\n"
-               A t p super-t obj)
+          (LOG "<<subtype>> ref below\n A: ~a\n rt: ~a\n rp: ~a\n t: ~a\n obj: ~a\n env: ~a\n\n"
+               A t p super-t obj (or env (lexical-env)))
           (cond
             ;; quick check, is it a refinement of the parent type?
             [(eq? (unsafe-Rep-seq t) st) A0]
@@ -387,9 +387,9 @@
                   A t p super-t obj v)
              v])]
          [(sub-t (Refine-unsafe: t p))
-          (LOG "<<subtype>> ref above\n A: ~a\n s: ~a\n rt: ~a\n rp: ~a\n obj: ~a\n\n"
-               A sub-t t p obj)
           (when (not env) (set! env (lexical-env)))
+          (LOG "<<subtype>> ref above\n A: ~a\n s: ~a\n rt: ~a\n rp: ~a\n obj: ~a\n env: ~a\n\n"
+               A sub-t t p obj env)
           (define-values (T1 T2 P2 o)
             (match obj
               ;; standard case
@@ -429,8 +429,9 @@
          ;; (e.g. Byte -> [0,255], Nat -> [0,*) etc)
          [(sub-t (? has-int-provable-range? I))
           #:when obj
-          (LOG "<<subtype>> int provable\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n" A sub-t I obj)
           (when (not env) (set! env (lexical-env)))
+          (LOG "<<subtype>> int provable\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n env: ~a\n\n"
+               A sub-t I obj env)
           (define-values (axioms obj*)
             (match obj
               ;; standard case

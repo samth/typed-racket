@@ -527,20 +527,22 @@
 ;; Logical Implication for Systems of Integer Linear Inequalities
 ;; using Fourier-Motzkin elimination
 ;;**********************************************************************
-(define sli-imp-cache (make-hash))
+(define sli-imp-cache #f #;(make-hash))
 
 (define/cond-contract (internal-sli-imp? axioms goals)
   (-> immutable-leq-set? immutable-leq-set? 
       boolean?)
   (define proof-state (cons axioms goals))
   (cond
-    [(hash-has-key? sli-imp-cache proof-state)
+    [(and sli-imp-cache
+          (hash-has-key? sli-imp-cache proof-state))
      (hash-ref sli-imp-cache proof-state)]
     [else
      (define result
        (for/and ([ineq (in-set goals)])
          (internal-sli-imp-leq? axioms ineq)))
-     (hash-set! sli-imp-cache proof-state result)
+     (when sli-imp-cache
+       (hash-set! sli-imp-cache proof-state result))
      result]))
 
 (define/cond-contract (SLI-implies? sli1 sli2)
@@ -550,8 +552,23 @@
 
 (define/cond-contract (SLIs-imply? slis goal)
   (-> (listof SLI?) SLI? boolean?)
-  (for/or ([sli (in-list slis)])
-    (SLI-implies? sli goal)))
+
+  (match-define (SLI: goal-sys goal-ps) goal)
+  
+  (define-values (axiom-sys _)
+    (for/fold ([system empty-leq-set]
+               [paths empty-path-set])
+              ([sli (in-list slis)])
+      (match-define (SLI: sys ps) sli)
+      (cond
+        [(set-overlap? ps goal-ps)
+         (values (set-union system sys)
+                 (set-union paths ps))]
+        [else (values system paths)])))
+
+  (cond
+    [(set-empty? axiom-sys) #f]
+    [else (internal-sli-imp? axiom-sys goal-sys)]))
 
 (define (SLI->LExp-pairs s)
   (for/list ([ineq (in-set (SLI-system s))])
