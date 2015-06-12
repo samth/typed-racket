@@ -559,10 +559,10 @@
                       
                       ;; they're subtypes. easy.
                       [(a b) 
-                       #:when (subtype a b #:obj obj)
-                       (begin
-                         (LOG "CGEN SUBTYPE \n~a \n AND \n ~a\n@ ~a\n\n" a b obj)
-                         empty)]
+                       #:when (let ([st? (subtype a b #:obj obj)])
+                                (LOG "CGEN SUBTYPE \n~a \n AND \n ~a\n@ ~a\n\n --> ~a\n\n" a b obj st?)
+                                st?)
+                       empty]
                       
                       ;; Lists delegate to sequences
                       [((ListSeq: s-seq) (ListSeq: t-seq))
@@ -711,7 +711,7 @@
                        (LOG "BASE BASE BASE!!!>!>!>>!\n\n")
                        (define type
                          (for/or ([t (in-list (list -Byte -Index -NonNegFixnum -Nat))])
-                           (and (subtype S t) t)))
+                           (and (subtype S t #:obj obj) t)))
                        (% cg type t* #f)]
                       [((Hashtable: k v) (Sequence: (list k* v*)))
                        (cgen/list context (list k v) (list k* v*))]
@@ -824,6 +824,11 @@
                                            ;; ensure that something produces a constraint set
                                            (and (not (null? results))
                                                 (cset-join results)))))]
+
+                      ;; last resort, try weakinging the refinement lower bound
+                      [((Refine-unsafe: rt _) T)
+                       (cg rt T obj)]
+
                       [(_ _)
                        ;; nothing worked, and we fail
                        #f]))))
@@ -843,14 +848,14 @@
   ;; variance : Variance
   (define (constraint->type v variance)
     (match v
-      [(c S T _)
+      [(c S T o)
        (evcase variance
                [Constant S]
                [Covariant S]
                [Contravariant T]
                [Invariant
                 (let ([gS (generalize S)])
-                  (if (subtype gS T)
+                  (if (subtype gS T #:obj o)
                       gS
                       S))])]))
 

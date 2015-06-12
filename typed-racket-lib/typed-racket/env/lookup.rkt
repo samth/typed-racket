@@ -5,11 +5,11 @@
          (except-in racket/contract ->* -> )
          (env type-env-structs global-env mvar-env)
          (utils tc-utils)
-         (rep type-rep object-rep rep-utils object-ops)
+         (rep type-rep object-rep rep-utils filter-rep object-ops)
          (only-in (rep type-rep) Type/c)
          (typecheck renamer)
          (prefix-in c: (contract-req))
-         (except-in (types utils abbrev) -> ->* one-of/c))
+         (except-in (types utils abbrev filter-ops) -> ->* one-of/c))
 
 
 (lazy-require 
@@ -35,7 +35,8 @@
          [(constant-LExp? l) 
           => (λ (c) (values null l (tc-literal (datum->syntax #f c))))]
          ;; TODO(amk) might be able to leverage more info about the LExp here?
-         [else (values null l (-refine x (integer-type) (-eqSLI l (-lexp (list 1 (-id-path x))))))])]
+         [else (values null l (-refine x (integer-type) (apply -and (leqs->SLIs (leq l (-lexp (-id-path x)))
+                                                                                (leq (-lexp (-id-path x)) l)))))])]
       [(Empty:) (values null id (env-struct-lookup id env #:fail fail))]))
   
   (cond

@@ -249,7 +249,7 @@
                 (-filter ty (or o (-id-path tmp-id)))))
             ;; update the lexical environment with domain types
             (define-values (env* _)
-              (env+props (lexical-env) dom-ty-props #:ingore-non-identifier-ids? #f))
+              (env+props (lexical-env) dom-ty-props #:ignore-non-identifier-ids? #f))
             
             (cond
               [(not env*) (make-arr (map (λ _ Univ) doms) 

@@ -4,9 +4,10 @@
          "signatures.rkt"
          "utils.rkt"
          syntax/parse racket/match racket/function
-         syntax/parse/experimental/reflect
-         (typecheck signatures tc-funapp)
-         (types utils)
+         syntax/parse/experimental/reflect racket/list
+         (typecheck signatures tc-funapp tc-subst tc-envops)
+         (types abbrev utils)
+         (env lexical-env)
          (rep type-rep filter-rep object-rep))
 
 (import tc-expr^ tc-app-keywords^
@@ -105,4 +106,33 @@
                   (tc-expr/check a (ret t))
                   (single-value a)))]
            [_ (map single-value args*)]))
-       (tc/funapp #'f #'args f-ty arg-tys expected))]))
+
+       ;; generate temporary identifiers for arguments w/o objects
+       ;; and any associated props discussing their types
+       (define-values (args-res opt-props opt-temp-ids)
+         (for/lists (_1 _2 _3) ([ares (in-list arg-tys)])
+           (match-define (tc-result1: t fs o) ares)
+           (cond
+             [(non-empty-obj? o)
+              (values ares #f #f)]
+             [else
+              (define temp-id (genid))
+              (define o* (-id-path temp-id))
+              (values (ret t fs o*) (-filter t o*) temp-id)])))
+
+       ;; extend the env w/ any new types
+       (define-values (env* _) (env+props (lexical-env) (filter values opt-props)))
+
+       ;; tc the application
+       (define tc-res (with-lexical-env
+                       (or env* (lexical-env))
+                       (tc/funapp #'f
+                                  #'args
+                                  f-ty
+                                  args-res
+                                  expected)))
+
+       ;; remove any temps remaining in the result from typechecking
+       (for/fold ([tc-res tc-res])
+                 ([temp-id (in-list (filter values opt-temp-ids))])
+         (subst-tc-results tc-res temp-id -empty-obj #t)))]))

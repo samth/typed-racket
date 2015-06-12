@@ -37,13 +37,13 @@
     (for/lists (ids/ts ps) 
       ([id (in-list ids)] [t (in-list types)])
       (let-values ([(t* ps) (extract-props-from-type id t)])
-        (values (cons id t*) ps))))
+        (values (cons id t*) (cons (-filter t* (-id-path id)) ps)))))
   (cond
     [(for/or ([id/t (in-list ids/ts*)]) (type-equal? (cdr id/t) -Bottom))
      #f]
     [else 
      (define ps (apply append pss))
-     (define-values (new-env _) 
+     (define-values (new-env _)
        (env+props (naive-extend/types (lexical-env) ids/ts*)
                   ps))
      new-env]))
@@ -54,7 +54,7 @@
 ;; AMK: We also return the atoms? I'm sure there's a reason
 ;; but from the body of this function it's difficult to
 ;; understand why
-(define (env+props env fs #:ingore-non-identifier-ids? [ingore-non-identifier-ids? #t])
+(define (env+props env fs #:ignore-non-identifier-ids? [ingore-non-identifier-ids? #t])
   (let/ec exit*
     (define (exit) (exit* #f empty))
 
@@ -148,7 +148,7 @@
            (for/lists (ids/ts ps) 
              ([id (in-list ids)] [t (in-list types)])
              (let-values ([(t* ps) (extract-props-from-type id t)])
-               (values (cons id t*) ps))))
+               (values (cons id t*) (cons (-filter t* id) ps)))))
          (cond
            [(for/or ([id/t (in-list ids/ts*)]) 
               (type-equal? (cdr id/t) -Bottom))
