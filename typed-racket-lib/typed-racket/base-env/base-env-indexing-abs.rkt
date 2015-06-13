@@ -264,7 +264,10 @@
                                         (-VectorTop index-type . -> . Univ)))]
    [unsafe-vector*-ref (-poly (a) (cl->* ((-vec a) index-type . -> . a)
                                          (-VectorTop index-type . -> . Univ)))]
-   [build-vector (-poly (a) (index-type (-Index . -> . a) . -> . (-vec a)))]
+   [build-vector (-poly (a) (~> ([i : index-type]
+                                 [f : (-Index . -> . a)])
+                                (-refine v (-vec a) (-eqSLI (-lexp (-id-path i))
+                                                            (-lexp (-acc-path -len (-id-path v)))))))]
    [vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [unsafe-vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [unsafe-vector*-set! (-poly (a) (-> (-vec a) index-type a -Void))]

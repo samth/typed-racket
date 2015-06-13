@@ -5,7 +5,7 @@
          (typecheck signatures check-below)
          (types abbrev numeric-tower resolve subtype union generalize
                 prefab restrict)
-         (rep type-rep)
+         (rep type-rep object-rep)
          (utils stxclass-util)
          syntax/parse
          unstable/function
@@ -99,11 +99,11 @@
      (match (and expected (resolve (restrict -VectorTop expected)))
        [(Vector: t)
         (make-Vector
-          (check-below
-            (apply Un
-              (for/list ([l (in-vector (syntax-e #'i))])
-                (tc-literal l t)))
-            t))]
+         (check-below
+          (apply Un
+                 (for/list ([l (in-vector (syntax-e #'i))])
+                   (tc-literal l t)))
+          t))]
        [(HeterogeneousVector: ts)
         (make-HeterogeneousVector
          (for/list ([l (in-vector (syntax-e #'i))]

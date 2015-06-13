@@ -48,16 +48,6 @@
     [(Function: (list (and a (arr: _ _ _ #f _ dep?))))
      ;; non-dependent case
      (tc/funapp1 f-stx args-stx a args-res expected)]
-    #;[(Function: (list (and a (arr: dom rng rest #f kw #t))))
-     ;; dependent case
-     (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
-            [dom (unabstract-doms/arg-objs dom argobjs argtys)]
-            [rng (unabstract-rng/arg-objs rng argobjs argtys)]
-            [expected (and expected
-                           (unabstract-expected/arg-objs
-                            expected argobjs argtys))]
-            [a (make-arr dom rng rest #f kw #t)])
-       (tc/funapp1 f-stx args-stx a args-res expected))]
     [(Function/arrs: doms rngs rests (and drests #f) kws deps? #:arrs arrs)
      (or
       ;; find the first function where the argument types match
@@ -67,23 +57,13 @@
                [kw (in-list kws)]
                [a (in-list arrs)]
                [dep? (in-list deps?)])
-        (cond-let*
-         #f #;dep?
-         ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
-          [dom (unabstract-doms/arg-objs dom argobjs argtys)]
-          [rng (unabstract-rng/arg-objs rng argobjs argtys)]
-          [expected (and expected
-                         (unabstract-expected/arg-objs
-                          expected argobjs argtys))])
-         (cond
-           [(subtypes/varargs argtys argobjs dom rest)
-            ;; then typecheck here
-            ;; we call the separate function so that we get the appropriate
-            ;; filters/objects
-            (cond-let*
-             #f #;dep? ([a (make-arr dom rng rest #f kw #t)])
-             (tc/funapp1 f-stx args-stx a args-res expected #:check #f))]
-           [else #f])))
+        (cond
+          [(subtypes/varargs argtys argobjs dom rest)
+           ;; then typecheck here
+           ;; we call the separate function so that we get the appropriate
+           ;; filters/objects
+           (tc/funapp1 f-stx args-stx a args-res expected #:check #f)]
+          [else #f]))
       ;; if nothing matched, error
       (domain-mismatches
        f-stx args-stx f-type doms rests drests rngs args-res #f #f
@@ -113,19 +93,14 @@
              fixed-vars dotted-var argtys dom (car drest) rng (fv rng)
              #:expected (and expected (tc-results->values expected)))]
            [rest
-            ;; TODO(AMK) we can just do this on dependent functions
-            (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
-                   [dom* (unabstract-doms/arg-objs dom argobjs argtys)]
-                   [rng* (unabstract-rng/arg-objs rng argobjs argtys)]
-                   [expected* (and expected (tc-results->values (unabstract-expected/arg-objs expected argobjs argtys)))])
-              (infer/vararg fixed-vars
-                            (list dotted-var)
-                            argtys
-                            argobjs
-                            dom*
-                            rest
-                            rng*
-                            expected*))]
+            (infer/vararg fixed-vars
+                          (list dotted-var)
+                          argtys
+                          argobjs
+                          dom
+                          rest
+                          rng
+                          (and expected (tc-results->values expected)))]
            ;; no rest or drest
            [else
             (infer fixed-vars (list dotted-var) argtys dom rng
@@ -145,19 +120,14 @@
       (λ (dom rng rest kw? a)
         (extend-tvars
          vars
-         ;; TODO(AMK) we can just do this on dependent functions
-         (let* ([argobjs (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) argobjs)]
-                [dom* (unabstract-doms/arg-objs dom argobjs argtys)]
-                [rng* (unabstract-rng/arg-objs rng argobjs argtys)]
-                [expected* (and expected (tc-results->values (unabstract-expected/arg-objs expected argobjs argtys)))])
-           (infer/vararg vars
-                         null
-                         argtys
-                         argobjs
-                         dom*
-                         rest
-                         rng*
-                         expected*))))
+         (infer/vararg vars
+                       null
+                       argtys
+                       argobjs
+                       dom
+                       rest
+                       rng
+                       (and expected (tc-results->values expected)))))
       f-type args-res expected)]
     ;; Row polymorphism. For now we do really dumb inference that only works
     ;; in very restricted cases, but is probably enough for most cases in

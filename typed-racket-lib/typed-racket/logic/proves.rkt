@@ -15,7 +15,7 @@
 (lazy-require
  ("../types/remove-intersect.rkt" (overlap))
  ("../types/type-ref-path.rkt" (type-ref/path type-unref/path))
- ("../types/filter-ops.rkt" (-and -or))
+ ("../types/filter-ops.rkt" (-and -or invert-filter))
  ("../types/numeric-tower.rkt" (integer-type int-type-bounds bounded-int-type?)) 
  ("type-update.rkt" (update-type))
  ("../types/subtype.rkt" (subtype))
@@ -82,6 +82,10 @@
                    [new-props '()]) 
                   ([f (in-list atoms)])
           (match f
+            [(NotTypeFilter: (? Refine? r) o)
+             (match-define (Refine/obj: o t p) r)
+             (values Γ (cons (-or (-not-filter o t) (invert-filter p))
+                             new-props))]
             [(or (? TypeFilter?) (? NotTypeFilter?))
              (LOG "proves(~a) update-env/atom ...\n env: ~a\n f: ~a\n\n"
             DEPTH env f)
@@ -125,6 +129,18 @@
     [(Bot:) (list goal)]
     
     [(Top:) null]
+
+    ;; distribute implicit conjuction in goal 
+    [(TypeFilter: (? Refine? r) o)
+     (match-define (Refine/obj: o t p) r)
+     (define goal* (apply -and (append (logical-reduce A env (-filter t o))
+                                   (logical-reduce A env p))))
+     (logical-reduce A env goal*)]
+    ;; distribute negation w/ DeMorgan's law
+    [(NotTypeFilter: (? Refine? r) o)
+     (match-define (Refine/obj: o t p) r)
+     (define goal* (-or (-not-filter t o) (invert-filter p)))
+     (logical-reduce A env goal*)]
     
     [(or (? TypeFilter?) (? NotTypeFilter?))
      #;(LOG "proves:logical-reduce(~a) will env witness atomic goal?\n env: ~a\n goal: ~a\n\n"
@@ -167,6 +183,11 @@
     ['() (null? (logical-reduce A env goal))]
     [(cons p ps)
      (match p
+       [(NotTypeFilter: (? Refine? r) o)
+        (match-define (Refine/obj: o t p) r)
+        (full-proves A env (cons (-or (-not-filter t o) (invert-filter p))
+                                 ps)
+                     goal)]
        [(? atomic-prop?)
         (define-values (env* new-props) (update-env/atom A env p (λ () #f)))
         (define goal* (and env* (apply -and (logical-reduce A env* goal))))

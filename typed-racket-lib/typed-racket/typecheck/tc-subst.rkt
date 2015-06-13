@@ -7,7 +7,7 @@
          (utils tc-utils)
          racket/match racket/list
          (contract-req)
-         (except-in (types abbrev utils filter-ops type-ref-path refine restrict)
+         (except-in (types abbrev utils filter-ops type-ref-path refine restrict resolve)
                     -> ->* one-of/c)
          (rep type-rep object-rep filter-rep rep-utils object-ops))
 
@@ -22,7 +22,10 @@
   [subst-result (->* (any/c name-ref/c Object? boolean?) (Type?)
                      any/c)]
   [subst-tc-results (->* (any/c name-ref/c Object? boolean?) (Type?)
-                         any/c)])
+                         any/c)]
+  [instantiate-fun-args (-> Type/c (listof Object?) Type/c)]
+  [unabstract-expected/arg-objs (-> any/c (listof Object?)
+                                    any/c)])
 
 ;; Substitutes the given objects into the values and turns it into a tc-result.
 ;; This matches up to the substitutions in the T-App rule from the ICFP paper.
@@ -107,6 +110,7 @@
     (match r-o
       [(Path: p (? (lambda (nm) (name-ref=? nm k))))
        (type-ref/path t p)]
+      [(? LExp?) r-t]
       [_ Err]))
 
   (let ([t (if (equal? argument-side Err)
@@ -146,11 +150,15 @@
   (type-case (#:Type st #:Filter sf #:Object (λ (f) (subst-object f k o polarity)))
     t
     [#:arr dom rng rest drest kws dep?
-           (make-arr (map st dom)
+           (make-arr (for/list ([d (in-list dom)])
+                       (subst-type d (add-scope k) (add-scope/object o) polarity o-ty))
                      (subst-type rng (add-scope k) (add-scope/object o) polarity o-ty)
-                     (and rest (st rest))
-                     (and drest (cons (st (car drest)) (cdr drest)))
-                     (map st kws)
+                     (and rest (subst-type rest (add-scope k) (add-scope/object o) polarity o-ty))
+                     (and drest
+                          (cons (subst-type (car drest) (add-scope k) (add-scope/object o) polarity o-ty)
+                                (cdr drest)))
+                     (for/list ([kw (in-list kws)])
+                       (subst-type kw (add-scope k) (add-scope/object o) polarity o-ty))
                      dep?)]
     [#:Refine-unsafe type prop
                      (unsafe-make-Refine*
@@ -170,7 +178,8 @@
   (match obj
     [(Empty:) -empty-obj]
     [(Path: p nm) (make-Path p (add-scope nm))]
-    [(? LExp? l) (LExp-path-map add-scope/object l)]))
+    [(? LExp? l) (LExp-path-map add-scope/object l)]
+    [_ (int-err 'add-scope/object "invalid obj ~a" obj)]))
 
 ;; Substitution of objects into objects
 ;; This is o [o'/x] from the paper
@@ -236,4 +245,35 @@
        (if (Empty? l*)
            (if polarity -top -bot)
            (maker (subst-type t k o polarity o-ty) ;; TODO(AMK) Where do we check/handle non-integer type case?
-                  l*)))]))
+                  l*)))]
+    [_ (int-err 'add-scope/object "invalid filter ~a" f)]))
+
+(define/cond-contract (instantiate-fun-args f-type os)
+  (-> Type/c (listof Object?) Type/c)
+  (match f-type
+    ;; we special-case this (no case-lambda) for improved error messages
+    ;; tc/funapp1 currently cannot handle drest arities
+    [(or (? Function?)
+         (? PolyDots?)
+         (Poly: _ (? Function?))
+         (PolyRow: _ _ (? Function?))
+         (Union: (list (? Function?) ...)))
+
+     (for/fold ([f-type f-type])
+               ([(o arg) (in-indexed (in-list os))])
+       (subst-type f-type (list -1 arg) o #t))]
+    
+    ;; resolve names, polymorphic apps, mu, etc
+    [(? needs-resolving?)
+     (define resolved-f-ty (resolve-once f-type))
+     (define instd-f-ty (instantiate-fun-args resolved-f-ty os))
+     (if (eq? instd-f-ty resolved-f-ty)
+         f-type
+         instd-f-ty)]
+    ;; we're not sure what it is, better leave it alone...
+    [_ f-type]))
+
+(define (unabstract-expected/arg-objs exptd objs)
+  (for/fold ([exptd exptd])
+            ([(obj arg-num) (in-indexed (in-list objs))])
+    (subst-tc-results exptd (list 0 arg-num) obj #t)))

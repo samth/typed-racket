@@ -11,9 +11,13 @@
          "../utils/utils.rkt" 
          (except-in racket/contract one-of/c)
          racket/match racket/dict racket/list racket/function
+         racket/lazy-require
          (contract-req)
          (for-syntax racket/base)
          (utils tc-utils))
+
+(lazy-require
+ ["../types/abbrev.rkt" (-id-path)])
 
 (provide object-equal?
          LExp?
@@ -170,7 +174,7 @@
       [(cons (? exact-integer? new-const) rst)
        (loop (+ new-const const) h rst)]
       [(cons (? name-ref/c var) rst)
-       (define p (make-Path null var))
+       (define p (-id-path var))
        (loop const 
              (hash-set-coeff h p (add1 (hash-get-coeff h p)))
              rst)]

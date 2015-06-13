@@ -14,6 +14,7 @@
            (rep free-variance type-rep filter-rep object-rep rep-utils)
            (types utils abbrev numeric-tower union subtype resolve
                   substitute generalize prefab)
+           (logic proves)
            (env index-env tvar-env lexical-env))
           make-env -> ->* one-of/c)
          "constraint-structs.rkt"
@@ -483,6 +484,7 @@
   ((context? (or/c Values/c ValuesDots? AnyValues?) (or/c Values/c ValuesDots? AnyValues?))
    (#:obj (or/c #f Object?))
    . ->* . (or/c #F cset?))
+  (LOG "ENTERING CGEN for ~a <: (obj ~a) <: ~a \n\n" S obj T)
   ;; useful quick loop
   (define/cond-contract (cg S T obj)
     ((Type/c Type/c) ((or/c #f Object?)) . ->* . (or/c #f cset?))
@@ -825,7 +827,21 @@
                                            (and (not (null? results))
                                                 (cset-join results)))))]
 
-                      ;; last resort, try weakinging the refinement lower bound
+                      ;; Refined Types
+                      ;; if Γ |- rp1 --> rp2 then we can cgen on the refined types
+                      [((Refine-unsafe: rt1 rp1) (Refine-unsafe: rt2 rp2))
+                       #:when (let ([obj (or obj (-id-path (genid)))])
+                                (proves null (lexical-env)
+                                        (list (subst-filter rp1 (list 0 0) obj #t))
+                                        (subst-filter rp2 (list 0 0) obj #t)))
+                       (cg rt1 rt2 obj)]
+                      ;; we can weaken the upper bound rp if Γ |- rp
+                      [(S (Refine-unsafe: rt rp))
+                       #:when (let ([obj (or obj (-id-path (genid)))])
+                                (proves null (lexical-env) (list)
+                                        (subst-filter rp (list 0 0) obj #t)))
+                       (cg S rt obj)]
+                      ;; okay well we can always raise the lower bound to a super type
                       [((Refine-unsafe: rt _) T)
                        (cg rt T obj)]
 

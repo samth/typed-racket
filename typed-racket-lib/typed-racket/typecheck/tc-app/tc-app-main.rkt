@@ -77,7 +77,7 @@
          (for/or ([arr (in-list arrs)])
            (or (has-filter? arr) (arr-drest arr))))
 
-       (define arg-tys
+       (define initial-arg-res-list
          (match f-ty
            ;; TODO(AMK) support multi-arr functions w/ dependent types
            [(Function: (list (arr: doms rng rest drest kws #t)))
@@ -109,30 +109,44 @@
 
        ;; generate temporary identifiers for arguments w/o objects
        ;; and any associated props discussing their types
-       (define-values (args-res opt-props opt-temp-ids)
-         (for/lists (_1 _2 _3) ([ares (in-list arg-tys)])
-           (match-define (tc-result1: t fs o) ares)
+       (define-values
+         (args-res arg-objs arg-tys props temp-ids)
+         (for/fold ([res-l null]
+                    [obj-l null]
+                    [ty-l null]
+                    [prop-l null]
+                    [temp-id-l null])
+                   ([r (in-list (reverse initial-arg-res-list))])
+           (match-define (tc-result1: t fs o) r)
            (cond
              [(non-empty-obj? o)
-              (values ares #f #f)]
+              (values (cons r res-l)
+                      (cons o obj-l)
+                      (cons t ty-l)
+                      prop-l
+                      temp-id-l)]
              [else
               (define temp-id (genid))
               (define o* (-id-path temp-id))
-              (values (ret t fs o*) (-filter t o*) temp-id)])))
+              (values (cons (ret t fs o*) res-l)
+                      (cons o* obj-l)
+                      (cons t ty-l)
+                      (cons (-filter t o*) prop-l)
+                      (cons temp-id temp-id-l))])))
 
        ;; extend the env w/ any new types
-       (define-values (env* _) (env+props (lexical-env) (filter values opt-props)))
+       (define-values (env* _) (env+props (lexical-env) props))
 
-       ;; tc the application
+       ;; tc the application TODO (ret -bot) on no env*?
        (define tc-res (with-lexical-env
                        (or env* (lexical-env))
                        (tc/funapp #'f
                                   #'args
-                                  f-ty
+                                  (instantiate-fun-args f-ty arg-objs)
                                   args-res
-                                  expected)))
+                                  (and expected (unabstract-expected/arg-objs expected arg-objs)))))
 
-       ;; remove any temps remaining in the result from typechecking
+       ;; erase any temps remaining in the result from typechecking
        (for/fold ([tc-res tc-res])
-                 ([temp-id (in-list (filter values opt-temp-ids))])
+                 ([temp-id (in-list temp-ids)])
          (subst-tc-results tc-res temp-id -empty-obj #t)))]))

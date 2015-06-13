@@ -6,8 +6,6 @@
          (contract-req)
          (typecheck check-below tc-subst tc-metafunctions)
          (utils tc-utils)
-         (env lexical-env)
-         (logic type-update)
          (rep type-rep filter-rep object-rep)
          (except-in (types utils abbrev subtype)
                     -> ->* one-of/c))
@@ -40,14 +38,12 @@
                                #:delayed? #t)])
        ;; doing these unabstracts seemed to not work when only performing them
        ;; when 'dep?' was true...
-       (let* ([o-a (map (λ (o) (if (non-empty-obj? o) o (-id-path (genid)))) o-a)]
-              [dom (unabstract-doms/arg-objs dom o-a t-a)])
-         (for ([dom-t (if rest (in-sequence-forever dom rest) (in-list dom))]
+       (for ([dom-t (if rest (in-sequence-forever dom rest) (in-list dom))]
                [a (in-syntax args-stx)]
                [arg-t (in-list t-a)]
                [arg-o (in-list o-a)])
            (parameterize ([current-orig-stx a])
-             (check-below arg-t dom-t arg-o)))))
+             (check-below arg-t dom-t arg-o))))
      
      (let* ([dom-count (length dom)])
        ;; Currently do nothing with rest args and keyword args as there are no support for them in

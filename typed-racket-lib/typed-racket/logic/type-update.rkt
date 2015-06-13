@@ -19,7 +19,7 @@
   ("../types/filter-ops.rkt" (-and -or)))
 
 (provide update-type/env update-function/arg-types update-type
-         unabstract-doms/arg-objs unabstract-rng/arg-objs unabstract-expected/arg-objs)
+         unabstract-doms/arg-objs unabstract-rng/arg-objs)
 
 
 ;; update-type   (formerly simply 'update')
@@ -290,9 +290,5 @@
              [ty (in-list argtys)])
     (subst-result rng (list 0 arg-num) obj #t ty)))
 
-(define (unabstract-expected/arg-objs exptd objs argtys)
-  (for/fold ([exptd exptd])
-            ([(obj arg-num) (in-indexed (in-list objs))]
-             [ty (in-list argtys)])
-    (subst-tc-results exptd (list 0 arg-num) obj #t ty)))
+
 

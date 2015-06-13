@@ -20,8 +20,8 @@
 
 (lazy-require
  ("remove-intersect.rkt" (integer-overlap?))
- ("filter-ops.rkt" (-or invert-filter))
- ("../typecheck/tc-subst.rkt" (subst-filter)))
+ #;("filter-ops.rkt" (-or invert-filter))
+ #;("../typecheck/tc-subst.rkt" (subst-filter)))
 
 ;; This table maps types (or really, the sequence number of the type)
 ;; to identifiers that are those types. This allows us to avoid
@@ -135,9 +135,20 @@
 (define (-arg-path arg [depth 0])
   (make-Path null (list depth arg)))
 (define (-acc-path path-elems o)
-  (match o
-    [(Path: p o) (make-Path (append path-elems p) o)]
-    [_ o]))
+  (cond
+    [(null? path-elems) o]
+    [(non-empty-obj? o)
+     (let ([addition (cond
+                       [(list? path-elems) path-elems]
+                       [(PathElem? path-elems) (list path-elems)]
+                       [else (error 'acc-path "invalid path-elems ~a" path-elems)])])
+       (match o
+         [(Path: p o) (make-Path (append addition p) o)]
+         [(? name-ref/c) (make-Path addition (-id-path o))]
+         [_ (error 'acc-path "cannot access ~a of object(? ~a) ~a"
+                   addition (Object? o) o)]))]
+    ;; empty object, just leave it
+    [else o]))
 
 (define/cond-contract (-FS + -)
   (c:-> Filter/c Filter/c FilterSet?)
@@ -158,6 +169,7 @@
     [(Empty? o) -top]
     [(equal? Univ t) -top]
     [(equal? -Bottom t) -bot]
+    [(and (LExp? o) (not (integer-overlap? t))) -bot]
     [else (make-TypeFilter t o)]))
 
 
@@ -176,10 +188,11 @@
     [(Empty? o) -top]
     [(equal? -Bottom t) -top]
     [(equal? Univ t) -bot]
-    [(Refine? t)
-     (match-define (Refine-unsafe: rt rp) t)
-     (-or (-not-filter rt o)
-          (invert-filter (subst-filter rp (list 0 0) o #t)))]
+    [(and (LExp? o) (not (integer-overlap? t))) -top]
+    #;[(Refine? t)
+       (match-define (Refine-unsafe: rt rp) t)
+       (-or (-not-filter rt o)
+            (invert-filter (subst-filter rp (list 0 0) o #t)))]
     [else (make-NotTypeFilter t o)]))
 
 

@@ -33,7 +33,7 @@
          remove-dups
          sub-t sub-f sub-o sub-pe
          Name/simple: Name/struct:
-         Refine-type
+         Refine-type Refine-type: Refine/obj:
          unsafe-make-Refine
          (rename-out [Class:* Class:]
                      [Class* make-Class]
@@ -64,7 +64,8 @@
 (lazy-require
   ("../types/union.rkt" (Un))
   ("../types/resolve.rkt" (resolve-app))
-  ["../types/refine.rkt" (unsafe-make-Refine*)])
+  ["../types/refine.rkt" (unsafe-make-Refine*)]
+  ["../typecheck/tc-subst.rkt" (subst-filter)])
 
 (define name-table (make-weak-hasheq))
 
@@ -1033,7 +1034,7 @@
                                (not/c Bot?))]) #:no-provide
   [#:intern (list (Rep-seq type) (Rep-seq prop))]
   [#:frees (λ (f) (combine-frees (list (f type) 
-                                       (f prop))))] ;; TODO(AMK) remove id??
+                                       (f prop))))]
   [#:fold-rhs (unsafe-make-Refine* (type-rec-id type) (filter-rec-id prop))])
 
 ;; the 'smart' constructor
@@ -1071,9 +1072,26 @@
     (syntax-case stx ()
       [(_ x t p)
        #'(? Refine?
-            (app (lambda (ref) (let ([id (datum->syntax #f (freshid))])
-                                 (list id (Refine-type ref) (Refine-prop* id ref))))
-                 (list x t p)))])))
+            (and (app Refine-type t)
+                 (app (λ (ref) (let ([id (datum->syntax #f (freshid))])
+                                 (cons id (Refine-prop* id ref))))
+                 (cons x p))))])))
+
+(define-match-expander Refine/obj:
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ o t p)
+       #'(? Refine?
+            (and (app Refine-type t)
+                 (app (λ (ref) (subst-filter (Refine-prop ref) (list 0 0) o #t))
+                      p)))])))
+
+(define-match-expander Refine-type:
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ t)
+       #'(? Refine?
+            (app Refine-type t))])))
 
 (define (abstract-ident id a)
   (abstract-idents (list id) a))
