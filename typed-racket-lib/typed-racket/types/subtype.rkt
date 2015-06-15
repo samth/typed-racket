@@ -33,19 +33,14 @@
   
 ;; is s a subtype of t?
 ;; type type -> boolean
-(define (subtype s t 
-                 #:A [A (current-seen)] 
-                 #:env [env #f] 
-                 #:obj [obj #f])
+(define (subtype s t #:env [env #f] #:obj [obj #f])
   
-  (and (subtype* A s t env obj) #t))
+  (and (subtype* (current-seen) s t env obj) #t))
 
 ;; are all the s's subtypes of all the t's?
 ;; [type] [type] -> boolean
-(define (subtypes s t 
-                  #:A [A (current-seen)] 
-                  #:env [env #f])
-  (and (subtypes* A s t env) #t))
+(define (subtypes s t #:env [env #f])
+  (and (subtypes* (current-seen) s t env) #t))
 
 ;; check subtyping for two lists of types
 ;; List[(cons Number Number)] listof[type] listof[type] -> Opt[List[(cons Number Number)]]
@@ -382,10 +377,10 @@
                           obj*)]))
              (define axioms (list P1 (-filter T1 o)))
              (define goal (-filter T2 o))
-             (define v (proves A0 env axioms goal))
+             (define v (proves env axioms goal))
              (LOG "<<subtype>>\n A: ~a\n rt: ~a\n rp: ~a\n t: ~a\n obj: ~a\n\n ===> ~a\n\n"
                   A t p super-t obj v)
-             v])]
+             (and v A0)])]
          [(sub-t (Refine-unsafe: t p))
           (when (not env) (set! env (lexical-env)))
           (LOG "<<subtype>> ref above\n A: ~a\n s: ~a\n rt: ~a\n rp: ~a\n obj: ~a\n env: ~a\n\n"
@@ -421,52 +416,10 @@
                                      '())
                                  (list (-filter T1 o))))
           (define goal (-and P2 (-filter T2 o)))
-          (define v (proves A0 env axioms goal))
+          (define v (proves env axioms goal))
           (LOG "<<subtype>>\n A: ~a\n s: ~a\n rt: ~a\n rp: ~a\n obj: ~a\n\n ====> ~a\n\n"
                A sub-t t p obj v)
-          v]
-         ;; integer w/ bounds that imply membership
-         ;; (e.g. Byte -> [0,255], Nat -> [0,*) etc)
-         [(sub-t (? has-int-provable-range? I))
-          #:when obj
-          (when (not env) (set! env (lexical-env)))
-          (LOG "<<subtype>> int provable\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n env: ~a\n\n"
-               A sub-t I obj env)
-          (define-values (axioms obj*)
-            (match obj
-              ;; standard case
-              [(Path: π (? identifier?))
-               (values (list (-filter sub-t obj)) obj)]
-              ;; obj is a debruijn, this shouldn't happen ideally,
-              ;; but we must be conservative & sound
-              ;; introduce a new object
-              [(Path: π (list lvl arg))
-               (define id-obj* (-id-path (genid)))
-               (define obj* (-acc-path π id-obj*))
-               (values (list (-filter (subst-type sub-t (list lvl arg) id-obj* #t) obj*))
-                       obj*)]
-              ;; it's an LExp or empty object, introduce an object to
-              ;; stand in for filters, add an equality proposition if an LExp
-              [_
-               (define obj* (new-obj))
-               (values (append (if (LExp? obj)
-                                   (list (-eqSLI obj (-lexp (list 1 obj*))))
-                                   '())
-                               (list (-filter sub-t obj*)))
-                       obj*)]))
-          (define-values (lower-bound upper-bound)
-            (int-type->provable-range I))
-          (define goal
-            (apply -and (append (or (and lower-bound (list (-leqSLI (-lexp lower-bound)
-                                                                    (-lexp (list 1 obj*)))))
-                                    '())
-                                (or (and upper-bound (list (-leqSLI (-lexp (list 1 obj*))
-                                                                    (-lexp upper-bound))))
-                                    '()))))
-          (define v (proves A0 env axioms goal))
-          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n ====> ~a\n\n" A sub-t I obj v)
-          v]
-         ;; (Un) is bot
+          (and v A0)];; (Un) is bot
          [(_ (Union: (list))) #f]
          ;; value types
          [((Value: v1) (Value: v2))
@@ -679,6 +632,47 @@
           (and (for/or ([elem (in-list es)])
                  (subtype* A0 s elem env obj))
                A0)]
+         ;; integer w/ bounds that imply membership
+         ;; (e.g. Byte -> [0,255], Nat -> [0,*) etc)
+         [(sub-t (? has-int-provable-range? I))
+          #:when obj
+          (when (not env) (set! env (lexical-env)))
+          (LOG "<<subtype>> int provable\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n env: ~a\n\n"
+               A sub-t I obj env)
+          (define-values (axioms obj*)
+            (match obj
+              ;; standard case
+              [(Path: π (? identifier?))
+               (values (list (-filter sub-t obj)) obj)]
+              ;; obj is a debruijn, this shouldn't happen ideally,
+              ;; but we must be conservative & sound
+              ;; introduce a new object
+              [(Path: π (list lvl arg))
+               (define id-obj* (-id-path (genid)))
+               (define obj* (-acc-path π id-obj*))
+               (values (list (-filter (subst-type sub-t (list lvl arg) id-obj* #t) obj*))
+                       obj*)]
+              ;; it's an LExp or empty object, introduce an object to
+              ;; stand in for filters, add an equality proposition if an LExp
+              [_
+               (define obj* (new-obj))
+               (values (append (if (LExp? obj)
+                                   (list (-eqSLI obj (-lexp (list 1 obj*))))
+                                   '())
+                               (list (-filter sub-t obj*)))
+                       obj*)]))
+          (define-values (lower-bound upper-bound)
+            (int-type->provable-range I))
+          (define goal
+            (apply -and (append (or (and lower-bound (list (-leqSLI (-lexp lower-bound)
+                                                                    (-lexp (list 1 obj*)))))
+                                    '())
+                                (or (and upper-bound (list (-leqSLI (-lexp (list 1 obj*))
+                                                                    (-lexp upper-bound))))
+                                    '()))))
+          (define v (proves env axioms goal))
+          (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n ====> ~a\n\n" A sub-t I obj v)
+          (and v A0)]
          ;; subtyping on immutable structs is covariant
          ;; TODO(AMK) path recursion down obj?
          [((Struct: nm _ flds proc _ _) (Struct: nm* _ flds* proc* _ _)) 
@@ -902,7 +896,7 @@
          [(_ _) #f])))
    ;; cache when we didn't use special env and obj
    ;; TODO(amk) fix! caching must include env =(
-   (when (and (null? A) (not env) (not obj))
+   (when (and (null? A) (not env))
      (hash-set! subtype-cache (cons ss st) r))
    r))
 
@@ -915,13 +909,13 @@
 
 (provide/cond-contract
  [subtype (c:->* ((c:or/c Type/c SomeValues/c) (c:or/c Type/c SomeValues/c))
-                 (#:A list? #:env (c:or/c #f env?) #:obj (c:or/c #f Object?))
+                 (#:env (c:or/c #f env?) #:obj (c:or/c #f Object?))
                  boolean?)]
  [type-compare? (c:->* ((c:or/c Type/c SomeValues/c) (c:or/c Type/c SomeValues/c)) 
                       (#:env (c:or/c #f env?) #:obj (c:or/c #f Object?) )
                       boolean?)]
  [subtypes (c:->* ((c:listof (c:or/c Type/c SomeValues/c))
                    (c:listof (c:or/c Type/c SomeValues/c)))
-                  (#:A list? #:env (c:or/c #f env?))
+                  (#:env (c:or/c #f env?))
                   boolean?)]
  [subtypes/varargs (c:->* ((c:listof Type/c) (c:listof Object?) (c:listof Type/c) (c:or/c Type/c #f)) (#:env (c:or/c #f env?)) boolean?)])

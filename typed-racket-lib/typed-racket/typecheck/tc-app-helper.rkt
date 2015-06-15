@@ -44,8 +44,19 @@
                [arg-o (in-list o-a)])
            (parameterize ([current-orig-stx a])
              (check-below arg-t dom-t arg-o))))
-     
-     (let* ([dom-count (length dom)])
+
+     ;(printf "\n TCFUNAPP1 formatting rng ~a\n\n" rng)
+     (define rng*
+       (match rng
+         [(AnyValues: f)
+          (tc-any-results f)]
+         [(Results: t f o)
+          (ret t f o)]
+         [(Results: t f o dty dbound)
+          (ret t f o dty dbound)]))
+     ;(printf "\n TCFUNAPP1 returning ~a\n\n" rng*)
+     rng*
+     #;(let* ([dom-count (length dom)])
        ;; Currently do nothing with rest args and keyword args as there are no support for them in
        ;; objects yet.
        (let-values

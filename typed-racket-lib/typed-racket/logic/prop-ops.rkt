@@ -61,9 +61,10 @@
 
 ;; TODO(amk) turn unions w/ nested refinements
 ;; into logical propositions instead!
-(define/cond-contract (extract-props-from-type x ty)
-  (c:-> (c:or/c identifier? Object?) Type? 
-        (values Type? (c:listof Filter/c)))
+(define/cond-contract (extract-props-from-type x ty #:int-bounds? [int-bounds? #f])
+  (c:->* ((c:or/c identifier? Object?) Type?)
+         (#:int-bounds? boolean?)
+         (values Type? (c:listof Filter/c)))
   
   (define stack empty)
   (define (push obj prop)
@@ -76,19 +77,20 @@
                           x)]))
   
   (define obj (if (identifier? x) (-id-path x) x))
-  (define ty* (extract-nested-props ty obj push))
+  (define ty* (extract-nested-props ty obj push #:int-bounds? int-bounds?))
   
   (let loop ([ps '()])
       (match (pop)
         [#f (values ty* ps)]
         [(cons obj f) 
-         (define f* (extract-nested-props f obj push))
+         (define f* (extract-nested-props f obj push #:int-bounds? int-bounds?))
          (loop (cons f* ps))]
         [x (int-err "invalid list of objs/props! ~a" x)])))
 
-(define/cond-contract (extract-nested-props a obj save)
-  (c:-> (c:or/c Type? Filter/c) (c:or/c #f Object?) (c:-> Object? Filter/c void?)
-        (c:or/c Type? Filter/c))
+(define/cond-contract (extract-nested-props a obj save #:int-bounds? [int-bounds? #f])
+  (c:->* ((c:or/c Type? Filter/c) (c:or/c #f Object?) (c:-> Object? Filter/c void?))
+         (#:int-bounds? boolean?)
+         (c:or/c Type? Filter/c))
   
   (define ((sift-t obj) ty)
     (type-case 
@@ -131,10 +133,12 @@
                   t obj*
                   (match obj*
                     [(Path: π (list lvl arg)) f]
-                    [else
+                    [int-bounds?
                      (apply -and
-                            (-filter ((sift-t obj*) t) obj*)
-                            (get-int-bound-props obj* t))])]
+                            (cons (-filter ((sift-t obj*) t) obj*)
+                                  (get-int-bound-props obj* t)))]
+                    [else
+                     (-filter ((sift-t obj*) t) obj*)])]
                  [#:AndFilter
                   fs
                   (apply -and (map (sift-f obj) fs))]

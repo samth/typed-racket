@@ -38,6 +38,8 @@
   [empty-env env?]
   [raw-lookup-alias (env? identifier? (identifier? . -> . (or/c #f Object?)) . -> . (or/c #f Object?))]
   [env-extract-props (env? . -> . (values env? (listof Filter/c)))]
+  [env-extract-props+slis (env? . -> . (values env? (listof (and/c Filter/c
+                                                                   (not/c SLI?))) (listof SLI?)))]
   [naive-extend/type (env? identifier? (and/c Type?
                                               (not/c Bottom?)
                                               (not/c Refine?))
@@ -64,6 +66,12 @@
 (define (env-extract-props e)
   (match-let ([(env tys ntys fs als sli) e])
     (values (env tys ntys (list) als (list)) (append sli fs))))
+
+(define (env-extract-props+slis e)
+  (match-let ([(env tys ntys fs als sli) e])
+    (values (env tys ntys (list) als (list))
+            fs
+            sli)))
 
 (define (env-props+SLIs e)
   (match-let ([(env _ _ ps _ slis) e])

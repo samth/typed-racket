@@ -15,7 +15,7 @@
 (lazy-require 
  ("../types/kw-types.rkt" (kw-convert))
  ("../types/numeric-tower.rkt" (integer-type))
- ("../types/type-ref-path.rkt" (type-ref/path))
+ ("../types/type-ref-path.rkt" (id-ty+path->obj-ty))
  ("../typecheck/typechecker.rkt" (tc-literal)))
 
 (provide lookup-id-type lookup-id-not-type lookup-obj-type lookup-obj-not-type resolve-id-alias)
@@ -42,7 +42,7 @@
   (cond
     [id*-ty (if (null? π*) 
             id*-ty 
-            (type-ref/path id*-ty π*))]
+            (id-ty+path->obj-ty id*-ty π*))]
     [fail (fail id)]
     [else (lookup-fail id)]))
 
@@ -62,7 +62,7 @@
   (cond
     [id*-not-ty (if (null? π*)
                     id*-not-ty 
-                    (type-ref/path id*-not-ty π*))] ;; TODO(amk) correct?
+                    (id-ty+path->obj-ty id*-not-ty π*))] ;; TODO(amk) correct?
     [fail (fail id)]
     [else -Bottom]))
 
@@ -73,7 +73,7 @@
     [(Path: π (? identifier? x))
      (let ([ty (lookup-id-not-type x env #:fail fail)])
        (cond 
-         [ty (type-ref/path ty π)] ;; TODO(amk) correct????
+         [ty (id-ty+path->obj-ty ty π)] ;; TODO(amk) correct????
          [fail (fail o)]
          [else -Bottom]))]
     ;; ignore LExps specifics?
@@ -86,14 +86,15 @@
          (c:or/c Type/c #f))
   (match o
     [(Path: π (? identifier? x)) 
-     (let ([ty (lookup-id-type x env #:fail fail)])
+     (let* ([ty (lookup-id-type x env #:fail fail)]
+            [o-ty (and ty (id-ty+path->obj-ty ty π))])
        (cond 
-         [ty (type-ref/path ty π)]
+         [(not (Error? o-ty)) o-ty]
          [fail (fail o)]
          [else (lookup-fail o)]))]
     ;; TODO(amk) maybe something else here more specific
     ;; for what LExp it is? I dunno
-    [(? LExp?) (integer-type)]
+    [(? LExp? l) (integer-type)]
     [_ #:when fail (fail o)]
     [_ (lookup-fail o)]))
 

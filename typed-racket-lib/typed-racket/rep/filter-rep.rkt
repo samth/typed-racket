@@ -61,6 +61,7 @@
          equals-constant-SLI?
          leq-lhs
          leq-rhs
+         SLIs-contain?
          (rename-out [SLI:* SLI:]))
 
 (define (Filter/c-predicate? e)
@@ -119,9 +120,17 @@
 ;; smart constructor -- reduces them when possible by gcds
 (define/cond-contract (leq l1 l2)
   (-> LExp? LExp? leq?)
-  (let*-values ([(l1* l2*) (LExp-gcd-shrink l1 l2)]
+  (let*-values (;[(l1* l2*) (LExp-gcd-shrink l1 l2)] ; worth it??
                 [(l1* l2*) (LExp-const-normalize l1 l2)])
     (cons l1* l2*)))
+
+(define/cond-contract (opt-leq l1 l2)
+  (-> LExp? LExp? (or/c boolean? leq?))
+  (cond
+    [(and (constant-LExp? l1)
+          (constant-LExp? l2))
+     (<= (LExp-const l1) (LExp-const l2))]
+    [else (cons l1 l2)]))
 
 (define (leq-lhs x)
   (car x))
@@ -291,6 +300,9 @@
 (define/cond-contract (internal-sli-path-map f system paths)
   (-> (-> Path? Object?) immutable-leq-set? immutable-path-set? 
       Filter?)
+  #;(printf "internal-sli-path-map || sys-size(~a)  || paths-size(~a) || \n"
+          (set-count system)
+          (set-count paths))
   ;; calculate changes
   (define-values (new-path-map eliminated-paths)
     (for/fold ([pmap empty-path-hash]
@@ -333,7 +345,10 @@
      -top]
     [(not (internal-sli-sat? system*))
      -bot]
-    [else (*SLI system* (internal-sli-path-set system*))]))
+    [else
+     #;(when (equal? system system*)
+       (printf "internal-sli-path-set-result-EQUAL || || || \n"))
+     (*SLI system* (internal-sli-path-set system*))]))
 
 (define empty-set (set))
 
@@ -540,9 +555,13 @@
       boolean?)
   (define proof-state (cons axioms goals))
   (cond
-    [(and sli-imp-cache
+    #;[(and sli-imp-cache
           (hash-has-key? sli-imp-cache proof-state))
      (hash-ref sli-imp-cache proof-state)]
+    ;; trivial implication
+    [(subset? goals axioms)
+     #t]
+    ;; solving implication
     [else
      (define result
        (for/and ([ineq (in-set goals)])
@@ -553,12 +572,13 @@
 
 (define/cond-contract (SLI-implies? sli1 sli2)
   (-> SLI? SLI? boolean?)
+  ;(printf "SLI-implies? || ~a  ||  ---->?  ||  ~a\n" sli1 sli2)
   (internal-sli-imp? (SLI-system sli1) 
                      (SLI-system sli2)))
 
 (define/cond-contract (SLIs-imply? slis goal)
   (-> (listof SLI?) SLI? boolean?)
-
+  ;(printf "SLIs-imply? || ~a   || ---->?  ||  ~a\n" slis goal)
   (match-define (SLI: goal-sys goal-ps) goal)
   
   (define-values (axiom-sys _)
@@ -575,6 +595,13 @@
   (cond
     [(set-empty? axiom-sys) #f]
     [else (internal-sli-imp? axiom-sys goal-sys)]))
+
+(define/cond-contract (SLIs-contain? slis s)
+  (-> (listof SLI?) SLI? boolean?)
+  (set-empty?
+   (for/fold ([s-sys (SLI-system s)])
+             ([sli (in-list slis)])
+     (set-subtract s-sys (SLI-system sli)))))
 
 (define (SLI->LExp-pairs s)
   (for/list ([ineq (in-set (SLI-system s))])

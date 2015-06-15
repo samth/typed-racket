@@ -828,23 +828,28 @@
                                                 (cset-join results)))))]
 
                       ;; Refined Types
-                      ;; if Γ |- rp1 --> rp2 then we can cgen on the refined types
-                      [((Refine-unsafe: rt1 rp1) (Refine-unsafe: rt2 rp2))
-                       #:when (let ([obj (or obj (-id-path (genid)))])
-                                (proves null (lexical-env)
-                                        (list (subst-filter rp1 (list 0 0) obj #t))
-                                        (subst-filter rp2 (list 0 0) obj #t)))
-                       (cg rt1 rt2 obj)]
-                      ;; we can weaken the upper bound rp if Γ |- rp
-                      [(S (Refine-unsafe: rt rp))
-                       #:when (let ([obj (or obj (-id-path (genid)))])
-                                (proves null (lexical-env) (list)
-                                        (subst-filter rp (list 0 0) obj #t)))
-                       (cg S rt obj)]
-                      ;; okay well we can always raise the lower bound to a super type
-                      [((Refine-unsafe: rt _) T)
-                       (cg rt T obj)]
-
+                      [(t1 t2)
+                       #:when (or (Refine? t1) (Refine? t2))
+                       (define o (or obj (-id-path (genid))))
+                       (match t1
+                         ;; t1 is a refined type
+                         [(Refine/obj: o rt1 rp1)
+                          (match t2
+                            ;;t2 also a refined type, check if
+                            ;; t2's prop is provable and proceed
+                            [(Refine/obj: o rt2 rp2)
+                             (define assumptions (list rp1 (-is-type o rt1)))
+                             (and (proves (lexical-env) assumptions rp2)
+                                  (cg rt1 rt2 o))]
+                            ;; t1 only is refined, simply raise the lower bound
+                            ;; to obvious super type of t1
+                            [_ (cg rt1 t2 o)])]
+                         ;; only t2 is refined type
+                         [_
+                          (match-define (Refine/obj: o rt2 rp2) t2)
+                          ;; proceed if rp2 is provable
+                          (and (proves (lexical-env) (list) rp2)
+                               (cg t1 rt2 o))])]
                       [(_ _)
                        ;; nothing worked, and we fail
                        #f]))))

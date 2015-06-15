@@ -14,11 +14,11 @@
 
  (lazy-require
   #;("../types/remove-intersect.rkt" (overlap))
-  ("../types/type-ref-path.rkt" (type-unref/rev-path))
+  ("../types/type-ref-path.rkt" (obj-ty+rev-path->id-ty))
   ("../types/subtype.rkt" (subtype))
   ("../types/filter-ops.rkt" (-and -or)))
 
-(provide update-type/env update-function/arg-types update-type
+(provide restrict-type/env restrict-fun/arg-types update-type
          unabstract-doms/arg-objs unabstract-rng/arg-objs)
 
 
@@ -138,7 +138,7 @@
        (unsafe-make-Refine* (update t ft reversed-path path-stack) p)]
       
       [_
-       (let ([t (type-unref/rev-path ft reversed-path Univ)])
+       (let ([t (obj-ty+rev-path->id-ty ft reversed-path Univ)])
          (if (overlap orig-t t)
              t
              -Bottom))]))
@@ -147,14 +147,23 @@
 
 
 
-
-(define (update-type/env ty env)
+(define (restrict-type/env ty env)
   ;(define new-props '())
   
   (define (do-type ty)
     (type-case
      (#:Type do-type #:Filter do-filter #:Object do-obj)
-     ty))
+     ty
+      [#:Result
+       t ps o
+       (let ([o (do-obj o)]
+             [ty (lookup-obj-type o env #:fail (λ (_) #f))]
+             [t (do-type t)]
+             [ps (do-filter ps)])
+         (make-Result (if ty (restrict ty t) t)
+                      ps
+                      o))]))
+                
   
   (define (do-filter f)
     (filter-case (#:Type do-type
@@ -162,19 +171,22 @@
                   #:Object do-obj)
                  f
                  [#:TypeFilter t o 
-                  (let ([ty (lookup-obj-type o env #:fail (λ (_) #f))])
-                    (cond
-                      [(and ty (not (overlap t ty))) -bot]
-                      [else f]))]
+                  (let ([o (do-obj o)]
+                        [ty (lookup-obj-type o env #:fail (λ (_) #f))]
+                        [t (do-type t)])
+                    (-is-type o (if ty (restrict ty t) t)))]
                  [#:NotTypeFilter t o
-                  (let ([ty (lookup-obj-type o env #:fail (λ (_) #f))])
+                  (let ([o (do-obj o)]
+                        [ty (lookup-obj-type o env #:fail (λ (_) #f))]
+                        [t (do-type t)])
                     (cond
-                      [(and ty (subtype t ty #:env env #:obj o)) -bot]
-                      [else f]))]
+                      [(and ty (subtype ty t #:env env #:obj o))
+                       -bot]
+                      [else (-is-not-type o t)]))]
                  [#:AndFilter fs (apply -and (map do-filter fs))]
                  [#:OrFilter fs (apply -or (map do-filter fs))]
-                 [#:SLI sli
-                        (let ([env-slis (env-SLIs env)])
+                 [#:SLI sli sli
+                        #;(let ([env-slis (env-SLIs env)])
                           (cond
                             [(SLIs-imply? env-slis sli) -top]
                             [(Bot? (add-SLI sli env-slis)) -bot]
@@ -196,7 +208,7 @@
 
 
 
-(define (update-function/arg-types args-res f-type)
+(define (restrict-fun/arg-types f-type args-res)
  ;; TODO support polymorphic functions
   ;; e.g. match-define: no matching clause for (All (a) (-> (Listof a) Index))
   ;; if match-define (Function: (list (arr: domss rngs rests drests kwss dep?s) ...))
@@ -246,9 +258,9 @@
               (for/list ([tmp-id (in-list tmp-ids)]
                          [o (in-list arg-objs)]
                          [ty (in-list arg-tys)]) ;; was doms*
-                (-filter ty (or o (-id-path tmp-id)))))
+                (-is-type (or o (-id-path tmp-id)) ty)))
             ;; update the lexical environment with domain types
-            (define-values (env* _)
+            (define env*
               (env+props (lexical-env) dom-ty-props #:ignore-non-identifier-ids? #f))
             
             (cond
@@ -260,8 +272,8 @@
                                     dep?)]
               [else
                (define updated-doms (for/list ([d (in-list doms*)])
-                                      (abstract-idents tmp-ids (update-type/env d env*))))
-               (define updated-rng (abstract-idents tmp-ids (update-type/env rng* env*)))
+                                      (abstract-idents tmp-ids (restrict-type/env d env*))))
+               (define updated-rng (abstract-idents tmp-ids (restrict-type/env rng* env*)))
                (make-arr updated-doms updated-rng rest drest kws dep?)])])))
      (make-Function new-arrs)]
     [_ f-type]))

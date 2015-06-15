@@ -36,14 +36,14 @@
   (define-values (ids/ts* pss) 
     (for/lists (ids/ts ps) 
       ([id (in-list ids)] [t (in-list types)])
-      (let-values ([(t* ps) (extract-props-from-type id t)])
+      (let-values ([(t* ps) (extract-props-from-type id t #:int-bounds? #t)])
         (values (cons id t*) (cons (-filter t* (-id-path id)) ps)))))
   (cond
     [(for/or ([id/t (in-list ids/ts*)]) (type-equal? (cdr id/t) -Bottom))
      #f]
     [else 
      (define ps (apply append pss))
-     (define-values (new-env _)
+     (define new-env
        (env+props (naive-extend/types (lexical-env) ids/ts*)
                   ps))
      new-env]))
@@ -54,7 +54,9 @@
 ;; AMK: We also return the atoms? I'm sure there's a reason
 ;; but from the body of this function it's difficult to
 ;; understand why
-(define (env+props env fs #:ignore-non-identifier-ids? [ingore-non-identifier-ids? #t])
+(define (env+props env fs
+                   #:return-atoms? [return-atoms? #f]
+                   #:ignore-non-identifier-ids? [ingore-non-identifier-ids? #t])
   (let/ec exit*
     (define (exit) (exit* #f empty))
 
@@ -84,7 +86,7 @@
                 (define-values (Γ* newly-exposed-props)
                   (parameterize
                       ([current-orig-stx x])
-                    (update-env/atom empty Γ f exit)))
+                    (update-env/atom Γ f exit)))
                 (values Γ* (append newly-exposed-props new-ps))])]
             [(TypeFilter: ft (? LExp? l))
              (if (subtype ft -Integer #:obj l)
@@ -100,14 +102,18 @@
         [(null? new-exposed-props)
          ;; simple/common case -- no new nested propositions were discovered
          ;; when refining types
-         (values Γ* atoms)]
+         (if return-atoms?
+             (values Γ* atoms)
+             Γ*)]
         [else
          ;; we found some new propositions when we updated a type and it became
          ;; a refinement! we have to start over making sure to incorporate
          ;; the new facts
          (define-values (Γ** new-atoms)
            (update-env/props Γ* new-exposed-props))
-         (values Γ** (append atoms new-atoms))]))
+         (if return-atoms?
+             (values Γ** (append atoms new-atoms))
+             Γ**)]))
 
     (update-env/props env fs)))
 
@@ -121,7 +127,7 @@
     (pattern (~seq) #:with form #'(begin)))
   (syntax-parse stx
     [(_ ps:expr u:unreachable? . bodies)
-     #'(let*-values ([(new-env atoms) (env+props (lexical-env) ps)])
+     #'(let*-values ([(new-env atoms) (env+props (lexical-env) ps #:return-atoms? #t)])
          (if new-env
              (with-lexical-env new-env
                (add-unconditional-prop 
@@ -147,7 +153,7 @@
          (define-values (ids/ts* pss) 
            (for/lists (ids/ts ps) 
              ([id (in-list ids)] [t (in-list types)])
-             (let-values ([(t* ps) (extract-props-from-type id t)])
+             (let-values ([(t* ps) (extract-props-from-type id t #:int-bounds? #t)])
                (values (cons id t*) (cons (-filter t* id) ps)))))
          (cond
            [(for/or ([id/t (in-list ids/ts*)]) 
@@ -158,7 +164,8 @@
             (let*-values 
                 ([(ps) (apply append pss)]
                  [(new-env atoms) (env+props (naive-extend/types (lexical-env) ids/ts*)
-                                             ps)]
+                                             ps
+                                             #:return-atoms? #t)]
                  [(new-env) (and new-env
                                  (replace-props
                                   new-env
@@ -187,13 +194,13 @@
                (match o
                  [(Empty:)
                   ;; no alias, so just record the type and props as usual
-                  (define-values (t* ps*) (extract-props-from-type id t))
+                  (define-values (t* ps*) (extract-props-from-type id t #:int-bounds? #t))
                   (values `((,id . ,t*) . ,ids/ts) 
                           ids/als
                           (cons ps* pss))]
                  [(? LExp? l)
                   ;; no alias, but record linear equality!
-                  (define-values (t* ps*) (extract-props-from-type id t))
+                  (define-values (t* ps*) (extract-props-from-type id t #:int-bounds? #t))
                   (values `((,id . ,t*) . ,ids/ts) 
                           ids/als
                           (cons (cons (-eqSLI l (-lexp (list 1 (-id-path id)))) ps*)
@@ -201,13 +208,13 @@
                  [(Path: '() id*)
                   ;; id is aliased to an identifier
                   ;; record the alias relation *and* type of that alias id along w/ props
-                  (define-values (t* ps*) (extract-props-from-type id* t))
+                  (define-values (t* ps*) (extract-props-from-type id* t #:int-bounds? #t))
                   (values `((,id* . ,t*) . ,ids/ts) 
                           `((,id . ,o) . ,ids/als)
                           (cons ps* pss))]
                  ;; standard aliasing, just record the type and the alias
                  [(? Path? o)
-                  (define-values (t* ps*) (extract-props-from-type o t))
+                  (define-values (t* ps*) (extract-props-from-type o t #:int-bounds? #t))
                   (values ids/ts
                           `((,id . ,o) . ,ids/als)
                           (cons ps* pss))]
@@ -221,7 +228,7 @@
                 ([(all-ps) (apply append (cons ps pss))]
                  [(env) (naive-extend/types (lexical-env) ids/ts*)] 
                  [(env) (and env (extend/aliases env ids/als))]
-                 [(new-env atoms) (if env (env+props env all-ps) (values #f '()))]
+                 [(new-env atoms) (if env (env+props env all-ps #:return-atoms? #t) (values #f '()))]
                  [(new-env) (and new-env 
                                  (replace-props new-env 
                                                 (append atoms (env-props+SLIs new-env))))])

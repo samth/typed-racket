@@ -97,8 +97,8 @@
       [(f f) #t]
       [(f (NoFilter:)) #t]
       [((FilterSet: f1+ f1-) (FilterSet: f2+ f2-))
-       (define v (and (proves null (lexical-env) (list f1+) f2+)
-                      (proves null (lexical-env) (list f1-) f2-)))
+       (define v (and (proves (lexical-env) (list f1+) f2+)
+                      (proves (lexical-env) (list f1-) f2-)))
        #;(printf "Proved??? ~a\n\n" v)
        v]
       [(_ _) #f]))
@@ -109,7 +109,7 @@
       [(_ _) #f]))
   (define (filter-better? f1 f2)
     (or (NoFilter? f2)
-        (proves null (lexical-env) (list f1) f2)))
+        (proves (lexical-env) (list f1) f2)))
 
   (match* (tr1 expected)
     ;; This case has to be first so that bottom (exceptions, etc.) can be allowed in cases

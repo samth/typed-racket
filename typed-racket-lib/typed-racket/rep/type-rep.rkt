@@ -1068,8 +1068,8 @@
               (format "~a.~a" var counter))))))
 
 (define-match-expander Refine:*
-  (lambda (stx)
-    (syntax-case stx ()
+  (λ (stx)
+    (syntax-parse stx
       [(_ x t p)
        #'(? Refine?
             (and (app Refine-type t)
@@ -1078,8 +1078,8 @@
                  (cons x p))))])))
 
 (define-match-expander Refine/obj:
-  (lambda (stx)
-    (syntax-case stx ()
+  (λ (stx)
+    (syntax-parse stx
       [(_ o t p)
        #'(? Refine?
             (and (app Refine-type t)
@@ -1087,11 +1087,10 @@
                       p)))])))
 
 (define-match-expander Refine-type:
-  (lambda (stx)
-    (syntax-case stx ()
+  (λ (stx)
+    (syntax-parse stx
       [(_ t)
-       #'(? Refine?
-            (app Refine-type t))])))
+       #'(Refine: t _)])))
 
 (define (abstract-ident id a)
   (abstract-idents (list id) a))
@@ -1153,9 +1152,8 @@
               (map (do-type lvl*) kws)
               dep?))]
      [#:Refine type prop
-      (let ([lvl* (add1 lvl)])
-        (unsafe-make-Refine ((do-type lvl) type)
-                            ((do-filter lvl*) prop)))]))
+      (unsafe-make-Refine ((do-type lvl) type)
+                            ((do-filter (add1 lvl)) prop))]))
   
   (define ((do-filter lvl) f)
     (filter-case (#:Type (do-type lvl)

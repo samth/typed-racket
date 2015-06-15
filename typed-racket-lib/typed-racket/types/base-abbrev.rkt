@@ -40,8 +40,12 @@
 
 ;; Top and error types
 (define/decl Univ (make-Univ))
+(define -Any Univ)
 (define/decl -Bottom (make-Union null))
+(define -Nothing -Bottom)
 (define/decl Err (make-Error))
+(define Any? Univ?)
+(define Nothing? Bottom?)
 
 (define/decl -False (make-Value #f))
 (define/decl -True (make-Value #t))
@@ -154,15 +158,19 @@
   (c:-> Filter/c Filter/c FilterSet?)
   (make-FilterSet + -))
 
-;; Abbreviation for filters
-;; `i` can be an integer or name-ref/c for backwards compatibility
-;; FIXME: Make all callers pass in an object and remove backwards compatibility
-(define/cond-contract (-filter t i)
-  (c:-> Type/c (c:or/c integer? name-ref/c Object?) Filter/c)
+(define/cond-contract (-PS + -)
+  (c:-> Filter/c Filter/c FilterSet?)
+  (make-FilterSet + -))
+
+
+
+;; (non-opaque) abbreviate for positive type propositions
+(define/cond-contract (-is-type i t)
+  (c:-> (c:or/c name-ref/c Object?) Type/c
+        Filter/c)
   (define o
     (cond
       [(Object? i) i]
-      [(integer? i) (make-Path null (list 0 i))]
       [(list? i) (make-Path null i)]
       [else (-id-path i)]))
   (cond
@@ -172,16 +180,21 @@
     [(and (LExp? o) (not (integer-overlap? t))) -bot]
     [else (make-TypeFilter t o)]))
 
-
-;; Abbreviation for not filters
+;; Abbreviation for filters (LEGACY - SHOULD BE DEPRECATED AT SOME POINT)
 ;; `i` can be an integer or name-ref/c for backwards compatibility
 ;; FIXME: Make all callers pass in an object and remove backwards compatibility
-(define/cond-contract (-not-filter t i)
+(define/cond-contract (-filter t i)
   (c:-> Type/c (c:or/c integer? name-ref/c Object?) Filter/c)
+  (-is-type (if (integer? i) (list 0 i) i) t))
+
+
+;; (less opaque) abbreviate for negative type propositions
+(define/cond-contract (-is-not-type i t)
+  (c:-> (c:or/c name-ref/c Object?) Type/c
+        Filter/c)
   (define o
     (cond
       [(Object? i) i]
-      [(integer? i) (make-Path null (list 0 i))]
       [(list? i) (make-Path null i)]
       [else (-id-path i)]))
   (cond
@@ -189,11 +202,14 @@
     [(equal? -Bottom t) -top]
     [(equal? Univ t) -bot]
     [(and (LExp? o) (not (integer-overlap? t))) -top]
-    #;[(Refine? t)
-       (match-define (Refine-unsafe: rt rp) t)
-       (-or (-not-filter rt o)
-            (invert-filter (subst-filter rp (list 0 0) o #t)))]
     [else (make-NotTypeFilter t o)]))
+
+;; Abbreviation for not filters
+;; `i` can be an integer or name-ref/c for backwards compatibility
+;; FIXME: Make all callers pass in an object and remove backwards compatibility
+(define/cond-contract (-not-filter t i)
+  (c:-> Type/c (c:or/c integer? name-ref/c Object?) Filter/c)
+  (-is-not-type (if (integer? i) (list 0 i) i) t))
 
 
 ;; A Type that corresponds to the any contract for the

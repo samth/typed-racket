@@ -224,7 +224,11 @@
              [slis null]
              [result null])
     (match fs
-      [(list) (apply mk (append slis (compact result #f)))]
+      [(list)
+       (define ps (compact result #f))
+       (if (memf Bot? ps)
+           -bot
+           (apply mk (append slis ps)))]
       [(cons f fs*)
        (match f
          [(and t (Bot:))

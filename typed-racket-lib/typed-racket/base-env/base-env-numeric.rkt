@@ -680,25 +680,19 @@
 
   ;; helper for adding props to turnary integer comparisons
   ;; (< <= = >= >)
-  (define ((int-tcomp-props fn+ fn-) p+ p-)
+  (define ((int-tcomp-props fn+) p+ p-)
     (-FS (-and (fn+ (-lexp (list 1 (-arg-path 0)))
                     (-lexp (list 1 (-arg-path 1))))
                (fn+ (-lexp (list 1 (-arg-path 1)))
                     (-lexp (list 1 (-arg-path 2))))
                p+)
-         (-and (-or (fn- (-lexp (list 1 (-arg-path 0)))
-                         (-lexp (list 1 (-arg-path 1))))
-                    (-and (fn+ (-lexp (list 1 (-arg-path 0)))
-                               (-lexp (list 1 (-arg-path 1))))
-                          (fn- (-lexp (list 1 (-arg-path 1)))
-                               (-lexp (list 1 (-arg-path 2))))))
-               p-)))
+         p-))
 
-  (define -FSt< (int-tcomp-props -ltSLI -gteqSLI))
-  (define -FSt<= (int-tcomp-props -leqSLI -gtSLI))
-  (define -FSt= (int-tcomp-props -eqSLI -neqSLI))
-  (define -FSt> (int-tcomp-props -gtSLI -leqSLI))
-  (define -FSt>= (int-tcomp-props -gteqSLI -ltSLI))
+  (define -FSt< (int-tcomp-props -ltSLI))
+  (define -FSt<= (int-tcomp-props -leqSLI))
+  (define -FSt= (int-tcomp-props -eqSLI))
+  (define -FSt> (int-tcomp-props -gtSLI))
+  (define -FSt>= (int-tcomp-props -gteqSLI))
 
   (define isum->
     (case-lambda

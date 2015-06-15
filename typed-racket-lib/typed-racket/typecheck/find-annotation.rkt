@@ -4,9 +4,8 @@
          (contract-req)
          (env lexical-env)
          (private type-annotation)
+         (rep type-rep)
          (for-label racket/base))
-
-(require-for-cond-contract (rep type-rep))
 
 (provide/cond-contract [find-annotation (syntax? identifier? . -> . (or/c #f Type/c))])
 
@@ -49,7 +48,7 @@
   (and t
        (let loop ([t t])
          (match t
-           [(Refine-unsafe: t _) (loop t)]
+           [(Refine-type: t) (loop t)]
            [_ t]))))
 
 ;; expr id -> type or #f

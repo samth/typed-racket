@@ -7,7 +7,7 @@
          (utils tc-utils)
          racket/match racket/list
          (contract-req)
-         (except-in (types abbrev utils filter-ops type-ref-path refine restrict resolve)
+         (except-in (types abbrev utils filter-ops type-ref-path refine restrict resolve union)
                     -> ->* one-of/c)
          (rep type-rep object-rep filter-rep rep-utils object-ops))
 
@@ -105,26 +105,26 @@
 ;; Substitution of objects into a tc-result
 ;; This is a combination of the other substitutions, plus a restriction of the returned type
 ;; to the arguments type if the returned object corresponds to an argument.
-(define (subst-tc-result r-t r-fs r-o k o polarity t)
+(define (subst-tc-result r-t r-fs r-o k o polarity k-t)
   (define argument-side
     (match r-o
       [(Path: p (? (lambda (nm) (name-ref=? nm k))))
-       (type-ref/path t p)]
+       (id-ty+path->obj-ty k-t p)]
       [(? LExp?) r-t]
       [_ Err]))
 
   (let ([t (if (equal? argument-side Err)
-               (subst-type r-t k o polarity t)
-               (restrict argument-side (subst-type r-t k o polarity t)))]
-        [fs (subst-filter-set r-fs k o polarity t)]
+               (subst-type r-t k o polarity k-t)
+               (restrict argument-side (subst-type r-t k o polarity k-t)))]
+        [fs (subst-filter-set r-fs k o polarity k-t)]
         [o (subst-object r-o k o polarity)])
     (tc-result t fs o)))
 
 ;; Substitution of objects into a filter set
 ;; This is essentially ψ+|ψ- [o/x] from the paper
-(define/cond-contract (subst-filter-set fs k o polarity [o-ty Univ]) 
+(define/cond-contract (subst-filter-set fs k o polarity [k-ty Univ]) 
   (-> (or/c FilterSet? NoFilter?) name-ref/c Object? boolean? Type/c FilterSet?)
-  (define extra-filter (-filter o-ty k))
+  (define extra-filter (-filter k-ty k))
   (define (add-extra-filter f)
     (define f* (-and f extra-filter))
     (cond
@@ -133,37 +133,37 @@
       [else f]))
   (match fs
     [(FilterSet: f+ f-)
-     (-FS (subst-filter (add-extra-filter f+) k o polarity o-ty)
-          (subst-filter (add-extra-filter f-) k o polarity o-ty))]
+     (-FS (subst-filter (add-extra-filter f+) k o polarity k-ty)
+          (subst-filter (add-extra-filter f-) k o polarity k-ty))]
     [_ -top-filter]))
 
 ;; Substitution of objects into a type
 ;; This is essentially t [o/x] from the paper
-(define/cond-contract (subst-type t k o polarity [o-ty Univ])
+(define/cond-contract (subst-type t k o polarity [k-ty Univ])
   (->* (Type? name-ref/c Object? boolean?) (Type?) Type?)
-  (define (st t) (subst-type t k o polarity o-ty))
+  (define (st t) (subst-type t k o polarity k-ty))
   (define/cond-contract (sf fs) ((or/c Filter/c FilterSet?) . -> . (or/c Filter/c FilterSet?)) 
     (if (FilterSet? fs)
-        (subst-filter-set fs k o polarity o-ty)
-        (subst-filter fs k o polarity o-ty))) ; this seems wrong???
+        (subst-filter-set fs k o polarity k-ty)
+        (subst-filter fs k o polarity k-ty))) ; this seems wrong???
   ;(define/cond-contract (sf f) (Filter/c . -> . Filter/c) (subst-filter f k o polarity))
   (type-case (#:Type st #:Filter sf #:Object (λ (f) (subst-object f k o polarity)))
     t
     [#:arr dom rng rest drest kws dep?
            (make-arr (for/list ([d (in-list dom)])
-                       (subst-type d (add-scope k) (add-scope/object o) polarity o-ty))
-                     (subst-type rng (add-scope k) (add-scope/object o) polarity o-ty)
-                     (and rest (subst-type rest (add-scope k) (add-scope/object o) polarity o-ty))
+                       (subst-type d (add-scope k) (add-scope/object o) polarity k-ty))
+                     (subst-type rng (add-scope k) (add-scope/object o) polarity k-ty)
+                     (and rest (subst-type rest (add-scope k) (add-scope/object o) polarity k-ty))
                      (and drest
-                          (cons (subst-type (car drest) (add-scope k) (add-scope/object o) polarity o-ty)
+                          (cons (subst-type (car drest) (add-scope k) (add-scope/object o) polarity k-ty)
                                 (cdr drest)))
                      (for/list ([kw (in-list kws)])
-                       (subst-type kw (add-scope k) (add-scope/object o) polarity o-ty))
+                       (subst-type kw (add-scope k) (add-scope/object o) polarity k-ty))
                      dep?)]
     [#:Refine-unsafe type prop
                      (unsafe-make-Refine*
-                      (subst-type type k o polarity o-ty)
-                      (subst-filter prop (add-scope k) (add-scope/object o) polarity o-ty))]))
+                      (subst-type type k o polarity k-ty)
+                      (subst-filter prop (add-scope k) (add-scope/object o) polarity k-ty))]))
 
 ;; add-scope : name-ref/c -> name-ref/c
 ;; Add a scope to an index name-ref
@@ -204,14 +204,14 @@
 
 ;; This is ψ+ [o/x] and ψ- [o/x] with the addition that filters are restricted to
 ;; only those values which are a subtype of the actual argument type (o-ty).
-(define/cond-contract (subst-filter f k o polarity [o-ty Univ])
+(define/cond-contract (subst-filter f k o polarity [k-ty Univ])
   (->* (Filter/c name-ref/c Object? boolean?) (Type/c) Filter/c)
-  (define (sub-f f) (subst-filter f k o polarity o-ty))
+  (define (sub-f f) (subst-filter f k o polarity k-ty))
   (define (sub-o o*) (subst-object o* k o polarity))
   
   (match f
     [(ImpFilter: ant consq)
-     (-imp (subst-filter ant k o (not polarity) o-ty) (sub-f consq))]
+     (-imp (subst-filter ant k o (not polarity) k-ty) (sub-f consq))]
     [(AndFilter: fs) 
      (apply -and (map sub-f fs))]
     [(OrFilter: fs) (apply -or (map sub-f fs))]
@@ -229,12 +229,12 @@
           [_
            ;; `ty` alone doesn't account for the path, so
            ;; first traverse it with the path to match `t`
-           (define path-type (type-ref/path o-ty p))
+           (define path-type (id-ty+path->obj-ty k-ty p))
            (maker
             ;; don't restrict if the path doesn't match the type
             (if (equal? path-type Err)
-                (subst-type t k o polarity o-ty)
-                (restrict path-type (subst-type t k o polarity o-ty)))
+                (subst-type t k o polarity k-ty)
+                (restrict path-type (subst-type t k o polarity k-ty)))
             (-acc-path p o))])]
        ;[(index-free-in? k t) (if polarity -top -bot)] this line is wrong -amk
        [else f])]
@@ -244,25 +244,30 @@
      (let ([l* (LExp-path-map sub-o l)])
        (if (Empty? l*)
            (if polarity -top -bot)
-           (maker (subst-type t k o polarity o-ty) ;; TODO(AMK) Where do we check/handle non-integer type case?
+           (maker (subst-type t k o polarity k-ty) ;; TODO(AMK) Where do we check/handle non-integer type case?
                   l*)))]
     [_ (int-err 'add-scope/object "invalid filter ~a" f)]))
 
-(define/cond-contract (instantiate-fun-args f-type os)
-  (-> Type/c (listof Object?) Type/c)
+(define (instantiate-fun-args f-type os)
   (match f-type
     ;; we special-case this (no case-lambda) for improved error messages
     ;; tc/funapp1 currently cannot handle drest arities
     [(or (? Function?)
          (? PolyDots?)
          (Poly: _ (? Function?))
-         (PolyRow: _ _ (? Function?))
-         (Union: (list (? Function?) ...)))
+         (PolyRow: _ _ (? Function?)))
 
-     (for/fold ([f-type f-type])
+     (for/fold ([t f-type])
                ([(o arg) (in-indexed (in-list os))])
-       (subst-type f-type (list -1 arg) o #t))]
-    
+       (subst-type t (list -1 arg) o #t))]
+
+    [(Union: (and ts (list (? Function?) ...)))
+     (apply Un (for/list ([t (in-list ts)])
+                 (if (Function? t)
+                     (for/fold ([t t])
+                               ([(o arg) (in-indexed (in-list os))])
+                       (subst-type t (list -1 arg) o #t))
+                     t)))]
     ;; resolve names, polymorphic apps, mu, etc
     [(? needs-resolving?)
      (define resolved-f-ty (resolve-once f-type))
@@ -274,6 +279,7 @@
     [_ f-type]))
 
 (define (unabstract-expected/arg-objs exptd objs)
+
   (for/fold ([exptd exptd])
             ([(obj arg-num) (in-indexed (in-list objs))])
     (subst-tc-results exptd (list 0 arg-num) obj #t)))

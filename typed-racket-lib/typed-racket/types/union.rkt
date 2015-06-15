@@ -24,20 +24,24 @@
 ;; The overlapping constraint is lifted if we are in the midst of subtyping. This is because during
 ;; subtyping calls to subtype are expensive.
 (define (merge a b)
-  (define b* (make-union* b))
-  (match* (a b)
+  (cond
     ;; If a union element is a Name application, then it should not
     ;; be checked for subtyping since that can cause infinite
     ;; loops if this is called during type instantiation.
-    [((App: (? Name? rator) rands stx) _)
+    [(App? a)
+     (match-define (App: (? Name? rator) rands stx) a)
      ;; However, we should check if it's a well-formed application
      ;; so that bad applications are rejected early.
      (resolve-app-check-error rator rands stx)
      (cons a b)]
-    [(_ _) #:when (currently-subtyping?) (cons a b)]
-    [((? (λ _ (subtype a b*))) _) b]
-    [((? (λ _ (subtype b* a))) _) (list a)]
-    [(_ _) (cons a (filter-not (λ (b-elem) (subtype b-elem a)) b))]))
+    [(currently-subtyping?) (cons a b)]
+    [else
+     (define bU (make-union* b))
+     (cond
+       [(subtype a bU) b]
+       [(subtype bU a) (list a)]
+       [else
+        (cons a (filter-not (λ (b-elem) (subtype b-elem a)) b))])]))
 
 ;; Type -> List[Type]
 (define (flat t)
