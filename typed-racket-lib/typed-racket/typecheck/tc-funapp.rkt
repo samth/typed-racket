@@ -81,7 +81,7 @@
   ;; TODO - only restrict-type/env if fun-type contains dependent references?
   ;; not as simple as checking for free vars (since fun is a binder)
   (define f-ty*
-    (restrict-type/env (instantiate-fun-args f-ty arg-objs) env*))
+    (and env* (restrict-type/env (instantiate-fun-args f-ty arg-objs) env*)))
   (define expected* (and expected (unabstract-expected/arg-objs expected arg-objs)))
 
   #;(printf "<~a><<TC/FUNAPP 4>>\n --NEW-F-TY--\n ~a\n\n"
