@@ -183,7 +183,7 @@
                            [t (do-type t)])
                        (cond
                          [(or (and ty+ (not (overlap ty+ t)))
-                              (and ty- (subtype ty- t #:env env #:obj o)))
+                              (and ty- (subtype t ty- #:env env #:obj o)))
                           -bot]
                          [(and ty+ (subtype ty+ t #:obj o))
                           -top]

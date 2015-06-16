@@ -564,7 +564,10 @@
            #:expected (ret -Integer)]
         [tc-e (vector-immutable 2 "3" #t) (make-HeterogeneousVector (list -Integer -String -Boolean))]
         [tc-e (make-vector 4 1) (-vec -Integer)]
-        [tc-e (build-vector 4 (lambda (x) 1)) (-vec -Integer)]
+        [tc-e (build-vector 4 (lambda (x) 1))
+              (-refine v (-vec -Integer)
+                       (-eqSLI (-lexp (-acc-path -len v))
+                               (-lexp 4)))]
         [tc-e (range 0) -Null]
         [tc-e (range 1) (-lst* -Zero)]
         [tc-e (range 4) (-lst (-refine x -Byte
@@ -602,7 +605,7 @@
                 (t:-> -Number -Number -Number)]
         [tc-e/t (let: ([x : Number 5]) x) -Number]
         [tc-e/t (let-values ([(x) 4]) (+ x 1))
-                (-int-type 5 -PosIndex)
+                (-int-type 5)
                 (-int-obj 5)]
         [tc-e (let-values ([(x y) (values 3 #t)]) (and (= x 1) (not y)))
               #:ret (ret -False -false-filter)]
@@ -728,7 +731,7 @@
                     12
                     14))
               (t:Un (-int-type 12) (-int-type 14))]
-        [tc-e (car (append (list 1 2) (list 3 4))) (t:Un (-int-type 1) (-int-type 2) (-int-type 3) (-int-type 4))]
+        [tc-e/t (car (append (list 1 2) (list 3 4))) (t:Un (-int-type 1) (-int-type 2) (-int-type 3) (-int-type 4))]
         [tc-e
          (let-syntax ([a
                        (syntax-rules ()
@@ -848,12 +851,12 @@
         [tc-e/t (let: ([x : (Listof Symbol)'(a b c)])
                       (cond [(memq 'a x) => car]
                             [else 'foo]))
-              -Symbol]
+              (-val 'foo)]
 
         [tc-e (list 2 3 4) (-lst* (-int-type 2) (-int-type 3) (-int-type 4))]
         [tc-e (list 2 3 4 'a) (-lst* (-int-type 2) (-int-type 3) (-int-type 4) (-val 'a))]
 
-        [tc-e `(1 2 ,(+ 3 4)) (-lst* (-int-type 1) (-int-type 2) (-int-type 7 -PosIndex))]
+        [tc-e `(1 2 ,(+ 3 4)) (-lst* (-int-type 1) (-int-type 2) (-int-type 7))]
 
         [tc-e (let: ([x : Any 1])
                     (when (and (list? x) (not (null? x)))
@@ -872,7 +875,7 @@
                       'foo))
                 (t:Un (-val 'foo) (-pair Univ (-lst Univ)))]
 
-        [tc-e (cadr (cadr (list 1 (list 1 2 3) 3))) (-int-type 2)]
+        [tc-e/t (cadr (cadr (list 1 (list 1 2 3) 3))) (-int-type 2)]
 
 
 
@@ -882,7 +885,7 @@
         [tc-e (let: ([x : Any 1]) (and (number? x) x))
               (t:Un -Number (-val #f))]
         [tc-e (let: ([x : Any 1]) (and x (boolean? x)))
-              -Boolean]
+              #:ret (ret -Boolean -false-filter)]
 
         [tc-e/t (let: ([x : Any 3])
                       (if (and (list? x) (not (null? x)))
@@ -912,7 +915,7 @@
                             (boolean? x))
                         (if (boolean? x) 1 (+ 1 x))
                         4))
-              (t:Un -Number (-int-type 4))]
+              (t:Un -Number (-int-type 1) (-int-type 4))]
         ;; these don't invoke the or rule
         [tc-e (let: ([x : Any 1]
                      [y : Any 12])
@@ -963,10 +966,10 @@
           #:ret (ret -Boolean -false-filter)]
 
         [tc-err ((lambda () 1) 2)
-          #:ret (ret (-int-type 1) -true-filter (-int-obj 1))]
+          #:ret (ret -One -true-filter (-int-obj 1))]
         [tc-err (apply (lambda () 1) '(2))]
         [tc-err ((lambda: ([x : Any] [y : Any]) 1) 2)
-          #:ret (ret (-int-type 1) -true-filter (-int-obj 1))]
+          #:ret (ret -One -true-filter (-int-obj 1))]
         [tc-err (map map '(2))]
         [tc-err ((plambda: (a) ([x : (a -> a)] [y : a]) (x y)) 5)]
         [tc-err ((plambda: (a) ([x : a] [y : a]) x) 5)]

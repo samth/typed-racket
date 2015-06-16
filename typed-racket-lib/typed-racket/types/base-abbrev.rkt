@@ -139,21 +139,22 @@
 (define (-arg-path arg [depth 0])
   (make-Path null (list depth arg)))
 (define (-acc-path path-elems o)
-  (cond
-    [(null? path-elems) o]
-    [(non-empty-obj? o)
-     (let ([addition (cond
-                       [(list? path-elems) path-elems]
-                       [(PathElem? path-elems) (list path-elems)]
-                       [else (error 'acc-path "invalid path-elems ~a" path-elems)])])
-       (match o
-         [(Path: p o) (make-Path (append addition p) o)]
-         [(? name-ref/c) (make-Path addition (-id-path o))]
-         [(? LExp? l) -empty-obj]
-         [_ (error 'acc-path "cannot access ~a of object(? ~a) ~a"
-                   addition (Object? o) o)]))]
-    ;; empty object, just leave it
-    [else o]))
+  (let ([o (if (name-ref/c o) (-id-path o) o)])
+    (cond
+      [(null? path-elems) o]
+      [(non-empty-obj? o)
+       (let ([addition (cond
+                         [(list? path-elems) path-elems]
+                         [(PathElem? path-elems) (list path-elems)]
+                         [else (error 'acc-path "invalid path-elems ~a" path-elems)])])
+         (match o
+           [(Path: p o) (make-Path (append addition p) o)]
+           [(? name-ref/c) (make-Path addition (-id-path o))]
+           [(? LExp? l) -empty-obj]
+           [_ (error 'acc-path "cannot access ~a of object(? ~a) ~a"
+                     addition (Object? o) o)]))]
+      ;; empty object, just leave it
+      [else o])))
 
 (define/cond-contract (-FS + -)
   (c:-> Filter/c Filter/c FilterSet?)

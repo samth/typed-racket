@@ -9,8 +9,8 @@
          (utils tc-utils)
          (types tc-result resolve subtype filter-ops
                 numeric-tower)
-         (env type-env-structs lexical-env mvar-env)
-         (logic prop-ops proves)
+         (env type-env-structs lexical-env mvar-env update)
+         (logic prop-ops)
          (rename-in (types abbrev)
                     [-> -->]
                     [->* -->*]
@@ -58,7 +58,10 @@
                    #:return-atoms? [return-atoms? #f]
                    #:ignore-non-identifier-ids? [ingore-non-identifier-ids? #t])
   (let/ec exit*
-    (define (exit) (exit* #f empty))
+    (define (exit)
+      (if return-atoms?
+          (exit* #f empty)
+          (exit* #f)))
 
     (define (update-env/props env fs)
       ;; logically combine all propositions
@@ -192,19 +195,12 @@
              (for/fold ([ids/ts null] [ids/als null] [pss null]) 
                        ([id (in-list ids)] [t (in-list types)] [o (in-list aliases)])
                (match o
-                 [(Empty:)
+                 [(not (? non-empty-obj?))
                   ;; no alias, so just record the type and props as usual
                   (define-values (t* ps*) (extract-props-from-type id t #:int-bounds? #t))
                   (values `((,id . ,t*) . ,ids/ts) 
                           ids/als
                           (cons ps* pss))]
-                 [(? LExp? l)
-                  ;; no alias, but record linear equality!
-                  (define-values (t* ps*) (extract-props-from-type id t #:int-bounds? #t))
-                  (values `((,id . ,t*) . ,ids/ts) 
-                          ids/als
-                          (cons (cons (-eqSLI l (-lexp (list 1 (-id-path id)))) ps*)
-                                pss))]
                  [(Path: '() id*)
                   ;; id is aliased to an identifier
                   ;; record the alias relation *and* type of that alias id along w/ props
@@ -213,7 +209,8 @@
                           `((,id . ,o) . ,ids/als)
                           (cons ps* pss))]
                  ;; standard aliasing, just record the type and the alias
-                 [(? Path? o)
+                 [(or (? Path?)
+                      (? LExp?))
                   (define-values (t* ps*) (extract-props-from-type o t #:int-bounds? #t))
                   (values ids/ts
                           `((,id . ,o) . ,ids/als)
