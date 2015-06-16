@@ -10,7 +10,7 @@
          (private-in syntax-properties)
          (rep type-rep filter-rep object-rep object-ops)
          (utils tc-utils)
-         (env lexical-env)
+         (env lexical-env lookup)
          racket/list
          racket/private/class-internal
          syntax/parse
@@ -78,7 +78,8 @@
     ;(printf "TC START!\n  STX: ~a\n  TYPE: ?\n  EXPD: ~a\n\n" form expected)
     (define t (tc-expr/check/internal form expected))
     #;(printf "<TC DONE>\n  STX: ~a\n  ENV: ~a\n\n TYPE: ~a\n\n  EXPD: ~a\n</TC DONE>\n\n"
-            form (lexical-env) t expected)
+              form (lexical-env) t expected)
+    
     (add-typeof-expr form t)
     (cond-check-below t expected)))
 

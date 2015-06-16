@@ -11,7 +11,8 @@
 (provide restrict restrict/notify)
 
 (lazy-require
- ["../infer/infer.rkt" (infer)])
+ ["../infer/infer.rkt" (infer)]
+ ["filter-ops.rkt" (-and)])
 
 (define/cond-contract (restrict old-ty new-ty)
   (c:-> Type? Type? Type?)
@@ -55,6 +56,16 @@
       [(_ (Poly: vars t))
        #:when (infer vars null (list old-ty) (list t) #f)
        old-ty]
+
+      ;; refined types
+      [((Refine-unsafe: rt1 rp1) (Refine-unsafe: rt2 rp2))
+       (notify old-ty (unsafe-make-Refine* (restrict* rt1 rt2 resolved path-stack) (-and rp1 rp2)) path-stack)]
+
+      [((Refine-unsafe: rt rp) t)
+       (notify old-ty (unsafe-make-Refine* (restrict* rt t resolved path-stack) rp) path-stack)]
+      
+      [(t (Refine-unsafe: rt rp))
+       (notify old-ty (unsafe-make-Refine* (restrict* t rt resolved path-stack) rp) path-stack)]
       
       ;; structural recursion on types
       [((Pair: a1 d1) (Pair: a2 d2))
@@ -93,11 +104,6 @@
        #:when (subtype new-ty old-ty)
        (notify old-ty new-ty path-stack)]
 
-      [((Refine-unsafe: rt rp) _)
-       (notify old-ty (unsafe-make-Refine* (restrict* rt new-ty resolved path-stack) rp) path-stack)]
-      
-      [(_ (Refine-unsafe: rt rp))
-       (unsafe-make-Refine* (restrict* old-ty rt resolved path-stack) rp)]
       
       ;; there's no overlap, so the restriction is empty
       [(_ _) #:when (not (overlap old-ty new-ty)) 

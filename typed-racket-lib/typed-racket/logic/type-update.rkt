@@ -170,23 +170,43 @@
                   #:Filter do-filter
                   #:Object do-obj)
                  f
-                 [#:TypeFilter t o 
+                 [#:TypeFilter
+                  t o 
+                  (match t
+                    [(Refine/obj: o rt rp)
+                     (-and (-is-type o (do-type rt))
+                           (do-filter rp))]
+                    [_
+                     (let ([o (do-obj o)]
+                           [ty+ (lookup-obj-type o env #:fail (λ (_) #f))]
+                           [ty- (lookup-obj-not-type o env #:fail (λ (_) #f))]
+                           [t (do-type t)])
+                       (cond
+                         [(or (and ty+ (not (overlap ty+ t)))
+                              (and ty- (subtype ty- t #:env env #:obj o)))
+                          -bot]
+                         [(and ty+ (subtype ty+ t #:obj o))
+                          -top]
+                         [else
+                          (-is-type o t)]))])]
+                 [#:NotTypeFilter
+                  t o
                   (let ([o (do-obj o)]
-                        [ty (lookup-obj-type o env #:fail (λ (_) #f))]
-                        [t (do-type t)])
-                    (-is-type o (if ty (restrict ty t) t)))]
-                 [#:NotTypeFilter t o
-                  (let ([o (do-obj o)]
-                        [ty (lookup-obj-type o env #:fail (λ (_) #f))]
+                        [ty+ (lookup-obj-type o env #:fail (λ (_) #f))]
+                        [ty- (lookup-obj-not-type o env #:fail (λ (_) #f))]
                         [t (do-type t)])
                     (cond
-                      [(and ty (subtype ty t #:env env #:obj o))
+                      [(or (and ty- (subtype t ty- #:env env #:obj o))
+                           (and ty+ (not (overlap ty+ t))))
+                       -top]
+                      [(and ty+ (subtype ty+ t #:env env #:obj o))
                        -bot]
-                      [else (-is-not-type o t)]))]
+                      [else
+                       (-is-not-type o t)]))]
                  [#:AndFilter fs (apply -and (map do-filter fs))]
                  [#:OrFilter fs (apply -or (map do-filter fs))]
-                 [#:SLI sli sli
-                        #;(let ([env-slis (env-SLIs env)])
+                 [#:SLI sli
+                        (let ([env-slis (env-SLIs env)])
                           (cond
                             [(SLIs-imply? env-slis sli) -top]
                             [(Bot? (add-SLI sli env-slis)) -bot]

@@ -35,8 +35,9 @@
          [(constant-LExp? l) 
           => (λ (c) (values null l (tc-literal (datum->syntax #f c))))]
          ;; TODO(amk) might be able to leverage more info about the LExp here?
-         [else (values null l (-refine x (integer-type) (apply -and (leqs->SLIs (leq l (-lexp (-id-path x)))
-                                                                                (leq (-lexp (-id-path x)) l)))))])]
+         [else (values null l (-refine x (integer-type)
+                                       (apply -and (leqs->SLIs (list (leq l (-lexp (-id-path x)))
+                                                                     (leq (-lexp (-id-path x)) l))))))])]
       [(Empty:) (values null id (env-struct-lookup id env #:fail fail))]))
   
   (cond
@@ -78,7 +79,7 @@
          [else -Bottom]))]
     ;; ignore LExps specifics?
     [_ #:when fail (fail o)]
-    [_ -Bottom]))
+    [_ -Nothing]))
 
 
 (define/cond-contract (lookup-obj-type o env #:fail [fail #f])
@@ -94,7 +95,14 @@
          [else (lookup-fail o)]))]
     ;; TODO(amk) maybe something else here more specific
     ;; for what LExp it is? I dunno
-    [(? LExp? l) (integer-type)]
+    [(? LExp? l)
+     (cond
+       [(constant-LExp? l) 
+        => (λ (c) (tc-literal (datum->syntax #f c)))]
+       ;; TODO(amk) might be able to leverage more info about the LExp here?
+       [else (-refine x (integer-type)
+                      (apply -and (leqs->SLIs (list (leq l (-lexp (-id-path x)))
+                                                    (leq (-lexp (-id-path x)) l)))))])]
     [_ #:when fail (fail o)]
     [_ (lookup-fail o)]))
 

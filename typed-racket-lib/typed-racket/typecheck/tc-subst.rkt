@@ -43,15 +43,20 @@
     (subst-tc-results res (list 0 arg) o #t t)))
 
 ;; Restrict the objects in v refering to the current functions arguments to be of the types ts.
-(define (restrict-values v ts)
-  (for/fold ([v v]) ([t (in-list ts)] [arg (in-naturals)])
-    (subst-type v (list 0 arg) (-arg-path arg) #t t)))
+(define (restrict-values v ts [ids #f])
+  (cond
+    [ids
+     (for/fold ([v v]) ([t (in-list ts)] [id (in-list ids)])
+       (subst-type v id (-id-path id) #t t))]
+    [else
+     (for/fold ([v v]) ([t (in-list ts)] [arg (in-naturals)])
+       (subst-type v (list 0 arg) (-arg-path arg) #t t))]))
 
 (define (subst-result res x o polarity [o-ty Univ])
   (match res
     [(AnyValues: f)
      (make-AnyValues (subst-filter f x o polarity o-ty))]
-    [(or (Results: ts fsets objs)) 
+    [(Results: ts fsets objs) 
      (make-Values
       (map -result
            (for/list ([t (in-list ts)])
@@ -86,10 +91,10 @@
 ;; results.
 ;; o-ty is the type of the object that we are substituting in. This allows for restriction/simplification
 ;; of some filters if they conflict with the argument type.
-(define (subst-tc-results res k o polarity [o-ty Univ])
-  (define (st ty) (subst-type ty k o polarity o-ty))
-  (define (sr ty fs ob) (subst-tc-result ty fs ob k o polarity o-ty))
-  (define (sf f) (subst-filter f k o polarity o-ty))
+(define (subst-tc-results res k o polarity [k-ty Univ])
+  (define (st ty) (subst-type ty k o polarity k-ty))
+  (define (sr ty fs ob) (subst-tc-result ty fs ob k o polarity k-ty))
+  (define (sf f) (subst-filter f k o polarity k-ty))
   (match res
     [(tc-any-results: (NoFilter:))
      res]

@@ -5,6 +5,7 @@
          (only-in racket/list make-list)
          (contract-req)
          (typecheck check-below tc-subst tc-metafunctions)
+         (types type-ref-path)
          (utils tc-utils)
          (rep type-rep filter-rep object-rep)
          (except-in (types utils abbrev subtype)
@@ -45,28 +46,19 @@
            (parameterize ([current-orig-stx a])
              (check-below arg-t dom-t arg-o))))
 
-     ;(printf "\n TCFUNAPP1 formatting rng ~a\n\n" rng)
-     (define rng*
-       (match rng
-         [(AnyValues: f)
-          (tc-any-results f)]
-         [(Results: t f o)
-          (ret t f o)]
-         [(Results: t f o dty dbound)
-          (ret t f o dty dbound)]))
-     ;(printf "\n TCFUNAPP1 returning ~a\n\n" rng*)
-     rng*
-     #;(let* ([dom-count (length dom)])
-       ;; Currently do nothing with rest args and keyword args as there are no support for them in
-       ;; objects yet.
-       (let-values
-           ([(o-a t-a) (for/lists (os ts)
-                         ([_ (in-range dom-count)]
-                          [oa (in-sequence-forever (in-list o-a) -empty-obj)]
-                          [ta (in-sequence-forever (in-list t-a) Univ)])
-                         (values oa ta))])
-         
-         (values->tc-results rng o-a t-a)))]
+     ;; restrict argument objects in rng w/ their input type where applicable
+     (let ([rng (match rng
+                  [(AnyValues: f) (tc-any-results f)]
+                  [(Results: t f o) (ret t f o)]
+                  [(Results: t f o dty dbound) (ret t f o dty dbound)])])
+       (for/fold ([rng rng])
+                 ([oa (in-list o-a)]
+                  [ta (in-list t-a)])
+         (match oa
+           [(Path: π (? identifier? x))
+            (define x-ty (obj-ty+path->id-ty ta π -Any))
+            (subst-tc-results rng x (-id-path x) #t x-ty)]
+           [_ rng])))]
     
     ;; this case should only match if the function type has mandatory keywords
     ;; but no keywords were provided in the application

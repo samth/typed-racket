@@ -149,6 +149,7 @@
        (match o
          [(Path: p o) (make-Path (append addition p) o)]
          [(? name-ref/c) (make-Path addition (-id-path o))]
+         [(? LExp? l) -empty-obj]
          [_ (error 'acc-path "cannot access ~a of object(? ~a) ~a"
                    addition (Object? o) o)]))]
     ;; empty object, just leave it
