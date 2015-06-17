@@ -224,7 +224,7 @@
        (and x-obj-ty
             (not (Error? x-obj-ty))
             (with-lexical-env
-             (env-erase-type+ env x)
+             (env-erase-id-type env x)
              (subtype x-obj-ty ft #:obj o))))]
     
     [(NotTypeFilter: ft (and o (Path: π (? identifier? x))))
@@ -233,7 +233,7 @@
             [x-ty- (lookup-id-not-type x env #:fail (λ (_) #f))]
             [x-obj-ty- (and x-ty- (id-ty+path->obj-ty x-ty- π))])
        (with-lexical-env
-        (env-erase-type+ env x)
+        (env-erase-id-type env x)
         (or (and x-obj-ty-
                  (not (Error? x-obj-ty-))
                  (subtype ft x-obj-ty- #:obj o))

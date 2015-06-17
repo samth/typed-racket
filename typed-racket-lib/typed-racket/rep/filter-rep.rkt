@@ -120,7 +120,7 @@
 ;; smart constructor -- reduces them when possible by gcds
 (define/cond-contract (leq l1 l2)
   (-> LExp? LExp? leq?)
-  (let*-values (;[(l1* l2*) (LExp-gcd-shrink l1 l2)] ; worth it??
+  (let*-values ([(l1* l2*) (LExp-gcd-shrink l1 l2)] ; worth it??
                 [(l1* l2*) (LExp-const-normalize l1 l2)])
     (cons l1* l2*)))
 

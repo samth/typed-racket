@@ -157,7 +157,8 @@
       [#:Result
        t ps o
        (let ([o (do-obj o)]
-             [ty (lookup-obj-type o env #:fail (λ (_) #f))]
+             [ty (and (non-empty-obj? o)
+                      (lookup-obj-type o env #:fail (λ (_) #f)))]
              [t (do-type t)]
              [ps (do-filter ps)])
          (make-Result (if ty (restrict ty t) t)

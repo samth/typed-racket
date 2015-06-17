@@ -44,7 +44,7 @@
     [else 
      (define ps (apply append pss))
      (define new-env
-       (env+props (naive-extend/types (lexical-env) ids/ts*)
+       (env+props (naive-extend/id-types (lexical-env) ids/ts*)
                   ps))
      new-env]))
 
@@ -166,7 +166,7 @@
            [else
             (let*-values 
                 ([(ps) (apply append pss)]
-                 [(new-env atoms) (env+props (naive-extend/types (lexical-env) ids/ts*)
+                 [(new-env atoms) (env+props (naive-extend/id-types (lexical-env) ids/ts*)
                                              ps
                                              #:return-atoms? #t)]
                  [(new-env) (and new-env
@@ -223,7 +223,7 @@
            [else 
             (let*-values
                 ([(all-ps) (apply append (cons ps pss))]
-                 [(env) (naive-extend/types (lexical-env) ids/ts*)] 
+                 [(env) (naive-extend/id-types (lexical-env) ids/ts*)] 
                  [(env) (and env (extend/aliases env ids/als))]
                  [(new-env atoms) (if env (env+props env all-ps #:return-atoms? #t) (values #f '()))]
                  [(new-env) (and new-env 
@@ -239,5 +239,5 @@
 ;; run code in an extended env
 ;; WARNING! does not reason about nested props in refinements
 (define-syntax-rule (with-lexical-env/naive-extend-types ids types . b)
-  (with-lexical-env (naive-extend/types (lexical-env) (map cons ids types)) . b))
+  (with-lexical-env (naive-extend/id-types (lexical-env) (map cons ids types)) . b))
 

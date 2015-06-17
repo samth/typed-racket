@@ -40,7 +40,7 @@
   (lookup-id-type i env #:fail fail))
 
 (define (resolve-alias/lexical i [env (lexical-env)])
-  (resolve-id-alias i env))
+  (resolve-id-alias env i -id-path))
 
 ;; refine the type of i in the lexical env
 ;; (identifier type -> type) identifier -> environment
