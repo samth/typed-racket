@@ -136,6 +136,7 @@
          (make-Path null id))]
     [else
      (make-Path null id)]))
+
 (define (-arg-path arg [depth 0])
   (make-Path null (list depth arg)))
 (define (-acc-path path-elems o)
@@ -149,7 +150,7 @@
                          [else (error 'acc-path "invalid path-elems ~a" path-elems)])])
          (match o
            [(Path: p o) (make-Path (append addition p) o)]
-           [(? name-ref/c) (make-Path addition (-id-path o))]
+           [(? name-ref/c) (make-Path addition o)]
            [(? LExp? l) -empty-obj]
            [_ (error 'acc-path "cannot access ~a of object(? ~a) ~a"
                      addition (Object? o) o)]))]
@@ -172,9 +173,9 @@
         Filter/c)
   (define o
     (cond
-      [(Object? i) i]
-      [(list? i) (make-Path null i)]
-      [else (-id-path i)]))
+      [(name-ref/c i)
+       (make-Path null i)]
+      [else i]))
   (cond
     [(Empty? o) -top]
     [(equal? Univ t) -top]

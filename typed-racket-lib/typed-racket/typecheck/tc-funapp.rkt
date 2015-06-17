@@ -102,7 +102,7 @@
       [else
        (define trivial-args
          (map (const (ret -Nothing (-PS -bot -bot) -empty-obj)) args-res))
-       (tc/funapp* f-stx args-stx f-ty* trivial-args expected*)]))
+       (tc/funapp* f-stx args-stx f-ty trivial-args expected*)]))
 
   #;(printf "<~a><<TC/FUNAPP 6>>\n --RESULTS--\n ~a\n\n"
           counter tc-res)

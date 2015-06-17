@@ -50,7 +50,7 @@
   [env-SLIs (env? . -> . (listof SLI?))]
   [replace-props (env? (listof Filter/c) . -> . env?)]
   [empty-env env?]
-  [raw-lookup-alias (env? identifier? (identifier? . -> . (or/c #f Object?)) . -> . (or/c #f non-empty-obj?))]
+  [raw-lookup-alias (env? identifier? (identifier? . -> . (or/c #f Object?)) . -> . (or/c #f Object?))]
   [env-extract-props (env? . -> . (values env? (listof Filter/c)))]
   [env-extract-props+slis (env? . -> . (values env? (listof (and/c Filter/c
                                                                    (not/c SLI?))) (listof SLI?)))]

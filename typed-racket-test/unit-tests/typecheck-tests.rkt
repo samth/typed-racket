@@ -480,7 +480,7 @@
         (tc-e (extflexpt 0.00000000001t0 100000000000.0t0) -NonNegExtFlonum)
         (tc-e (extflexpt -2.0t0 -0.5t0) -ExtFlonum) ; NaN
         (tc-e/t (let-values ([(x y) (integer-sqrt/remainder 0)]) (+ x y))
-                -Zero
+                (-int-type 0)
                 (-int-obj 0))
         (tc-e (tanh (ann 0 Nonnegative-Integer)) -NonNegReal)
         (tc-e (sinh (ann 0 Nonpositive-Integer)) -NonPosReal)
@@ -709,7 +709,7 @@
                         3))
               (t:Un -Number (-int-type 3))]
 
-        [tc-e/t (let ([x 1]) x) -One (-int-obj 1)]
+        [tc-e/t (let ([x 1]) x) (-int-type 1) (-int-obj 1)]
         [tc-e (let ([x 1]) (boolean? x)) #:ret (ret -Boolean -false-filter)]
         [tc-e (boolean? number?) #:ret (ret -Boolean -false-filter)]
 
@@ -743,7 +743,7 @@
         [tc-e (string-join '("hello" "world") " ") -String]
         [tc-e (string-join '("hello" "world")) -String]
         [tc-e (string-join '("hello" "world") #:before-first "a") -String]
-        [tc-e (add-between '(1 2 3) 0) (-lst -Byte)]
+        [tc-e (add-between '(1 2 3) 0) (-lst (U -Byte (-int-type 0)))]
         [tc-e (add-between '(1 2 3) 'a) (-lst (t:Un -PosByte (-val 'a)))]
         [tc-e ((inst add-between Positive-Byte Symbol) '(1 2 3) 'a #:splice? #t #:before-first '(b))
               (-lst (t:Un -PosByte -Symbol))]
@@ -966,10 +966,10 @@
           #:ret (ret -Boolean -false-filter)]
 
         [tc-err ((lambda () 1) 2)
-          #:ret (ret -One -true-filter (-int-obj 1))]
+          #:ret (ret (-int-type 1) -true-filter (-int-obj 1))]
         [tc-err (apply (lambda () 1) '(2))]
         [tc-err ((lambda: ([x : Any] [y : Any]) 1) 2)
-          #:ret (ret -One -true-filter (-int-obj 1))]
+          #:ret (ret (-int-obj 1) -true-filter (-int-obj 1))]
         [tc-err (map map '(2))]
         [tc-err ((plambda: (a) ([x : (a -> a)] [y : a]) (x y)) 5)]
         [tc-err ((plambda: (a) ([x : a] [y : a]) x) 5)]
@@ -1063,7 +1063,7 @@
         [tc-e/t #'3 (-Syntax -PosByte)]
         [tc-e/t #'(2 3 4) (-Syntax (-lst* (-Syntax -PosByte) (-Syntax -PosByte) (-Syntax -PosByte)))]
         [tc-e/t #'id (-Syntax (-val 'id))]
-        [tc-e/t #'#(1 2 3) (-Syntax (make-HeterogeneousVector (list (-Syntax -One) (-Syntax -PosByte) (-Syntax -PosByte))))]
+        [tc-e/t #'#(1 2 3) (-Syntax (make-HeterogeneousVector (list (-Syntax (-int-type 1)) (-Syntax -PosByte) (-Syntax -PosByte))))]
         [tc-e/t (ann #'#(1 2 3) (Syntaxof (Vectorof (Syntaxof (U 1 2 3 'foo)))))
                 (-Syntax (-vec (-Syntax (t:Un (-val 1) (-val 2) (-val 3) (-val 'foo)))))]
         [tc-e/t (ann #'#(1 2 3) (Syntaxof (Vector (Syntaxof (U 1 'foo))
@@ -1357,7 +1357,7 @@
           #:ret (ret (make-pred-ty -String) -true-filter)]
 
 
-        [tc-e (time (+ 3 4)) -PosIndex]
+        [tc-e (time (+ 3 4)) -PosByte]
 
 
 
@@ -1387,7 +1387,7 @@
         (tc-e (or (string->number "7") 7)
               #:ret (ret (t:Un -Number (-int-type 7)) -true-filter))
         [tc-e (let ([x 1]) (if x x (add1 x)))
-              #:ret (ret -One -true-filter (-int-obj 1))]
+              #:ret (ret (-int-type 1) -true-filter (-int-obj 1))]
         [tc-e (let: ([x : (U (Vectorof Integer) String) (vector 1 2 3)])
                 (if (vector? x) (vector-ref x 0) (string-length x)))
          -Integer]
@@ -1801,9 +1801,9 @@
                 (subprocess? p))
               #:ret (ret -Boolean -true-filter))
 
-        (tc-e (car (process "hello"))
+        (tc-e/t (car (process "hello"))
               -Input-Port)
-        (tc-e (car (process* "hello"))
+        (tc-e/t (car (process* "hello"))
               -Input-Port)
 
         #;
@@ -2533,7 +2533,7 @@
              (-lst* -Flonum -Fixnum -ExtFlonum)]
 
        ;; for/hash, for*/hash - PR 14306
-       [tc-e (for/hash: : (HashTable Symbol String)
+       [tc-e/t (for/hash: : (HashTable Symbol String)
                ([x (in-list '(x y z))]
                 [y (in-list '("a" "b" "c"))]
                 #:when (eq? x 'x))

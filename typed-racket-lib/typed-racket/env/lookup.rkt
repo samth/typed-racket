@@ -72,10 +72,10 @@
     [(? LExp? l)
        (cond
          [(lookup-lexp-type env l (const #f)) 
-          => (λ (t) (-unsafe-refine t (-eqSLI l (-lexp (-id-path (-arg-path 0 0))))))]
+          => (λ (t) (-unsafe-refine t (-eqSLI l (-lexp (-arg-path 0 0)))))]
          [(constant-LExp? l)
           => (λ (c) (-unsafe-refine (tc-literal (datum->syntax #f c))
-                                    (-eqSLI l (-lexp (-id-path (-arg-path 0 0))))))]
+                                    (-eqSLI l (-lexp (-arg-path 0 0)))))]
          [else
           (-refine x (integer-type)
                    (apply -and (leqs->SLIs (list (leq l (-lexp (-id-path x)))
@@ -103,8 +103,8 @@
 
 (define/cond-contract (resolve-id-alias env id [fail (const #f)])
   (c:->* (env? identifier?)
-         ((c:-> identifier? (or/c non-empty-obj? #f)))
-        (or/c non-empty-obj? #f))
+         ((c:-> identifier? (or/c Object? #f)))
+         (or/c Object? #f))
   (raw-lookup-alias env id fail))
 
 

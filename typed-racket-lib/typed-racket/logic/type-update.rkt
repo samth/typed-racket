@@ -173,37 +173,43 @@
                  f
                  [#:TypeFilter
                   t o 
-                  (match t
-                    [(Refine/obj: o rt rp)
-                     (-and (-is-type o (do-type rt))
-                           (do-filter rp))]
+                  (match (do-obj o)
+                    [(and o (Path: _ (? list?)))
+                     (-is-type o (do-type t))]
                     [_
-                     (let ([o (do-obj o)]
-                           [ty+ (lookup-obj-type o env #:fail (λ (_) #f))]
+                     (match t
+                       [(Refine/obj: o rt rp)
+                        (-and (-is-type o (do-type rt))
+                              (do-filter rp))]
+                       [_
+                        (let ([ty+ (lookup-obj-type o env #:fail (λ (_) #f))]
+                              [ty- (lookup-obj-not-type o env #:fail (λ (_) #f))]
+                              [t (do-type t)])
+                          (cond
+                            [(or (and ty+ (not (overlap ty+ t)))
+                                 (and ty- (subtype t ty- #:env env #:obj o)))
+                             -bot]
+                            [(and ty+ (subtype ty+ t #:obj o))
+                             -top]
+                            [else
+                             (-is-type o t)]))])])]
+                 [#:NotTypeFilter
+                  t o
+                  (match (do-obj o)
+                    [(and o (Path: _ (? list?)))
+                     (-is-not-type o (do-type t))]
+                    [_
+                     (let ([ty+ (lookup-obj-type o env #:fail (λ (_) #f))]
                            [ty- (lookup-obj-not-type o env #:fail (λ (_) #f))]
                            [t (do-type t)])
                        (cond
-                         [(or (and ty+ (not (overlap ty+ t)))
-                              (and ty- (subtype t ty- #:env env #:obj o)))
-                          -bot]
-                         [(and ty+ (subtype ty+ t #:obj o))
+                         [(or (and ty- (subtype t ty- #:env env #:obj o))
+                              (and ty+ (not (overlap ty+ t))))
                           -top]
+                         [(and ty+ (subtype ty+ t #:env env #:obj o))
+                          -bot]
                          [else
-                          (-is-type o t)]))])]
-                 [#:NotTypeFilter
-                  t o
-                  (let ([o (do-obj o)]
-                        [ty+ (lookup-obj-type o env #:fail (λ (_) #f))]
-                        [ty- (lookup-obj-not-type o env #:fail (λ (_) #f))]
-                        [t (do-type t)])
-                    (cond
-                      [(or (and ty- (subtype t ty- #:env env #:obj o))
-                           (and ty+ (not (overlap ty+ t))))
-                       -top]
-                      [(and ty+ (subtype ty+ t #:env env #:obj o))
-                       -bot]
-                      [else
-                       (-is-not-type o t)]))]
+                          (-is-not-type o t)]))])]
                  [#:AndFilter fs (apply -and (map do-filter fs))]
                  [#:OrFilter fs (apply -or (map do-filter fs))]
                  [#:SLI sli

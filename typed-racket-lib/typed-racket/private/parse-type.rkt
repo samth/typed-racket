@@ -523,13 +523,9 @@
                              [rhs (in-list (cdr lobjs))])
            (values (-leq lhs rhs) (-leq rhs lhs))))
        (-build-SLI (append ineqs1 ineqs2))]
-      [((~datum !=)  ~! l1:expr l2:expr l-rest:expr ...)
-       (define lobjs (map l-obj (syntax->list #'(l1 l2 l-rest ...))))
-       (define neqs
-         (for/list ([lhs (in-list lobjs)]
-                    [rhs (in-list (cdr lobjs))])
-           (-SLI (-lt lhs rhs) (-lt rhs lhs))))
-       (apply -or neqs)]
+      [((~datum !=)  ~! l1:expr l2:expr)
+       (-or (-ltSLI (l-obj #'l1) (l-obj #'l2))
+            (-gtSLI (l-obj #'l1) (l-obj #'l2)))]
       [((~or (~datum >=) (~datum ≥)) ~! l1:expr l2:expr l-rest:expr ...)
        (define lobjs (map l-obj (syntax->list #'(l1 l2 l-rest ...))))
        (define ineqs (for/list ([lhs (in-list lobjs)]
