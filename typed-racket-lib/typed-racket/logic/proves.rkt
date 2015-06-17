@@ -244,9 +244,9 @@
     ;;TODO(amk) These should take into account the ranges
     ;; implied by the integer numeric-type when possible
     [(TypeFilter: ft (? LExp? l))
-     (subtype ft (integer-type) #:env env #:obj l)]
+     (subtype ft (lookup-obj-type l env #:fail (λ _ (integer-type))) #:env env #:obj l)]
     [(NotTypeFilter: ft (? LExp? l))
      (with-lexical-env
       env
-      (not (overlap (integer-type) ft)))]
+      (not (overlap (lookup-obj-type l env #:fail (λ _ (integer-type))) ft)))]
     [_ (int-err "invalid witnesses goal ~a" goal)]))

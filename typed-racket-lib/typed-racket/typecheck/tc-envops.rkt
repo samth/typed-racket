@@ -91,14 +91,11 @@
                       ([current-orig-stx x])
                     (update-env/atom Γ f exit)))
                 (values Γ* (append newly-exposed-props new-ps))])]
-            [(TypeFilter: ft (? LExp? l))
-             (if (subtype ft -Integer #:obj l)
-                 (values Γ new-ps)
-                 (exit))]
-            [(NotTypeFilter: ft (? LExp? l))
-             (if (subtype -Integer ft #:obj l)
-                 (exit)
-                 (values Γ new-ps))]
+            [(or (TypeFilter: _ (? LExp? l))
+                 (NotTypeFilter: _ (? LExp? l)))
+             (define-values (Γ* newly-exposed-props)
+               (update-env/atom Γ f exit))
+             (values Γ* (append newly-exposed-props new-ps))]
             [_ (values Γ new-ps)])))
       
       (cond
