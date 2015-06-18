@@ -1028,7 +1028,7 @@
       [(_) #'(Name: _ _ #t)]
       [(_ name-pat) #'(Name: name-pat _ #t)])))
 
-(def-type Refine ([type Type/c]
+(def-type Refine ([type (and/c Type/c (not/c Refine?))]
                   [prop (and/c Filter/c
                                (not/c Top?)
                                (not/c Bot?))]) #:no-provide

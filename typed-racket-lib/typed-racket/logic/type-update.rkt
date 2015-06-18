@@ -152,9 +152,14 @@
     [else (update orig-t new-t (reverse path-list) '())]))
 
 
-
+;; reduce-type/env
+;; - updates a type based on an environment
+;; - necc. for proper dependent function application
+;; basically performs the following:
+;; 1) tautilogical propositions are mapped to top
+;; 2) contradictory propositions are mapped to bottom
+;; 3) Results returning known objects have their types restricted
 (define (reduce-type/env ty env)
-  ;(define new-props '())
   
   (define (do-type ty)
     (type-case

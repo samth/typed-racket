@@ -244,7 +244,10 @@
     ;;TODO(amk) These should take into account the ranges
     ;; implied by the integer numeric-type when possible
     [(TypeFilter: ft (? LExp? l))
-     (subtype ft (lookup-obj-type l env #:fail (λ _ (integer-type))) #:env env #:obj l)]
+     (with-lexical-env
+      env
+      (subtype (lookup-obj-type l env #:fail (λ _ (-unsafe-refine (integer-type) (-eqSLI l (-lexp (-arg-path 0 0))))))
+               ft))]
     [(NotTypeFilter: ft (? LExp? l))
      (with-lexical-env
       env
