@@ -56,8 +56,10 @@
                   [ta (in-list t-a)])
          (match oa
            [(Path: π (? identifier? x))
-            (define x-ty (obj-ty+path->id-ty ta π -Any))
-            (subst-tc-results rng x (-id-path x) #t x-ty)]
+            (define x-ty (try/obj-ty+path->ty ta π #:fail-type -Any))
+            (if (Any? x-ty)
+                rng
+                (subst-tc-results rng x (-id-path x) #t x-ty))]
            [_ rng])))]
     
     ;; this case should only match if the function type has mandatory keywords

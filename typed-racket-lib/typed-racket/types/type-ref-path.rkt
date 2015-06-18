@@ -9,9 +9,12 @@
          (types subtype resolve union remove-intersect numeric-tower)
          (except-in (types utils abbrev kw-types) -> ->* one-of/c))
 
-(require-for-cond-contract (rep rep-utils))
-
-(provide id-ty+path->obj-ty obj-ty+path->id-ty obj-ty+rev-path->id-ty)
+(provide/cond-contract
+ [id-ty+path->obj-ty (Type/c (listof PathElem?) . -> . Type/c)]
+ [try/obj-ty+path->ty ((Type/c (listof PathElem?) #:fail-type Type/c)
+                              . ->* . Type/c)]
+ [try/obj-ty+rev-path->ty ((Type/c (listof PathElem?) (listof PathElem?) #:fail-type fail-type)
+                                  . ->* . Type/c)])
 
 (define empty-resolved-set (set))
 
@@ -24,12 +27,10 @@
 ;; It is intentionally reset each time we decrease the
 ;; paths size on a recursive call, and maintained/extended
 ;; when the path does not decrease on a recursive call.
-(define (id-ty+path->obj-ty t path [fail-type Err])
-  (id-ty+rev-path->obj-ty t (reverse path) empty-resolved-set fail-type))
+(define (id-ty+path->obj-ty t path)
+  (id-ty+rev-path->obj-ty t (reverse path) empty-resolved-set))
 
-(define/cond-contract (id-ty+rev-path->obj-ty t reversed-path resolved fail-type)
-  (-> Type/c (listof PathElem?) set? Type?
-      Type/c)
+(define (id-ty+rev-path->obj-ty t reversed-path resolved)
   (define-values (path-elem rst)
     (match reversed-path
       [(cons h t) (values h t)]
@@ -41,17 +42,17 @@
     
     ;; pair ops
     [(Pair: a _) #:when (CarPE? path-elem)
-                 (id-ty+rev-path->obj-ty a rst resolved fail-type)]
+                 (id-ty+rev-path->obj-ty a rst resolved)]
     [(Pair: _ d) #:when (CdrPE? path-elem)
-                 (id-ty+rev-path->obj-ty d rst resolved fail-type)]
+                 (id-ty+rev-path->obj-ty d rst resolved)]
     
     ;; syntax ops
     [(Syntax: t) #:when (SyntaxPE? path-elem)
-                 (id-ty+rev-path->obj-ty t rst resolved fail-type)]
+                 (id-ty+rev-path->obj-ty t rst resolved)]
     
     ;; promise op
     [(Promise: t) #:when (ForcePE? path-elem)
-                  (id-ty+rev-path->obj-ty t rst resolved fail-type)]
+                  (id-ty+rev-path->obj-ty t rst resolved)]
     
     ;; struct ops
     [(Struct: nm par flds proc poly pred)
@@ -61,25 +62,25 @@
                    [_ #f]))
      (match-let* ([(StructPE: _ idx) path-elem]
                   [(fld: ft _ _) (list-ref flds idx)])
-       (id-ty+rev-path->obj-ty ft rst resolved fail-type))]
+       (id-ty+rev-path->obj-ty ft rst resolved))]
     
     [(Union: ts)
-     (apply Un (map (λ (t) (id-ty+rev-path->obj-ty t reversed-path resolved fail-type)) ts))]
+     (apply Un (map (λ (t) (id-ty+rev-path->obj-ty t reversed-path resolved)) ts))]
     
     ;; paths into polymorphic types
-    [(Poly: _ body-t) (id-ty+rev-path->obj-ty body-t reversed-path resolved fail-type)]
-    [(PolyDots: _ body-t) (id-ty+rev-path->obj-ty body-t reversed-path resolved fail-type)]
-    [(PolyRow: _ _ body-t) (id-ty+rev-path->obj-ty body-t reversed-path resolved fail-type)]
+    [(Poly: _ body-t) (id-ty+rev-path->obj-ty body-t reversed-path resolved)]
+    [(PolyDots: _ body-t) (id-ty+rev-path->obj-ty body-t reversed-path resolved)]
+    [(PolyRow: _ _ body-t) (id-ty+rev-path->obj-ty body-t reversed-path resolved)]
     
     ;; for private fields in classes
     [(Function: (list (arr: doms (Values: (list (Result: rng _ _))) _ _ _ _)))
      #:when (FieldPE? path-elem)
-     (id-ty+rev-path->obj-ty rng rst resolved fail-type)]
+     (id-ty+rev-path->obj-ty rng rst resolved)]
     
     ;; types which need resolving
     [(? needs-resolving?)
      #:when (not (set-member? resolved (cons reversed-path t)))
-     (id-ty+rev-path->obj-ty (resolve-once t) reversed-path (set-add resolved (cons reversed-path t)) fail-type)]
+     (id-ty+rev-path->obj-ty (resolve-once t) reversed-path (set-add resolved (cons reversed-path t)))]
     
     ;; length ops
     [vt #:when (and (LengthPE? path-elem)
@@ -87,19 +88,21 @@
         -Nat]
     
     ;; type/path mismatch =(
-    [_ fail-type]))
+    [_ Err]))
 
-(define (obj-ty+path->id-ty t path fail-type)
-  (obj-ty+rev-path->id-ty t (reverse path) fail-type))
 
+;; try/obj-ty+path->ty
 ;; takes a path and a type and builds up the type from 'unwrapping'
 ;; the path. Ex: (car cdr) String --> (Pairof (Pairof Any String) Any)
+;; WARNING - this is best effort, but currently cannot rebuild *any* type
+;; from a path (FIXME make it work for any type/path combo?)
 ;; NOTE: path is reversed (so we're not continually matching on the last
 ;; element of a list) -- i.e. for caddr we would expect reversed-path
 ;; to equal '(cdr cdr car)
-(define/cond-contract (obj-ty+rev-path->id-ty t reversed-path fail-type)
-  (-> Type/c (listof PathElem?) Type/c
-      Type/c)
+(define (try/obj-ty+path->ty t path #:fail-type fail-type)
+  (try/obj-ty+rev-path->ty t (reverse path) #:fail-type fail-type))
+
+(define (try/obj-ty+rev-path->ty t reversed-path #:fail-type fail-type)
   (define-values (hd rst)
     (match reversed-path
       [(cons h t) (values h t)]
@@ -111,19 +114,19 @@
     
     ;; pair ops
     [(CarPE:)
-     (define a (obj-ty+rev-path->id-ty t rst fail-type))
+     (define a (try/obj-ty+rev-path->ty t rst #:fail-type fail-type))
      (-pair a Univ)]
     [(CdrPE:)
-     (define d (obj-ty+rev-path->id-ty t rst fail-type))
+     (define d (try/obj-ty+rev-path->ty t rst #:fail-type fail-type))
      (-pair Univ d)]
     
     ;; syntax ops
     [(SyntaxPE:)
-     (-Syntax (obj-ty+rev-path->id-ty t rst fail-type))]
+     (-Syntax (try/obj-ty+rev-path->ty t rst #:fail-type fail-type))]
     
     ;; promise op
     [(ForcePE:)
-     (-Promise (obj-ty+rev-path->id-ty t rst fail-type))]
+     (-Promise (try/obj-ty+rev-path->ty t rst #:fail-type fail-type))]
     
     ;; struct ops
     #;[(StructPE: (? (λ (s) (subtype t s)) s) idx)

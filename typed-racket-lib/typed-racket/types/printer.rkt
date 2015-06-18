@@ -550,6 +550,7 @@
           (cond
             ;; print singleton integer type refinements as the integer
             [(and (subtype t -Int)
+                  (SLI? p)
                   (equals-constant-SLI? p))
              => (λ (n) n)]
             [else

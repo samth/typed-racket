@@ -14,7 +14,7 @@
 
  (lazy-require
   #;("../types/remove-intersect.rkt" (overlap))
-  ("../types/type-ref-path.rkt" (obj-ty+rev-path->id-ty))
+  ("../types/type-ref-path.rkt" (try/obj-ty+rev-path->ty))
   ("../types/subtype.rkt" (subtype))
   ("../types/filter-ops.rkt" (-and -or)))
 
@@ -138,7 +138,7 @@
        (unsafe-make-Refine* (update t ft reversed-path path-stack) p)]
       
       [_
-       (let ([t (obj-ty+rev-path->id-ty ft reversed-path Univ)])
+       (let ([t (try/obj-ty+rev-path->ty ft reversed-path #:fail-type -Any)])
          (if (overlap orig-t t)
              t
              -Bottom))]))
