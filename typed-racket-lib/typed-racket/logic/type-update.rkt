@@ -18,8 +18,8 @@
   ("../types/subtype.rkt" (subtype))
   ("../types/filter-ops.rkt" (-and -or)))
 
-(provide restrict-type/env restrict-fun/arg-types update-type
-         unabstract-doms/arg-objs unabstract-rng/arg-objs)
+(provide reduce-type/env update-type unabstract-doms/arg-objs
+         unabstract-rng/arg-objs)
 
 
 ;; update-type   (formerly simply 'update')
@@ -143,11 +143,17 @@
              t
              -Bottom))]))
 
-  (update orig-t new-t (reverse path-list) '()))
+  (cond
+    [(and (null? path-list)
+          (type-equal? orig-t new-t))
+     (if pos?
+         (notify orig-t orig-t '())
+         (notify orig-t -Nothing '()))]
+    [else (update orig-t new-t (reverse path-list) '())]))
 
 
 
-(define (restrict-type/env ty env)
+(define (reduce-type/env ty env)
   ;(define new-props '())
   
   (define (do-type ty)
@@ -156,12 +162,12 @@
      ty
       [#:Result
        t ps o
-       (let ([o (do-obj o)]
-             [ty (and (non-empty-obj? o)
-                      (lookup-obj-type o env #:fail (λ (_) #f)))]
-             [t (do-type t)]
-             [ps (do-filter ps)])
-         (make-Result (if ty (restrict ty t) t)
+       (let* ([o (do-obj o)]
+              [ty (and (not (B? t))
+                       (non-empty-obj? o)
+                       (lookup-obj-type o env #:fail (λ (_) #f)))]
+              [ps (do-filter ps)])
+         (make-Result (if ty (restrict ty (do-type t)) (do-type t))
                       ps
                       o))]))
                 
@@ -178,6 +184,8 @@
                      (-is-type o (do-type t))]
                     [_
                      (match t
+                       [(? B?)
+                        (-is-type o t)]
                        [(Refine/obj: o rt rp)
                         (-and (-is-type o (do-type rt))
                               (do-filter rp))]
@@ -199,17 +207,21 @@
                     [(and o (Path: _ (? list?)))
                      (-is-not-type o (do-type t))]
                     [_
-                     (let ([ty+ (lookup-obj-type o env #:fail (λ (_) #f))]
-                           [ty- (lookup-obj-not-type o env #:fail (λ (_) #f))]
-                           [t (do-type t)])
-                       (cond
-                         [(or (and ty- (subtype t ty- #:env env #:obj o))
-                              (and ty+ (not (overlap ty+ t))))
-                          -top]
-                         [(and ty+ (subtype ty+ t #:env env #:obj o))
-                          -bot]
-                         [else
-                          (-is-not-type o t)]))])]
+                     (match t
+                       [(? B?)
+                         (-is-not-type o t)]
+                       [_
+                        (let ([ty+ (lookup-obj-type o env #:fail (λ (_) #f))]
+                              [ty- (lookup-obj-not-type o env #:fail (λ (_) #f))]
+                              [t (do-type t)])
+                          (cond
+                            [(or (and ty- (subtype t ty- #:env env #:obj o))
+                                 (and ty+ (not (overlap ty+ t))))
+                             -top]
+                            [(and ty+ (subtype ty+ t #:env env #:obj o))
+                             -bot]
+                            [else
+                             (-is-not-type o t)]))])])]
                  [#:AndFilter fs (apply -and (map do-filter fs))]
                  [#:OrFilter fs (apply -or (map do-filter fs))]
                  [#:SLI sli
@@ -231,79 +243,6 @@
                    pe))
   (do-type ty))
 
-
-
-
-
-(define (restrict-fun/arg-types f-type args-res)
- ;; TODO support polymorphic functions
-  ;; e.g. match-define: no matching clause for (All (a) (-> (Listof a) Index))
-  ;; if match-define (Function: (list (arr: domss rngs rests drests kwss dep?s) ...))
-  ;; grab objects for the arguments if there is one
-  (define-values (arg-tys arg-objs)
-    (for/lists (a b) ([tcres (in-list args-res)])
-      (match tcres
-        [(tc-result1: t _ o)
-         (values t (and (or (Path? o) (LExp? o))
-                        o))]
-        [_ (int-err "unknown tc-result type for argument ~a" tcres)])))
-  
-  (match f-type
-    [(Function: (list (and arrs (arr: domss rngs rests drests kwss dep?s)) ...)) 
-     #:when (ormap values dep?s)
-     (define new-arrs 
-       (for/list ([arr (in-list arrs)]
-                  [doms (in-list domss)]
-                  [rng (in-list rngs)]
-                  [rest (in-list rests)]
-                  [drest (in-list drests)]
-                  [kws (in-list kwss)]
-                  [dep? (in-list dep?s)])
-         (cond
-           [(not dep?) arr]
-           [else
-            (define tmp-ids (genids (length doms) 'arg))
-            (define-values (tmp-doms tmp-rng)
-              ((instantiate-many tmp-ids) doms rng))
-            ;; replace tmp ids w/ objects when possible in domains
-            (define doms*
-              (for/list ([d (in-list tmp-doms)])
-                (for/fold ([d* d])
-                          ([o (in-list arg-objs)]
-                           [o-ty (in-list arg-tys)]
-                           [id (in-list tmp-ids)])
-                  (if o (subst-type d* id o #t o-ty) d*))))
-            ;; replace tmp ids w/ objects when possible in the range
-            (define rng*
-              (for/fold ([r* tmp-rng])
-                        ([o (in-list arg-objs)]
-                         [o-ty (in-list arg-tys)]
-                         [id (in-list tmp-ids)])
-                (if o (subst-result r* id o #t o-ty) r*)))
-            ;; build props that represent domain's types
-            (define dom-ty-props
-              (for/list ([tmp-id (in-list tmp-ids)]
-                         [o (in-list arg-objs)]
-                         [ty (in-list arg-tys)]) ;; was doms*
-                (-is-type (or o (-id-path tmp-id)) ty)))
-            ;; update the lexical environment with domain types
-            (define env*
-              (env+props (lexical-env) dom-ty-props #:ignore-non-identifier-ids? #f))
-            
-            (cond
-              [(not env*) (make-arr (map (λ _ Univ) doms) 
-                                    rng*
-                                    rest
-                                    drest
-                                    kws
-                                    dep?)]
-              [else
-               (define updated-doms (for/list ([d (in-list doms*)])
-                                      (abstract-idents tmp-ids (restrict-type/env d env*))))
-               (define updated-rng (abstract-idents tmp-ids (restrict-type/env rng* env*)))
-               (make-arr updated-doms updated-rng rest drest kws dep?)])])))
-     (make-Function new-arrs)]
-    [_ f-type]))
 
 
 ;; unabstract-arg-objs : (listof Type) (listof Object)

@@ -71,10 +71,6 @@
       [((Pair: a1 d1) (Pair: a2 d2))
        (define a (restrict* a1 a2 resolved (push -car)))
        (define d (restrict* d1 d2 resolved (push -cdr)))
-       (when (not (Type? a))
-         (error 'restrict* "WTF NOT A TYPE 1!!! ~a" a))
-       (when (not (Type? d))
-         (error 'restrict* "WTF NOT A TYPE 2!!! ~a" a))
        (build-type -pair a d)]
       ;; FIXME: support structural updating for structs when structs are updated to
       ;; contain not only *if* they are polymorphic, but *which* fields are too  

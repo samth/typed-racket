@@ -43,7 +43,7 @@
 (define print-aliases #t)
 ;; should we use subtype to better print unions?
 ;; (setting to #f very helpful for debugging infinite loops in subtype/proves/etc...)
-(define use-subtyping? #f)
+(define use-subtyping? #t)
 
 (define type-output-sexpr-tweaker (make-parameter values))
 (define print-complex-filters? (make-parameter #f))

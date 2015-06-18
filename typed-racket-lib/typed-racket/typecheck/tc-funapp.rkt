@@ -34,7 +34,7 @@
              (poly-fail f-stx args-stx t args-res
                         #:name (and (identifier? f-stx) f-stx)
                         #:expected expected))))]))
-;(define counter 0)
+#;(define counter 0)
 (define (tc/funapp f-stx args-stx f-ty initial-args-res expected)
 
   #;(printf "<~a><<TC/FUNAPP 1>>\n (apply ~a ~a)\n-F-TY-\n ~a\n --INIT-ARGS--\n ~a\n --EXPTD--\n ~a\n\n"
@@ -81,7 +81,7 @@
   ;; TODO - only restrict-type/env if fun-type contains dependent references?
   ;; not as simple as checking for free vars (since fun is a binder)
   (define f-ty*
-    (and env* (restrict-type/env (instantiate-fun-args f-ty arg-objs) env*)))
+    (and env* (reduce-type/env (instantiate-fun-args f-ty arg-objs) env*)))
   (define expected* (and expected (unabstract-expected/arg-objs expected arg-objs)))
 
   #;(printf "<~a><<TC/FUNAPP 4>>\n --NEW-F-TY--\n ~a\n\n"

@@ -743,7 +743,7 @@
         [tc-e (string-join '("hello" "world") " ") -String]
         [tc-e (string-join '("hello" "world")) -String]
         [tc-e (string-join '("hello" "world") #:before-first "a") -String]
-        [tc-e (add-between '(1 2 3) 0) (-lst (U -Byte (-int-type 0)))]
+        [tc-e (add-between '(1 2 3) 0) (-lst (t:Un -Byte (-int-type 0)))]
         [tc-e (add-between '(1 2 3) 'a) (-lst (t:Un -PosByte (-val 'a)))]
         [tc-e ((inst add-between Positive-Byte Symbol) '(1 2 3) 'a #:splice? #t #:before-first '(b))
               (-lst (t:Un -PosByte -Symbol))]
@@ -2533,14 +2533,14 @@
              (-lst* -Flonum -Fixnum -ExtFlonum)]
 
        ;; for/hash, for*/hash - PR 14306
-       [tc-e/t (for/hash: : (HashTable Symbol String)
-               ([x (in-list '(x y z))]
-                [y (in-list '("a" "b" "c"))]
-                #:when (eq? x 'x))
-               (values x y))
-             #:ret (ret (-HT -Symbol -String)
-                        (-FS -top -top)
-                        -empty-obj)]
+       [tc-e (for/hash: : (HashTable Symbol String)
+                 ([x (in-list '(x y z))]
+                  [y (in-list '("a" "b" "c"))]
+                  #:when (eq? x 'x))
+                 (values x y))
+               #:ret (ret (-HT -Symbol -String)
+                          (-FS -top -top)
+                          -empty-obj)]
        [tc-e (for*/hash: : (HashTable Symbol String)
                ([k (in-list '(x y z))]
                 [v (in-list '("a" "b"))]
@@ -3975,6 +3975,14 @@
                     "dead code"
                     42)
                 42))
+          (void))
+        -Void]
+       ;; ensure env can track types of lexp objects
+       [tc-e
+        (let ()
+          (: f (-> Fixnum Fixnum))
+          (define f
+            (λ (x) (ann (assert (- x 1075) fixnum?) Fixnum)))
           (void))
         -Void]
        )

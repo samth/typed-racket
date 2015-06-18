@@ -112,13 +112,9 @@
     ;; pair ops
     [(CarPE:)
      (define a (obj-ty+rev-path->id-ty t rst fail-type))
-     (when (not (Type? a))
-       (error 'restrict* "WTF NOT A TYPE 9!!! ~a" a))
      (-pair a Univ)]
     [(CdrPE:)
      (define d (obj-ty+rev-path->id-ty t rst fail-type))
-     (when (not (Type? d))
-       (error 'restrict* "WTF NOT A TYPE 10!!! ~a" d))
      (-pair Univ d)]
     
     ;; syntax ops
