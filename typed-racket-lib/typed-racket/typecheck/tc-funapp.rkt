@@ -34,11 +34,29 @@
              (poly-fail f-stx args-stx t args-res
                         #:name (and (identifier? f-stx) f-stx)
                         #:expected expected))))]))
-#;(define counter 0)
+
+(define-for-syntax (DEBUG)
+  #f)
+
+(define-syntax (LOG stx)
+  (if (DEBUG)
+      (syntax-case stx ()
+        [(_ args ...)
+         #'(printf args ...)])
+      #'(void)))
+
+(define-syntax (LOG! stx)
+  (if (DEBUG)
+      (syntax-case stx ()
+        [(_ args ...)
+         #'(begin args ...)])
+      #'(void)))
+
+(define counter 0) ;; remove when removing LOG
 (define (tc/funapp f-stx args-stx f-ty initial-args-res expected)
 
-  #;(printf "<~a><<TC/FUNAPP 1>>\n (apply ~a ~a)\n-F-TY-\n ~a\n --INIT-ARGS--\n ~a\n --EXPTD--\n ~a\n\n"
-          counter f-stx args-stx f-ty initial-args-res expected)
+  (LOG "<~a><<TC/FUNAPP 1>>\n (apply ~a ~a)\n-F-TY-\n ~a\n --INIT-ARGS--\n ~a\n --EXPTD--\n ~a\n\n"
+       counter f-stx args-stx f-ty initial-args-res expected)
   
   ;; generate temporary identifiers for arguments w/o objects
   ;; and any associated props discussing their types
@@ -68,13 +86,13 @@
                  (cons (-is-type o* t) prop-l)
                  (cons temp-id temp-id-l))])))
 
-  #;(printf "<~a><<TC/FUNAPP 2>>\n --NEW-ARGS--\n ~a\n\n"
-          counter args-res)
+  (LOG "<~a><<TC/FUNAPP 2>>\n --NEW-ARGS--\n ~a\n\n"
+       counter args-res)
   
   (define env* (env+props (lexical-env) props))
 
-  #;(printf "<~a><<TC/FUNAPP 3>>\n --OLD-ENV--\n ~a\n --NEW-ENV--\n ~a\n\n"
-          counter (lexical-env) env*)
+  (LOG "<~a><<TC/FUNAPP 3>>\n --OLD-ENV--\n ~a\n --PROPS--\n ~a\n --NEW-ENV--\n ~a\n\n"
+       counter (lexical-env) props env*)
   
   ;; NOTE: this next line IS COSTLY it seems (probably because we're rebuilding
   ;; every function here twice?)
@@ -84,11 +102,11 @@
     (and env* (reduce-type/env (instantiate-fun-args f-ty arg-objs) env*)))
   (define expected* (and expected (unabstract-expected/arg-objs expected arg-objs)))
 
-  #;(printf "<~a><<TC/FUNAPP 4>>\n --NEW-F-TY--\n ~a\n\n"
-          counter f-ty*)
+  (LOG "<~a><<TC/FUNAPP 4>>\n --NEW-F-TY--\n ~a\n\n"
+       counter f-ty*)
 
-  #;(printf "<~a><<TC/FUNAPP 5>>\n --OLD-EXPTD--\n ~a\n --NEW-EXPTD--\n ~a\n\n"
-          counter expected expected*)
+  (LOG "<~a><<TC/FUNAPP 5>>\n --OLD-EXPTD--\n ~a\n --NEW-EXPTD--\n ~a\n\n"
+       counter expected expected*)
   
   ;; tc the application TODO (ret -bot) on no env*?
   (define tc-res
@@ -104,7 +122,7 @@
          (map (const (ret -Nothing (-PS -bot -bot) -empty-obj)) args-res))
        (tc/funapp* f-stx args-stx f-ty trivial-args expected*)]))
 
-  #;(printf "<~a><<TC/FUNAPP 6>>\n --RESULTS--\n ~a\n\n"
+  (LOG "<~a><<TC/FUNAPP 6>>\n --RESULTS--\n ~a\n\n"
           counter tc-res)
   
   ;; erase any temps remaining in the result from typechecking
@@ -112,9 +130,9 @@
                       ([temp-id (in-list temp-ids)])
               (subst-tc-results tc-res temp-id -empty-obj #t)))
 
-  #;(printf "<~a><<TC/FUNAPP 7>>\n --RESULTS after temps removed--\n ~a\n\n"
-          counter v)
-  ;(set! counter (add1 counter))
+  (LOG "<~a><<TC/FUNAPP 7>>\n --RESULTS after temps removed--\n ~a\n\n"
+       counter v)
+  (LOG! (set! counter (add1 counter)))
   v)
 
 
