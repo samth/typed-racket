@@ -65,7 +65,15 @@
        (id-ty+rev-path->obj-ty ft rst resolved))]
     
     [(Union: ts)
-     (apply Un (map (λ (t) (id-ty+rev-path->obj-ty t reversed-path resolved)) ts))]
+     (let loop ([ts ts]
+                [ts* '()])
+       (match ts
+         [(list) (apply Un ts*)]
+         [(cons t ts)
+          (define t* (id-ty+rev-path->obj-ty t reversed-path resolved))
+          (if (type-equal? Err t*)
+              t*
+              (loop ts (cons t* ts*)))]))]
     
     ;; paths into polymorphic types
     [(Poly: _ body-t) (id-ty+rev-path->obj-ty body-t reversed-path resolved)]
@@ -86,6 +94,10 @@
     [vt #:when (and (LengthPE? path-elem)
                     (overlap vt -VectorTop))
         -Nat]
+
+    ;; go into refined type
+    [(Refine-type: t)
+     (id-ty+rev-path->obj-ty t reversed-path resolved)]
     
     ;; type/path mismatch =(
     [_ Err]))
