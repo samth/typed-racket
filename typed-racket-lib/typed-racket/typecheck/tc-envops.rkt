@@ -206,12 +206,17 @@
                           `((,id . ,o) . ,ids/als)
                           (cons ps* pss))]
                  ;; standard aliasing, just record the type and the alias
-                 [(or (? Path?)
-                      (? LExp?))
+                 [(? Path?)
                   (define-values (t* ps*) (extract-props-from-type o t #:int-bounds? #t))
                   (values ids/ts
                           `((,id . ,o) . ,ids/als)
                           (cons ps* pss))]
+                 ;; aliasing a linear expression, we should record the lexp's type
+                 [(? LExp? l)
+                  (define-values (t* ps*) (extract-props-from-type l t #:int-bounds? #t))
+                  (values ids/ts
+                          `((,id . ,o) . ,ids/als)
+                          (cons (cons (-is-type l t*) ps*) pss))]
                  [_ (int-err "unrecognized object! ~a" o)]))])
          (cond
            [(for/or ([id/t (in-list ids/ts*)]) (type-equal? (cdr id/t) -Bottom))
