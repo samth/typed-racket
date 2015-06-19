@@ -54,7 +54,7 @@
 
 (define counter 0) ;; remove when removing LOG
 (define (tc/funapp f-stx args-stx f-ty initial-args-res expected)
-
+  
   (LOG "<~a><<TC/FUNAPP 1>>\n (apply ~a ~a)\n-F-TY-\n ~a\n --INIT-ARGS--\n ~a\n --EXPTD--\n ~a\n\n"
        counter f-stx args-stx f-ty initial-args-res expected)
   

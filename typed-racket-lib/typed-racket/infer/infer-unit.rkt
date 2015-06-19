@@ -479,7 +479,7 @@
   (define empty (empty-cset/context context))
   ;; this constrains just x (which is a single var)
   (define (singleton S x T obj)
-    (insert empty x S T (and obj (non-empty-obj? obj) obj)))
+    (insert empty x S T obj))
   ;; FIXME -- figure out how to use parameters less here
   ;;          subtyping doesn't need to use it quite as much
   (define cs (current-seen))

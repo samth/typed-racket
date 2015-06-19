@@ -468,6 +468,7 @@
 ;; sli-satisfiable?
 (define/cond-contract (internal-sli-sat? sli)
   (-> immutable-leq-set? boolean?)
+  
   (define paths (internal-sli-path-set sli))
   ;; build a system where all variables are eliminated
   (define simplified-system
@@ -484,7 +485,8 @@
 
 (define/cond-contract (SLI-satisfiable? sli)
   (-> SLI? boolean?)
-  (internal-sli-sat? (SLI-system sli)))
+  (define sys (SLI-system sli))
+  (internal-sli-sat? sys))
 
 (define/cond-contract (internal-sli-trivially-valid? sli)
   (-> immutable-leq-set? boolean?)

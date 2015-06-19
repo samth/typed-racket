@@ -13,7 +13,7 @@
  [id-ty+path->obj-ty (Type/c (listof PathElem?) . -> . Type/c)]
  [try/obj-ty+path->ty ((Type/c (listof PathElem?) #:fail-type Type/c)
                               . ->* . Type/c)]
- [try/obj-ty+rev-path->ty ((Type/c (listof PathElem?) (listof PathElem?) #:fail-type fail-type)
+ [try/obj-ty+rev-path->ty ((Type/c (listof PathElem?) #:fail-type Type/c)
                                   . ->* . Type/c)])
 
 (define empty-resolved-set (set))

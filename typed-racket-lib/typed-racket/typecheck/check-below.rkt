@@ -88,7 +88,7 @@
 ;;                   (Results Results -> Result)
 ;;                   (Type Results -> Type)
 ;;                   (Type Type -> Type))
-(define (check-below tr1 expected [obj #f])
+(define (check-below tr1 expected [obj -empty-obj])
   #;(printf "check-below\n tr1: ~a\n\n expected: ~a\n\n [obj: ~a]\n\n\n"
           tr1 expected obj)
   (define (filter-set-better? f1 f2)

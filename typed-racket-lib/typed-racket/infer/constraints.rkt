@@ -12,7 +12,7 @@
 (export constraints^)
 
 ;; Widest constraint possible
-(define no-constraint (make-c (Un) Univ #f))
+(define no-constraint (make-c (Un) Univ -empty-obj))
 
 ;; Create an empty constraint map from a set of type variables X and
 ;; index variables Y.  For now, we add the widest constraints for
@@ -47,10 +47,11 @@
 
 (define (join-objs o o*)
   (cond
-    [(not o*) o]
-    [(not o) o*]
-    [(object-equal? o o*) o]
-    [else #f]))
+    [(or (object-equal? o o*)
+         (and (non-empty-obj? o)
+              (not (non-empty-obj? o*))))
+     o]
+    [else -empty-obj]))
 
 ;; meet of two variable constraints
 ;; never fails

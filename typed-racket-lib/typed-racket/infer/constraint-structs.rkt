@@ -6,9 +6,7 @@
 
 ;; S, T types
 ;; represents S <: X <: T (see "Local Type Inference" pg. 12)
-(define-struct/cond-contract c ([S Type/c] [T Type/c] [obj (or/c #f (and/c Object?
-                                                                           (not/c Empty?)
-                                                                           (not/c NoObject?)))]) #:transparent)
+(define-struct/cond-contract c ([S Type/c] [T Type/c] [obj Object?]) #:transparent)
 
 ;; fixed : Listof[c]
 ;; rest : option[c]

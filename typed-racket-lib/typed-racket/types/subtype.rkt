@@ -33,7 +33,7 @@
   
 ;; is s a subtype of t?
 ;; type type -> boolean
-(define (subtype s t #:env [env #f] #:obj [obj #f])
+(define (subtype s t #:env [env #f] #:obj [obj -empty-obj])
   
   (and (subtype* (current-seen) s t env obj) #t))
 
@@ -47,7 +47,7 @@
 (define (subtypes* A ss ts env)
   (cond [(and (null? ss) (null? ts) A)]
         [(or (null? ss) (null? ts)) #f]
-        [(subtype* A (car ss) (car ts) env #f)
+        [(subtype* A (car ss) (car ts) env -empty-obj)
          =>
          (lambda (A*) (subtypes* A* (cdr ss) (cdr ts) env))]
         [else #f]))
@@ -99,7 +99,7 @@
 	(cond [(eq? kt ks)
 	       (and ;; if t is optional, s must be as well
 		(or rt (not rs))
-		(loop (subtype* A tt ts #f #f) rest-s rest-t))]
+		(loop (subtype* A tt ts #f -empty-obj) rest-s rest-t))]
 	      ;; optional extra keywords in s are ok
 	      ;; we just ignore them
 	      [(and (not rs) (keyword<? ks kt)) (loop A rest-s t)]
@@ -128,7 +128,7 @@
          [(env) (env-extend-types (or env (lexical-env)) ids doms2)])
         (subtype-seq A0
                      (subtypes* doms2 doms1 env)
-                     (subtype* (restrict-values rng1 doms2) rng2 env #f)))]
+                     (subtype* (restrict-values rng1 doms2) rng2 env -empty-obj)))]
       
       [((arr: doms1 rng1 #f #f kws1 dep1?)
         (arr: doms2 rng2 #f #f kws2 dep2?)) 
@@ -143,7 +143,7 @@
         (subtype-seq A0
                      (subtypes* doms2 doms1 env)
                      (kw-subtypes* kws1 kws2 env)
-                     (subtype* (restrict-values rng1 doms2) rng2 env #f)))]
+                     (subtype* (restrict-values rng1 doms2) rng2 env -empty-obj)))]
       
       [((arr: doms1 rng1 rest1 #f kws1 dep1?)
         (arr: doms2 rng2 #f #f kws2 dep2?))
@@ -158,7 +158,7 @@
         (subtype-seq A0
                      (subtypes*/varargs doms2 doms1 rest1 env)
                      (kw-subtypes* kws1 kws2 env)
-                     (subtype* (restrict-values rng1 doms2) rng2 env #f)))]
+                     (subtype* (restrict-values rng1 doms2) rng2 env -empty-obj)))]
       
       [((arr: s-dom s-rng #f #f s-kws dep1?)
         (arr: t-dom t-rng t-rest #f t-kws dep2?))
@@ -176,9 +176,9 @@
          [(env) (env-extend-types (or env (lexical-env)) ids doms2)])
         (subtype-seq A0
                      (subtypes*/varargs doms2 doms1 rest1 env)
-                     (subtype* rest2 rest1 env #f)
+                     (subtype* rest2 rest1 env -empty-obj)
                      (kw-subtypes* kws1 kws2 env)
-                     (subtype* (restrict-values rng1 doms2) rng2 env #f)))]
+                     (subtype* (restrict-values rng1 doms2) rng2 env -empty-obj)))]
       
       ;; handle ... varargs when the bounds are the same
       [((arr: doms1 rng1 #f (cons drest1 dbound) kws1 dep1?)
@@ -192,29 +192,29 @@
           (inst-many doms1 rng1 drest1 dbound kws1 doms2 rng2 drest2 kws2)]
          [(env) (env-extend-types (or env (lexical-env)) ids doms2)])
         (subtype-seq A0
-                     (subtype* drest2 drest1 env #f)
+                     (subtype* drest2 drest1 env -empty-obj)
                      (subtypes* doms2 doms1 env)
                      (kw-subtypes* kws1 kws2 env)
-                     (subtype* rng1 rng2 env #f)))]
+                     (subtype* rng1 rng2 env -empty-obj)))]
       [(_ _) #f]))
 
 ;; check subtyping of filters, so that predicates subtype correctly
-(define (filter-subtype* A0 s t env) ;; BOOKMARK(AMK)
+(define (filter-subtype* A0 s t env) ;; TODO(AMK) proves?
   (match* (s t)
    [(f f) A0]
    [((Bot:) t) A0]
    [(s (Top:)) A0]
    [((TypeFilter: t1 p) (TypeFilter: t2 p))
-    (subtype* A0 t1 t2 env #f)]
+    (subtype* A0 t1 t2 env -empty-obj)]
    [((NotTypeFilter: t1 p) (NotTypeFilter: t2 p))
-    (subtype* A0 t2 t1 env #f)]
+    (subtype* A0 t2 t1 env -empty-obj)]
    [(_ _) #f]))
 
 (define (subtypes/varargs argtys argobjs dom rst #:env [env #f])
   (handle-failure (and (subtypes*/varargs null argtys dom rst env #:objs argobjs) #t)))
 
 (define (subtypes*/varargs A0 argtys dom rst env #:objs [objs #f])
-  (define argobjs (or objs (build-list (length argtys) (λ _ #f))))
+  (define argobjs (or objs (build-list (length argtys) (λ _ -empty-obj))))
   
   (let loop-varargs ([dom dom] [argtys argtys] [argobjs argobjs] [A A0])
     (cond
@@ -262,10 +262,10 @@
      (match* (f f*)
        [((fld: t _ #t) (fld: t* _ #t))
 	(subtype-seq A
-		     (subtype* t* t env #f)
-		     (subtype* t t* env #f))]
+		     (subtype* t* t env -empty-obj)
+		     (subtype* t t* env -empty-obj))]
        [((fld: t _ #f) (fld: t* _ #f))
-	(subtype* A t t* env #f)]
+	(subtype* A t t* env -empty-obj)]
        [(_ _) #f]))))
 
 
@@ -292,10 +292,10 @@
   (not (or (in-hierarchy? s1 s2) (in-hierarchy? s2 s1))))
 
 (define/cond-contract (type-equiv? A0 s t env obj)
-  (c:-> list? Type? Type? (c:or/c #f env?) (c:or/c #f Object?) c:any/c)
+  (c:-> list? Type? Type? (c:or/c #f env?) Object? c:any/c)
   (subtype-seq A0
-	       (subtype* s t env #f)
-	       (subtype* t s env #f)))
+	       (subtype* s t env obj)
+	       (subtype* t s env obj)))
 
 (define bottom-key (Rep-seq -Bottom))
 (define top-key (Rep-seq Univ))
@@ -635,7 +635,7 @@
          ;; integer w/ bounds that imply membership
          ;; (e.g. Byte -> [0,255], Nat -> [0,*) etc)
          [(sub-t (? has-int-provable-range? I))
-          #:when obj
+          #:when (non-empty-obj? obj)
           (when (not env) (set! env (lexical-env)))
           (LOG "<<subtype>> int provable\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n env: ~a\n\n"
                A sub-t I obj env)
@@ -784,9 +784,9 @@
                       (and A
                            (if mut?
                                (subtype-seq A
-                                            (subtype* t s env #f)
-                                            (subtype* s t env #f)) ;; TODO(AMK) support Prefab paths
-                               (subtype* A s t env #f))))))]
+                                            (subtype* t s env -empty-obj)
+                                            (subtype* s t env -empty-obj)) ;; TODO(AMK) support Prefab paths
+                               (subtype* A s t env -empty-obj))))))]
          ;; subtyping on values is pointwise, except special case for Bottom
          [((Values: (list (Result: (== -Bottom) _ _))) _)
           A0]
@@ -859,7 +859,7 @@
          [((Class: row inits fields methods augments init-rest)
            (Class: row* inits* fields* methods* augments* init-rest*))
           ;; TODO: should the result be folded instead?
-          (define sub (λ (t1 t2) (subtype* A t1 t2 env #f)))
+          (define sub (λ (t1 t2) (subtype* A t1 t2 env -empty-obj)))
           ;; check that each of inits, fields, methods, etc. are
           ;; equal by sorting and checking type equality
           (define (equal-clause? clause clause* [inits? #f])
@@ -900,7 +900,7 @@
      (hash-set! subtype-cache (cons ss st) r))
    r))
 
-(define (type-compare? a b #:env [env #f] #:obj [obj #f])
+(define (type-compare? a b #:env [env #f] #:obj [obj -empty-obj])
   (or (type-equal? a b)
       (and (subtype a b) (subtype b a))))
 
@@ -909,10 +909,10 @@
 
 (provide/cond-contract
  [subtype (c:->* ((c:or/c Type/c SomeValues/c) (c:or/c Type/c SomeValues/c))
-                 (#:env (c:or/c #f env?) #:obj (c:or/c #f Object?))
+                 (#:env (c:or/c #f env?) #:obj Object?)
                  boolean?)]
  [type-compare? (c:->* ((c:or/c Type/c SomeValues/c) (c:or/c Type/c SomeValues/c)) 
-                      (#:env (c:or/c #f env?) #:obj (c:or/c #f Object?) )
+                      (#:env (c:or/c #f env?) #:obj Object? )
                       boolean?)]
  [subtypes (c:->* ((c:listof (c:or/c Type/c SomeValues/c))
                    (c:listof (c:or/c Type/c SomeValues/c)))
