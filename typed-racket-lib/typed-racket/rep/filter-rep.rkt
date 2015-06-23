@@ -124,7 +124,7 @@
 ;; is actually in the path set (ps)
 (define (well-formed-paths+sys ps sys)
   (define p-set (for/seteq ([p (in-set ps)])
-                           (Rep-seq p)))
+                           (Obj-seq p)))
   (define (valid-lexp? l)
     (match l
       [(lexp: _ terms)
@@ -174,7 +174,7 @@
                [elim-keys null]
                [new-path-set empty-path-set])
               ([p (in-set paths)])
-      (define p-key (Rep-seq p))
+      (define p-key (Obj-seq p))
       (match (f p)
         [(? Empty?)
          (values path->path
@@ -182,9 +182,9 @@
                  (cons p-key elim-keys)
                  new-path-set)]
         [(? Path? p*)
-         (values (if (= p-key (Rep-seq p*))
+         (values (if (= p-key (Obj-seq p*))
                      path->path
-                     (hash-set path->path p-key (Rep-seq p*)))
+                     (hash-set path->path p-key (Obj-seq p*)))
                  path->lexp
                  elim-keys
                  (set-add new-path-set p*))]
@@ -312,8 +312,8 @@
     [(leq: (lexp: _ lhs-terms) (lexp: _ rhs-terms))
      (λ (sys)
        (for/or ([p (in-set (SLI-paths sys))])
-         (or (terms-contains-path-key? lhs-terms (Rep-seq p))
-             (terms-contains-path-key? rhs-terms (Rep-seq p)))))]
+         (or (terms-contains-path-key? lhs-terms (Obj-seq p))
+             (terms-contains-path-key? rhs-terms (Obj-seq p)))))]
     [_ (int-err "leq/SLI-overlap?: invalid leq ~a" l)]))
 
 ;;; takes a list of leqs and builds
@@ -476,7 +476,7 @@
      ;; build a function which converts Path-seq's to sexp
      (define path-key->sexp
        (let ([h (for/hasheq ([p (in-set ps)])
-                  (values (Rep-seq p) (Path->sexp p)))])
+                  (values (Obj-seq p) (Path->sexp p)))])
          (λ (p) (hash-ref h p (λ _ (error 'SLI->sexp "path not in hash! ~a" p))))))
      ;; build a function that turns lexp's into sexps
      (define (lexp->sexp l)
@@ -530,7 +530,7 @@
 
   (define (lookup p-key)
     (for/or ([p (in-set ps)])
-      (and (= p-key (Rep-seq p))
+      (and (= p-key (Obj-seq p))
            p)))
 
   (define (lexp->LExp exp)
@@ -563,8 +563,8 @@
                       [(leq: (lexp: _ termsl) (lexp: _ termsr))
                        (define ps* (for/fold ([new-ps empty-path-set])
                                              ([p (in-set ps)])
-                                     (if (or (terms-ref termsl (Rep-seq p) #f)
-                                             (terms-ref termsr (Rep-seq p) #f))
+                                     (if (or (terms-ref termsl (Obj-seq p) #f)
+                                             (terms-ref termsr (Obj-seq p) #f))
                                          (set-add new-ps p)
                                          new-ps)))
                        (unless (well-formed-paths+sys ps* sys*) (error 'naive-merge-SLIs+Leq "wrong remake6"))

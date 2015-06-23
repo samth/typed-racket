@@ -63,12 +63,11 @@
 ;; should only be used for parsing type annotations and expected types
 (def-object NoObject () [#:fold-rhs #:base])
 
-(define (object-equal? o1 o2) (= (Rep-seq o1) (Rep-seq o2)))
+(define (object-equal? o1 o2) (= (Obj-seq o1) (Obj-seq o2)))
 
 (define-custom-set-types path-set
-  #:elem? Path?
   object-equal?
-  Rep-seq)
+  Obj-seq)
 (define empty-path-set (make-immutable-path-set))
 
 #;(define (intern-lexp exp)
@@ -112,8 +111,8 @@
                  [ps* empty-path-set])
                 ([p (in-set paths)])
         (define p* (f p))
-        (define p-key (Rep-seq p))
-        (define p*-key (Rep-seq p*))
+        (define p-key (Obj-seq p))
+        (define p*-key (Obj-seq p*))
         (cond
           [(not const) (values const terms ps*)]
           ;; no change, continue
@@ -165,7 +164,7 @@
       [(cons term rst)
        (match term
          [(list (? exact-integer? coeff) (? Path? p))
-          (define p-key (Rep-seq p))
+          (define p-key (Obj-seq p))
           (loop const 
                 (terms-set terms p-key (+ coeff (terms-ref terms p-key 0)))
                 (set-add paths p)
@@ -176,16 +175,15 @@
                 paths
                 rst)]
          [(? Path? p)
-          (define p-key (Rep-seq p))
+          (define p-key (Obj-seq p))
           (loop const 
                 (terms-set terms p-key (add1 (terms-ref terms p-key 0)))
                 (set-add paths p)
                 rst)]
          [(? name-ref/c var)
           (define p (-id-path var))
-          (define p-key (Rep-seq p))
           (loop const 
-                (terms-set terms p-key (add1 (terms-ref terms p-key 0)))
+                (terms-set terms (Obj-seq p) (add1 (terms-ref terms (Obj-seq p) 0)))
                 (set-add paths p)
                 rst)]
          [_ (int-err "invalid term in -lexp args ~a" term)])]
@@ -208,7 +206,7 @@
     [(LExp: ps exp)
      (let ([terms (lexp-terms exp)])
        (for/list ([p (in-set ps)])
-         (cons p (terms-ref terms (Rep-seq p) 0))))]
+         (cons p (terms-ref terms (Obj-seq p) 0))))]
     [_ (int-err "invalid LExp-terms* argument: ~a" l)]))
 
 
@@ -257,7 +255,7 @@
       (zero? const)
       (let ([p (set-first ps)])
         ;; coefficient is 1?
-        (and (= 1 (terms-ref terms (Rep-seq p) 0))
+        (and (= 1 (terms-ref terms (Obj-seq p) 0))
              ;; okay, then return p
              p)))]
     [_ (int-err "invalid constant-LExp? argument: ~a" l)]))
@@ -274,7 +272,7 @@
        [else
         (define terms*
           (let ([terms (for/list ([p (in-set ps)])
-                         (define coeff (terms-ref terms (Rep-seq p) 0))
+                         (define coeff (terms-ref terms (Obj-seq p) 0))
                          (if (= 1 coeff)
                              (Path->sexp p)
                              `(* ,coeff ,(Path->sexp p))))])
@@ -349,8 +347,8 @@
        (*LExp (set-add ps p)
               (lexp const
                     (terms-set terms
-                               (Rep-seq p)
-                               (terms-ref terms (Rep-seq p) 0))))]
+                               (Obj-seq p)
+                               (terms-ref terms (Obj-seq p) 0))))]
       [_ (int-err "add-path-to-lexp: invalid lexp ~a" l)]))
   
   (match* (o1 o2)

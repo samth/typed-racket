@@ -396,7 +396,7 @@
   [rename rep<? type<? (Type? Type? . -> . boolean?)]
   [rename rep<? filter<? (Filter? Filter? . -> . boolean?)]
   [rename rep<? obj<? (Object? Object? . -> . boolean?)]
-  [rename rep>? obj>? (Object? Object? . -> . boolean?)]
+  [rename Rep-seq Obj-seq (Object? . -> . any/c)]
   [struct Rep ([seq exact-nonnegative-integer?]
                [free-vars (hash/c symbol? variance?)]
                [free-idxs (hash/c symbol? variance?)]
