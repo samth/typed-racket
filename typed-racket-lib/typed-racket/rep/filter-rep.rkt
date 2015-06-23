@@ -294,7 +294,6 @@
            -bot]
           [else
            (define ps* (set-union ps1 ps2))
-           (unless (well-formed-paths+sys ps* system*) (error 'SLI-try-join "wrong remake3"))
            (*SLI ps* system*)])]
        [else #f])]
     [(_ _) (int-err "invalid SLI(s) to SLI-try-join: ~a ~a" s1 s2)]))
@@ -451,16 +450,26 @@
 
 (define/cond-contract (add-SLI new-sli slis)
   (-> SLI? (listof SLI?) (or/c Bot? (listof SLI?)))
-  (match slis
-    [(list) (list new-sli)]
-    [(cons sli slis*)
-     (match (SLI-try-join new-sli sli)
-       [#f (match (add-SLI new-sli slis*)
-             [(? list? l) (cons sli l)]
-             [(? Bot? b) b])]
-       [(? SLI? new-s) (cons new-s slis*)]
-       [(? Top?) slis*]
-       [(? Bot? b) b])]))
+  (match new-sli
+    [(SLI: n-ps n-sys)
+     (define-values (new-ps new-sli others)
+       (for/fold ([new-ps n-ps] [new-sli n-sys] [others null])
+                 ([sli (in-list slis)])
+         (match-define (SLI: ps sys) sli)
+         (cond
+           [(set-overlap? new-ps ps)
+            (values (set-union new-ps ps)
+                    (set-union new-sli sys)
+                    others)]
+           [else (values new-ps new-sli (cons sli others))])))
+     (cond
+       [(sli-trivially-valid? new-sli)
+        others]
+       [(not (fme-sat? new-sli))
+        -bot]
+       [else
+        (cons (*SLI new-ps new-sli) others)])]
+    [_ (int-err "invalid arg to add-SLI ~a" new-sli)]))
 
 (define/cond-contract (add-SLIs new-slis slis)
   (-> (listof SLI?) (listof SLI?) (or/c Bot? (listof SLI?)))

@@ -62,7 +62,7 @@
       (if return-atoms?
           (exit* #f empty)
           (exit* #f)))
-
+    
     (define (update-env/props env fs)
       ;; logically combine all propositions
       (define-values (props atoms slis) 
@@ -114,7 +114,7 @@
          (if return-atoms?
              (values Γ** (append atoms new-atoms))
              Γ**)]))
-
+    
     (update-env/props env fs)))
 
 ;; run code in an extended env and with replaced props. Requires the body to return a tc-results.
