@@ -63,7 +63,7 @@
           (exit* #f empty)
           (exit* #f)))
     
-    (define (update-env/props env fs)
+    (define (update-env/props env fs return-atoms?)
       ;; logically combine all propositions
       (define-values (props atoms slis) 
         (combine-props (apply append (map flatten-nested-props fs)) 
@@ -110,12 +110,12 @@
          ;; a refinement! we have to start over making sure to incorporate
          ;; the new facts
          (define-values (Γ** new-atoms)
-           (update-env/props Γ* new-exposed-props))
+           (update-env/props Γ* new-exposed-props #t))
          (if return-atoms?
              (values Γ** (append atoms new-atoms))
              Γ**)]))
     
-    (update-env/props env fs)))
+    (update-env/props env fs return-atoms?)))
 
 ;; run code in an extended env and with replaced props. Requires the body to return a tc-results.
 ;; TODO make this only add the new prop instead of the entire environment once tc-id is fixed to

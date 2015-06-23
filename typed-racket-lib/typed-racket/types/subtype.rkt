@@ -663,14 +663,35 @@
                        obj*)]))
           (define-values (lower-bound upper-bound)
             (int-type->provable-range I))
-          (define goal
-            (apply -and (append (or (and lower-bound (list (-leqSLI (-lexp lower-bound)
-                                                                    (-lexp (list 1 obj*)))))
-                                    '())
-                                (or (and upper-bound (list (-leqSLI (-lexp (list 1 obj*))
-                                                                    (-lexp upper-bound))))
-                                    '()))))
-          (define v (proves env axioms goal))
+          (define lower-ineq
+            (and lower-bound
+                 (let ([ineq (-leqSLI (-lexp lower-bound)
+                                      (-lexp (list 1 obj*)))])
+                   (if (or (Top? ineq)
+                           (SLIs-contain? (env-SLIs env) ineq))
+                       -top
+                       ineq))))
+          (define upper-ineq
+            (and upper-bound
+                 (let ([ineq (-leqSLI (-lexp (list 1 obj*))
+                                      (-lexp upper-bound))])
+                   (if (or (Top? ineq)
+                           (SLIs-contain? (env-SLIs env) ineq))
+                       -top
+                       ineq))))
+          (define goal (cond
+                         [(not upper-ineq)
+                          (or lower-ineq -bot)]
+                         [(not lower-ineq)
+                          (or upper-ineq -bot)]
+                         [else
+                          (-and lower-ineq upper-ineq)]))
+          (define v
+            (cond
+              ;; should be possible, since it must have *some bound* if its bound provable
+              [(Bot? goal) #f]
+              [(Top? goal) #t]
+              [else (proves env axioms goal)]))
           (LOG "<<subtype>>\n A: ~a\n s: ~a\n t: ~a\n obj: ~a\n\n ====> ~a\n\n" A sub-t I obj v)
           (and v A0)]
          ;; subtyping on immutable structs is covariant

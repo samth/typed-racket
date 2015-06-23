@@ -164,18 +164,20 @@
      ;; grab the type we know l is currently and
      ;; combine it with the new type
      (define l-ty
-       (restrict (lookup-obj-type l env #:fail (const (integer-type))) new-o-ty))
+       (with-lexical-env
+        empty-env
+        (restrict (lookup-obj-type l env #:fail (const (integer-type))) new-o-ty)))
      ;; grab bounds if they're new
      (when (bounded-int-type? l-ty)
        (define-values (new-low new-high) (int-type-bounds new-o-ty))
        (when new-low
          (let ([leqsli (-leqSLI (-lexp new-low) l)])
-           (unless (SLIs-contain? (env-SLIs env) leqsli)
+           (unless (and (SLI? leqsli) (SLIs-contain? (env-SLIs env) leqsli))
              (set-box! new-props-box
                        (cons leqsli (unbox new-props-box))))))
        (when new-high
          (let ([leqsli (-leqSLI l (-lexp new-high))])
-           (unless (SLIs-contain? (env-SLIs env) leqsli)
+           (unless (and (SLI? leqsli) (SLIs-contain? (env-SLIs env) leqsli))
              (set-box! new-props-box
                        (cons leqsli (unbox new-props-box)))))))
      

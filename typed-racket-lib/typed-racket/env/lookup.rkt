@@ -31,8 +31,13 @@
   (define type
     (match (resolve-id-alias env id)
       [#f (env-struct-lookup env id #:fail (const  #f))]
-      [(or (? Path? o) (? LExp? o))
-         (lookup-obj-type o env #:fail (const #f))]
+      [(? LExp? l)
+       (cond
+         [(lookup-obj-type l env #:fail (const #f))
+          => (λ (t) (-refine x t (-eqSLI l (-lexp (-id-path x)))))]
+         [else #f])]
+      [(? Path? p)
+       (lookup-obj-type p env #:fail (const #f))]
       [unknown (int-err "unrecognized alias obj ~a" unknown)]))
   
   (cond
@@ -70,16 +75,12 @@
     ;; TODO(amk) maybe something else here more specific
     ;; for what LExp it is? I dunno
     [(? LExp? l)
-       (cond
-         [(lookup-lexp-type env l (const #f)) 
-          => (λ (t) (-unsafe-refine t (-eqSLI l (-lexp (-arg-path 0 0)))))]
-         [(constant-LExp? l)
-          => (λ (c) (-unsafe-refine (tc-literal (datum->syntax #f c))
-                                    (-eqSLI l (-lexp (-arg-path 0 0)))))]
-         [else
-          (-refine x (integer-type)
-                   (apply -and (leqs->SLIs (list (-leq l (-lexp (-id-path x)))
-                                                 (-leq (-lexp (-id-path x)) l)))))])]
+     (cond
+       [(lookup-lexp-type env l (const #f))]
+       [(constant-LExp? l)
+        => (λ (c) (tc-literal (datum->syntax #f c)))]
+       [else (or (and fail (fail l))
+                 (integer-type))])]
     [_ #:when fail (fail o)]
     [_ (lookup-fail o)]))
 

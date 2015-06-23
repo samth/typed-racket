@@ -46,7 +46,9 @@
          fme-imp?
          eqhash?
          lexp:
-         leq:)
+         leq:
+         leq-trivially-valid?
+         leq-trivially-invalid?)
 
 (define-for-syntax enable-fme-contracts? #f)
 
@@ -498,6 +500,13 @@
                (<= (lexp-const l) (lexp-const r)))
           (equal? l r))))
 
+(define/cond-fme-contract (leq-trivially-invalid? ineq)
+  (-> leq? boolean?)
+  (let-values ([(l r) (leq-lexps ineq)])
+    (and (constant-lexp? l)
+         (constant-lexp? r)
+         (< (lexp-const r) (lexp-const l)))))
+
 
 (define/cond-fme-contract (leq->string ineq [pp #f])
   (-> leq? (-> any/c any/c) string?)
@@ -529,8 +538,8 @@
   (-> sli? set?)
   (for/fold ([vars (seteq)])
             ([l (in-set sli)])
-    (set-union (leq-vars l)
-               vars)))
+    (set-union vars
+               (leq-vars l))))
 
 (module+ test
   (require rackunit)

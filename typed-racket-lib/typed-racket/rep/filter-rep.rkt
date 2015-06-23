@@ -120,6 +120,15 @@
      (Leq ps (leq-negate ineq))]
     [_ (int-err "invalid Leq for Leq-negate ~a" ineq)]))
 
+(define/cond-contract (try-simplify-Leq inequality)
+  (-> Leq? (or/c Leq? Top? Bot?))
+  (match inequality
+    [(Leq ps ineq)
+     (cond
+       [(leq-trivially-valid? ineq) -top]
+       [(leq-trivially-invalid? ineq) -bot]
+       [else inequality])]))
+
 ;; check that every path in an sli (sys)
 ;; is actually in the path set (ps)
 (define (well-formed-paths+sys ps sys)
@@ -317,44 +326,62 @@
 
 ;;; takes a list of leqs and builds
 ;;; the proper disjoint SLIs
-(define/cond-contract (Leqs->SLIs initial-Leqs)
+(define/cond-contract (Leqs->SLIs initial-inequalities)
   (-> (listof Leq?) (listof (or/c SLI? Top? Bot?)))
 
-  ;; create an SLI by joining the list of SLIs and adding the leq
-  ;; don't consider any details/satisfiability etc, just merge
-  (define (naive-merge-SLIs+Leq SLIs ineq)
-    (match-define (Leq l-ps l-exp) ineq)
-    (cond
-      [(pair? SLIs)
-       (define-values (ps sys)
-         (for/fold ([paths (SLI-paths (car SLIs))]
-                    [system (SLI-sys (car SLIs))])
-                   ([S (in-list (cdr SLIs))])
-           (match S
-             [(SLI: ps sys)
-              (values (set-union paths ps)
-                      (set-union system sys))]
-             [_ (int-err "invalid SLI in naive-merge-SLIs: ~a" S)])))
-       (*SLI (set-union ps l-ps)
-             (set-add sys l-exp))]
-      [else
-       (*SLI l-ps (set l-exp))]))
+  (define initial-Leqs
+    (let loop ([to-do initial-inequalities]
+               [ineqs null])
+      (cond
+        [(null? to-do)
+         (if (empty? ineqs)
+             -top
+             ineqs)]
+        [else
+         (match (try-simplify-Leq (car to-do))
+           [(? Top?) (loop (cdr to-do) ineqs)]
+           [(? Bot?) -bot]
+           [l (loop (cdr to-do) (cons l ineqs))])])))
   
-  ;; build the various SLIs based on overlap
-  (define SLI-list
-    (for/fold ([SLI-list null])
-              ([ineq (in-list initial-Leqs)])
-      (define-values (related-SLIs unrelated-SLIs)
-        (partition (leq/SLI-overlap? (Leq-exp ineq)) SLI-list))
-      (define joined-SLI (naive-merge-SLIs+Leq related-SLIs ineq))
-      (cons joined-SLI unrelated-SLIs)))
-  
-  ;; now just simplify (if needed) the list of SLIs
-  (for/list ([sli (in-list SLI-list)])
-    (cond
-      [(sli-trivially-valid? (SLI-sys sli)) -top]
-      [(not (SLI-satisfiable? sli)) -bot]
-      [else sli])))
+  (cond
+    [(not (list? initial-Leqs))
+     (list initial-Leqs)]
+    [else
+     ;; create an SLI by joining the list of SLIs and adding the leq
+     ;; don't consider any details/satisfiability etc, just merge
+     (define (naive-merge-SLIs+Leq SLIs ineq)
+       (match-define (Leq l-ps l-exp) ineq)
+       (cond
+         [(pair? SLIs)
+          (define-values (ps sys)
+            (for/fold ([paths (SLI-paths (car SLIs))]
+                       [system (SLI-sys (car SLIs))])
+                      ([S (in-list (cdr SLIs))])
+              (match S
+                [(SLI: ps sys)
+                 (values (set-union paths ps)
+                         (set-union system sys))]
+                [_ (int-err "invalid SLI in naive-merge-SLIs: ~a" S)])))
+          (*SLI (set-union ps l-ps)
+                (set-add sys l-exp))]
+         [else
+          (*SLI l-ps (set l-exp))]))
+     
+     ;; build the various SLIs based on overlap
+     (define SLI-list
+       (for/fold ([SLI-list null])
+                 ([ineq (in-list initial-Leqs)])
+         (define-values (related-SLIs unrelated-SLIs)
+           (partition (leq/SLI-overlap? (Leq-exp ineq)) SLI-list))
+         (define joined-SLI (naive-merge-SLIs+Leq related-SLIs ineq))
+         (cons joined-SLI unrelated-SLIs)))
+     
+     ;; now just simplify (if needed) the list of SLIs
+     (for/list ([sli (in-list SLI-list)])
+       (cond
+         [(sli-trivially-valid? (SLI-sys sli)) -top]
+         [(not (SLI-satisfiable? sli)) -bot]
+         [else sli]))]))
 
 (define/cond-contract (SLI-satisfiable? sli)
   (-> SLI? boolean?)
@@ -450,7 +477,17 @@
 
 (define/cond-contract (add-SLI new-sli slis)
   (-> SLI? (listof SLI?) (or/c Bot? (listof SLI?)))
-  (match new-sli
+  (match slis
+    [(list) (list new-sli)]
+    [(cons sli slis*)
+     (match (SLI-try-join new-sli sli)
+       [#f (match (add-SLI new-sli slis*)
+             [(? list? l) (cons sli l)]
+             [(? Bot? b) b])]
+       [(? SLI? new-s) (cons new-s slis*)]
+       [(? Top?) slis*]
+       [(? Bot? b) b])])
+  #;(match new-sli
     [(SLI: n-ps n-sys)
      (define-values (new-ps new-sli others)
        (for/fold ([new-ps n-ps] [new-sli n-sys] [others null])
