@@ -109,7 +109,7 @@
                    (-eqSLI (-lexp (-acc-path -len vec))
                            (-lexp (length v-ts)))))
 
-        (cond-check-below v-ty expected* (Refine? expected*))]
+        (cond-check-below v-ty (and expected* (Refine? expected*)))]
        [(or (HeterogeneousVector: ts)
             (Refine-type: (HeterogeneousVector: ts)))
         (define v-ts (for/list ([l (in-vector (syntax-e #'i))]
@@ -121,7 +121,7 @@
                    (-eqSLI (-lexp (-acc-path -len vec))
                            (-lexp (length v-ts)))))
         
-        (cond-check-below v-ty expected* (Refine? expected*))]
+        (cond-check-below v-ty (and expected* (Refine? expected*)))]
        [_
         (define v-ts (for/list ([l (in-vector (syntax-e #'i))])
                        (generalize (tc-literal l #f))))

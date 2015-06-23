@@ -3977,6 +3977,63 @@
                 42))
           (void))
         -Void]
+       ;; check fixnum inequalities as well
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Fixnum] (< i 10)) Fixnum))
+          (define foo
+            (λ (x) (if (fx< x 11)
+                       42
+                       "dead code")))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Fixnum] (< i 10)) Fixnum))
+          (define foo
+            (λ (x) (if (fx> 11 x)
+                       42
+                       "dead code")))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Fixnum] (< i 10)) Fixnum))
+          (define foo
+            (λ (x) (if (fx<= x 10)
+                       42
+                       "dead code")))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Fixnum] (< i 10)) Fixnum))
+          (define foo
+            (λ (x) (if (fx>= 10 x)
+                       42
+                       "dead code")))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> (Refine [i : Fixnum] (< i 10)) Fixnum))
+          (define foo
+            (λ (x) (if (fx= 10 x)
+                       "dead code"
+                       42)))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (: foo (-> Integer Fixnum Fixnum))
+          (define (foo x y)
+            (if (fx< x y)
+                (if (fx< y x)
+                    "dead code"
+                    42)
+                42))
+          (void))
+        -Void]
        ;; ensure env can track types of lexp objects
        [tc-e
         (let ()

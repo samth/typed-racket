@@ -55,7 +55,7 @@
         (c:-> Type/c Type/c (or/c #f (listof PathElem?))
               Type/c))
   (λ (old-t new-t path-stack)
-    (define obj (make-Path (reverse path-stack) x))
+    (define obj (and path-stack (make-Path (reverse path-stack) x)))
     (cond
       ;; we're in a context where we shouldn't assume things (e.g. nested in a union type)
       [(not path-stack) new-t]
