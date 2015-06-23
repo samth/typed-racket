@@ -419,8 +419,6 @@
     [(_ leqs)
      (apply -and (leqs->SLIs leqs))]))
 
-(define (-leq lhs rhs)
-  (leq lhs rhs))
 (define (-lt lhs rhs)
   (-leq (LExp-add1 lhs) rhs))
 (define (-gt lhs rhs)
@@ -429,7 +427,7 @@
   (-leq rhs lhs))
 
 (define (-leqSLI lhs rhs)
-  (-SLI (leq lhs rhs)))
+  (-SLI (-leq lhs rhs)))
 (define (-ltSLI lhs rhs)
   (-leqSLI (LExp-add1 lhs) rhs))
 (define (-gtSLI lhs rhs)

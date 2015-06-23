@@ -9,7 +9,7 @@
          (contract-req)
          (except-in (types abbrev utils filter-ops type-ref-path refine restrict resolve union)
                     -> ->* one-of/c)
-         (rep type-rep object-rep filter-rep rep-utils object-ops))
+         (rep type-rep object-rep filter-rep rep-utils))
 
 (provide add-scope subst-type subst-filter
          subst-object

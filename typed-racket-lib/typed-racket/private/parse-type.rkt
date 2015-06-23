@@ -3,7 +3,7 @@
 ;; This module provides functions for parsing types written by the user
 
 (require "../utils/utils.rkt"
-         (except-in (rep type-rep object-rep) make-arr)
+         (except-in (rep type-rep object-rep filter-rep) make-arr)
          (rename-in (types abbrev union utils filter-ops resolve
                            classes prefab)
                     [make-arr* make-arr])

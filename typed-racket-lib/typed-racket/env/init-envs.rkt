@@ -12,7 +12,7 @@
          (rep type-rep object-rep filter-rep rep-utils free-variance)
          (for-syntax syntax/parse racket/base)
          (types abbrev union filter-ops)
-         racket/dict racket/list
+         racket/dict racket/list racket/set ; set used by code gen'd by SLIs
          mzlib/pconvert racket/match)
 
 (provide ;; convenience form for defining an initial environment
@@ -132,10 +132,9 @@
     [(LExp: c ps/cs)
      `(apply -lexp (list ,c ,@(for/list ([p/c (in-list ps/cs)])
                                 `(list ,(sub (cdr p/c)) ,(sub (car p/c))))))]
-    [(SLI-leq-pairs: leqs)
-     `(apply -and (leqs->SLIs (list ,@(map (λ (p) `(leq ,(sub (leq-lhs p))
-                                                       ,(sub (leq-rhs p))))
-                                          leqs))))]
+    [(? SLI? s)
+     `(leqs->SLIs (list ,@(for/list ([l-pair (in-list (SLI->lexp-pairs s))])
+                            `(-leq ,(sub (car l-pair)) ,(sub (cdr l-pair))))))]
     [(? Rep? rep)
      `(,(gen-constructor (vector-ref (struct->vector rep) 0))
        ,@(map sub (Rep-values rep)))]

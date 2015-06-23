@@ -39,8 +39,8 @@
           make-Prompt-TagTop
           make-StructType make-StructTypeTop
           make-ListDots)
- (only-in (rep object-rep)
-          -lexp))
+ (only-in (rep object-rep filter-rep)
+          -lexp -leq))
 
 ;; Racket Reference
 ;; Section 4.1

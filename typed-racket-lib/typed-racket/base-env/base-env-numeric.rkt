@@ -3,7 +3,7 @@
 (begin
   (require
    (for-syntax racket/base racket/syntax syntax/parse)
-   (only-in (rep type-rep object-rep) Type/c? make-Values type-equal? -lexp)
+   (only-in (rep type-rep object-rep filter-rep) Type/c? make-Values type-equal? -lexp -leq)
    racket/list racket/math racket/flonum racket/extflonum racket/unsafe/ops unstable/sequence racket/match
    (for-template racket/flonum racket/extflonum racket/fixnum racket/math racket/unsafe/ops racket/base
                  (only-in "../types/numeric-predicates.rkt" index?))

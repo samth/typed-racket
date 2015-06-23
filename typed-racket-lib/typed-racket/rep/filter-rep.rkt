@@ -2,8 +2,8 @@
 
 ;;TODO use contract-req
 (require "../utils/utils.rkt"
-         "rep-utils.rkt" 
-         "free-variance.rkt" 
+         "rep-utils.rkt" "object-rep.rkt"
+         "free-variance.rkt" "fme.rkt"
          racket/contract/base
          racket/match racket/dict
          racket/list
@@ -14,27 +14,6 @@
 
 ;; TODO use something other than lazy-require.
 (lazy-require ["type-rep.rkt" (Type/c Univ? Bottom?)]
-              ["object-rep.rkt" (Path?
-                                 Empty?
-                                 LExp?
-                                 LExp-coeffs
-                                 LExp-coeff
-                                 LExp-set-coeff
-                                 LExp-const
-                                 LExp-set-const
-                                 LExp-scale
-                                 LExp-add1
-                                 LExp-minus
-                                 -lexp
-                                 constant-LExp?
-                                 LExp-paths
-                                 LExp-path-map
-                                 LExp-has-var?
-                                 LExp->sexp
-                                 LExp-gcd-shrink
-                                 LExp-const-normalize
-                                 LExp-simple?
-                                 object-equal?)]
               ["../types/filter-ops.rkt" (-or)])
 
 
@@ -42,27 +21,27 @@
          SLI?
          SLI-try-join
          SLI-satisfiable?
-         SLI-trivially-valid?
          SLI-implies?
          SLIs-imply?
          complementary-SLIs?
-         SLI->LExp-pairs
          SLI-paths
-         leq
-         leq-negate
          add-SLI
          add-SLIs
-         leqs->SLIs
          SLI-path-map
          SLI->sexp
          SLI-negate
-         SLI-leq-pairs:
+;         SLI-leq-pairs: TODO used for serialization
          *Top
          equals-constant-SLI?
-         leq-lhs
-         leq-rhs
          SLIs-contain?
-         (rename-out [SLI:* SLI:]))
+         ;; the rest of the world doesn't know about 'Leq' vs 'leq'...
+         ;; so they can just keep talking about leqs
+         -leq
+         (rename-out [Leq? leq?]
+                     [Leqs->SLIs leqs->SLIs]
+                     [SLI:* SLI:]
+                     [Leq-negate leq-negate])
+         SLI->lexp-pairs)
 
 (define (Filter/c-predicate? e)
   (and (Filter? e) (not (NoFilter? e)) (not (FilterSet? e))))
@@ -102,179 +81,72 @@
 ;; implication
 (def-filter ImpFilter ([a Filter/c] [c Filter/c]))
 
-(define-custom-hash-types path-hash
-  #:key? Path?
-  object-equal?
-  Rep-seq)
-;;******************************************************************************
-;; Less-than-or-Equal-to internal propositions
-;; (i.e. SLIs, which are Filters, use them internally,
-;;  but they are not accessible outside of this file)
+(define-struct/cond-contract Leq ([ps immutable-path-set?]
+                                  [exp leq?])
+  #:transparent)
 
-(define (leq? a)
-  (match a
-    [(cons lhs rhs) (and (LExp? lhs)
-                         (LExp? rhs))]
-    [_ #f]))
-
-;; smart constructor -- reduces them when possible by gcds
-(define/cond-contract (leq l1 l2)
-  (-> LExp? LExp? leq?)
-  (let*-values ([(l1* l2*) (LExp-gcd-shrink l1 l2)] ; worth it??
-                [(l1* l2*) (LExp-const-normalize l1 l2)])
-    (cons l1* l2*)))
-
-(define/cond-contract (opt-leq l1 l2)
-  (-> LExp? LExp? (or/c boolean? leq?))
-  (cond
-    [(and (constant-LExp? l1)
-          (constant-LExp? l2))
-     (<= (LExp-const l1) (LExp-const l2))]
-    [else (cons l1 l2)]))
-
-(define (leq-lhs x)
-  (car x))
-
-(define (leq-rhs x)
-  (cdr x))
-
-(define-match-expander leq:
-  (lambda (stx)
-    (syntax-case stx ()
-      [(_ l1 l2)
-       #'(cons l1 l2)])))
-
-(define (leq-equal? leq1 leq2)
-  (match* (leq1 leq2)
-    [((leq: lt1 gt1) (leq: lt2 gt2))
-     (and (object-equal? lt1 lt2)
-          (object-equal? gt1 gt2))]
-    [(_ _) (int-err "invalid arg(s) to leq-equal? ~a ~a" leq1 leq2)]))
-
-(define (leq-hash l)
-  (match l
-    [(leq: lt gt)
-     (bitwise-xor (Rep-seq lt) 
-                  (Rep-seq gt))]
-    [_ (int-err "cannot leq-hash ~a" l)]))
-
-; leq-negate
-; ~ (l1 <= l2) ->
-; l2 <= 1 + l1 
-; (obviously this is valid for integers only)
-(define/cond-contract (leq-negate ineq)
-  (-> leq? leq?)
-  (match-define (leq: l r) ineq)
-  (leq (LExp-add1 r) l))
-
-;; leq-isolate-var
-;; converts leq with x into either:
-;;  1) ax <= by + cz + ...
-;;  or
-;;  2) by + cz + ... <= ax
-;;  where a is a positive integer and x is on at most 
-;;  one side of the inequality
-(define/cond-contract (leq-isolate-var ineq p)
-  (-> leq? Path? leq?)
-  ;; ... + ax + .... <= ... + bx + ...
-  (match ineq
-    [(leq: l r)
-     (define a (LExp-coeff l p))
-     (define b (LExp-coeff r p))
+;; internal smart builder -- it normalizes the constant
+;; so one side has a const of 0
+;; NOTE: leq-negate does this as well, no need to double stack
+(define (leq* lhs rhs)
+  (match* (lhs rhs)
+    [((lexp: const-l terms-l) (lexp: const-r terms-r))
      (cond
-       [(= a b)
-        (leq (LExp-set-coeff l p 0)
-             (LExp-set-coeff r p 0))]
-       [(< a b)
-        (leq (LExp-set-coeff (LExp-minus l r) p 0)
-             (-lexp (list (- b a) p)))]
+       [(= const-l const-r)
+        (leq (lexp 0 terms-l) (lexp 0 terms-r))]
+       [(< const-l const-r)
+        (leq (lexp 0 terms-l) (lexp (- const-r const-l) terms-r))]
        [else
-        (leq (-lexp (list (- a b) p))
-             (LExp-set-coeff (LExp-minus r l) p 0))])]
-    [_ (int-err "invalid leq? for leq-isolate-var" ineq)]))
+        (leq (lexp (- const-l const-r) terms-l) (lexp 0 terms-r))])]
+    [(_ _) (int-err "leq* given invalid arg(s) ~a ~a" lhs rhs)]))
 
+;; constructor for the outside world
+;; (since they'll be constructing LExps
+;;  but leqs use the lighter weight lexp representation
+;; defined in fme.rkt and used internally by LExps)
+(define/cond-contract (-leq lhs rhs)
+  (-> LExp? LExp? Leq?)
+  (match* (lhs rhs)
+    [((LExp-raw: ps-l exp-l)
+      (LExp-raw: ps-r exp-r))
+     (Leq (set-union ps-l ps-r)
+          (leq* exp-l exp-r))]
+    [(_ _) (int-err "-leq: invalid lexp(s) ~a ~a" lhs rhs)]))
 
-;; leq-join
-;; takes a pair a1x <= l1 and l2 <= a2x
-;; and returns a2l1 <= a1l2
-(define/cond-contract (leq-join leq1 leq2 x)
-  (-> leq? leq? Path? leq?)
-  ;; leq1: ... + ax + .... <= ... + bx + ...
-  ;; leq2: ... + cx + .... <= ... + dx + ...
-  (match* (leq1 leq2)
-    [((leq: l1 r1) (leq: l2 r2))
-     (match* ((LExp-coeff l1 x) 
-              (LExp-coeff r1 x) 
-              (LExp-coeff l2 x) 
-              (LExp-coeff r2 x))
-       ; leq1: ax <= l1, leq2: l2 <= dx
-       [(a 0    0 d)
-        (leq (LExp-scale l2 a)
-             (LExp-scale r1 d))]
-       ; leq1: l1 <= bx, leq2: cx <= l2
-       [(0 b    c 0)
-        (leq (LExp-scale l1 c)
-             (LExp-scale r2 b))]
-       [(_ _ _ _) 
-        (int-err "cannot join ~a and ~a by ~a" leq1 leq2 x)])]
-    [(_ _) (int-err "invalid leq(s) to leq-join: ~a ~a" leq1 leq2)]))
-
-
-;; trivially-valid?
-;; equal or integer inequalities
-(define/cond-contract (leq-trivially-valid? ineq)
-  (-> leq? boolean?)
+(define/cond-contract (Leq-negate ineq)
+  (-> Leq? Leq?)
   (match ineq
-    [(leq: l r) (or (object-equal? l r)
-                    (let ([l-val (constant-LExp? l)]
-                          [r-val (constant-LExp? r)])
-                      (and l-val r-val
-                           (<= l-val r-val))))]
-    [_ (int-err "invalid leq in leq-trivially-valid?" ineq)]))
+    [(Leq ps ineq)
+     (Leq ps (leq-negate ineq))]
+    [_ (int-err "invalid Leq for Leq-negate ~a" ineq)]))
 
-(define-custom-set-types path-set
-  #:elem? Path?
-  object-equal?
-  Rep-seq)
-(define empty-path-set (make-immutable-path-set))
-
-(define/cond-contract (leq-paths ineq)
-  (-> leq? immutable-path-set?)
-  (match ineq
-    [(leq: l r)
-     (define set-l
-       (for/fold ([s empty-path-set])
-                 ([p (in-list (LExp-paths l))])
-         (set-add s p)))
-     (define set-l+r
-       (for/fold ([s set-l])
-                 ([p (in-list (LExp-paths r))])
-         (set-add s p)))
-     set-l+r]
-    [_ (int-err "invalid leq? to leq-paths: ~a" ineq)]))
-
-
-(define-custom-set-types leq-set
-  #:elem? leq?
-  leq-equal?
-  leq-hash)
-(define empty-leq-set (make-immutable-leq-set))
-(define empty-path-hash (make-immutable-path-hash))
-
-;; set of all paths (e.g. the variables) from the
-;; internal set in an SLI
-(define (internal-sli-path-set sys)
-  (for/fold ([s empty-path-set])
-            ([ineq (in-set sys)])
-    (set-union s (leq-paths ineq))))
+;; check that every path in an sli (sys)
+;; is actually in the path set (ps)
+(define (well-formed-paths+sys ps sys)
+  (define p-set (for/seteq ([p (in-set ps)])
+                           (Rep-seq p)))
+  (define (valid-lexp? l)
+    (match l
+      [(lexp: _ terms)
+       (for/and ([key (in-hash-keys terms)])
+         (set-member? p-set key))]))
+  
+  (for/and ([ineq (in-set sys)])
+        (match ineq
+          [(leq: lhs rhs)
+           (and (valid-lexp? lhs)
+                (valid-lexp? rhs))])))
 
 ;;******************************************************************************
 ;; System of Linear Inequalities (and related ops)
-(def-filter SLI ([system immutable-leq-set?] [paths immutable-path-set?])
+(def-filter SLI ([paths (and/c immutable-path-set?
+                               (not/c set-empty?))]
+                 [sys (and/c sli? (not/c set-empty?))])
   #:no-provide
-  [#:intern system]
+  [#:intern sys]
   [#:frees (λ (f) (combine-frees (set-map paths f)))]
-  [#:fold-rhs (internal-sli-path-map object-rec-id system paths)])
+  [#:fold-rhs (internal-sli-path-map object-rec-id paths sys)])
+
 
 (define-match-expander SLI:*
   (lambda (stx)
@@ -282,78 +154,128 @@
       [(_ sli)
        #'(? SLI? sli)])))
 
-(define-match-expander SLI-leq-pairs:
-  (lambda (stx)
-    (syntax-case stx ()
-      [(_ leq-pairs)
-       #'(? SLI?
-            (app (λ (s) (SLI->LExp-pairs s))
-                 leq-pairs))])))
-
 (define/cond-contract (SLI-path-map f sli)
   (-> (-> Path? Object?) SLI? Filter?)
   (match sli
-    [(SLI: sys paths)
-     (internal-sli-path-map f sys paths)]
+    [(SLI: paths sys)
+     (internal-sli-path-map f paths sys)]
     [_ (int-err "invalid SLI? to SLI-path-map: ~a" sli)]))
 
-(define/cond-contract (internal-sli-path-map f system paths)
-  (-> (-> Path? Object?) immutable-leq-set? immutable-path-set? 
+(define/cond-contract (internal-sli-path-map f paths orig-system)
+  (-> (-> Path? Object?) immutable-path-set? sli?
       Filter?)
-  #;(printf "internal-sli-path-map || sys-size(~a)  || paths-size(~a) || \n"
-          (set-count system)
-          (set-count paths))
   ;; calculate changes
-  (define-values (new-path-map eliminated-paths)
-    (for/fold ([pmap empty-path-hash]
-               [eliminated null])
+  (define-values (path->path-map
+                  path->lexp-map
+                  elim-keys
+                  new-path-set)
+    (for/fold ([path->path (hasheq)]
+               [path->lexp (hasheq)]
+               [elim-keys null]
+               [new-path-set empty-path-set])
               ([p (in-set paths)])
+      (define p-key (Rep-seq p))
       (match (f p)
-        [(? Empty?) 
-         (values pmap (cons p eliminated))]
-        [(or (? Path? o) (? LExp? o)) 
-         (if (eq? p o)
-             (values pmap eliminated)
-             (values (dict-set pmap p o) eliminated))]
+        [(? Empty?)
+         (values path->path
+                 path->lexp
+                 (cons p-key elim-keys)
+                 new-path-set)]
+        [(? Path? p*)
+         (values (if (= p-key (Rep-seq p*))
+                     path->path
+                     (hash-set path->path p-key (Rep-seq p*)))
+                 path->lexp
+                 elim-keys
+                 (set-add new-path-set p*))]
+        [(LExp-raw: l-ps exp)
+         (values path->path
+                 (hash-set path->lexp p-key exp)
+                 elim-keys
+                 (set-union new-path-set l-ps))]
         [o (int-err "unknown object from function in SLI-map ~a" o)])))
   ;; perform FM-elimination for all paths that were mapped to Empty
   (define system-w/o-empties
-    (for/fold ([sys system])
-              ([p (in-list eliminated-paths)])
-      (internal-sli-elim-path sys p)))
-  ;; define a function that can now go replace the surviving
-  ;; paths with their appropriate values
-  (define (path-fun p)
-    (dict-ref new-path-map p p))
-  ;; build the new system with the subst
-  (define system*
-    (for/fold ([sys system-w/o-empties])
-              ([ineq (in-set system-w/o-empties)])
-      (match ineq
-        [(leq: lhs rhs)
-         (define lhs* (LExp-path-map path-fun lhs))
-         (define rhs* (LExp-path-map path-fun rhs))
-         (if (and (eq? lhs lhs*) (eq? rhs rhs*))
-             sys
-             (set-add (set-remove sys ineq)
-                      (leq lhs* rhs*)))])))
-  ;; if our new system is trivial or contradictory,
-  ;; return the appropriate filter,
-  ;; otherwise just return the new SLI
-  (cond
-    [(internal-sli-trivially-valid? system*)
-     -top]
-    [(not (internal-sli-sat? system*))
-     -bot]
-    [else
-     #;(when (equal? system system*)
-       (printf "internal-sli-path-set-result-EQUAL || || || \n"))
-     (*SLI system* (internal-sli-path-set system*))]))
+    (for/fold ([sys orig-system])
+              ([p (in-list elim-keys)])
+      (fme-elim sys p)))
+  ;; define a function which tests if the lexp needs updated
+  ;; logic similar to LExp-path-map related functions on rep/object-rep.rkt
+  (define (update-lexp linear-expression)
+    (match linear-expression
+     [(lexp: const terms)
+      (define-values (const* terms*)
+        (for/fold ([const const]
+                   [terms terms])
+                  ([orig-key (in-hash-keys terms)])
+          (cond
+            ;; orig-key is now a new path -- remove the old,
+            ;; put in the new w/ the same coeff
+            [(hash-ref path->path-map orig-key #f)
+             => (λ (new-key)
+                  (values const
+                          (terms-set (terms-remove terms orig-key)
+                                     new-key
+                                     (terms-ref terms orig-key 0))))]
+            ;; orig-key is now a linear expression -- scale it by
+            ;; the old coeff and add it to the const and terms
+            [(hash-ref path->lexp-map orig-key #f)
+             => (λ (new-lexp)
+                  (define old-key-coeff (terms-ref terms orig-key 0))
+                  (match new-lexp
+                    [(lexp: p*-const p*-terms)
+                     (values (+ const (* old-key-coeff p*-const))
+                             (terms-plus (terms-remove terms orig-key)
+                                         (terms-scale p*-terms old-key-coeff)))]
+                    [_ (int-err "invalid new-lexp in path->lexp-map. lexp: ~a, map: ~a"
+                                new-lexp path->lexp-map)]))]
+            ;; this term was unchanged
+            [else (values const terms)])))
+      ;; if we didn't change the linear-expression return the original
+      ;; else build the new one
+      (if (and (eq? const const*)
+               (eq? terms terms*))
+          linear-expression
+          (lexp const* terms*))]
+      [_ (int-err "update-lexp: invalid lexp ~a" linear-expression)]))
 
-(define empty-set (set))
+  (cond
+    ;; no changes effected this system 
+    [(and (null? elim-keys)
+          (hash-empty? path->path-map)
+          (hash-empty? path->lexp-map))
+     (*SLI paths orig-system)]
+    ;; there were changes, we must update the system
+    [else
+     (define system*
+       (for/fold ([sys system-w/o-empties])
+                 ([inequality (in-set system-w/o-empties)])
+         ;; update each inequality individually
+         (match inequality
+          [(leq: lhs rhs)
+           (define lhs* (update-lexp lhs))
+           (define rhs* (update-lexp rhs))
+           ;; if it wasn't changed, leave the system be
+           ;; for this iteration
+           (if (and (eq? lhs lhs*) (eq? rhs rhs*))
+               sys
+               ;; otherwise remove the old inequality
+               ;; and put the new one in
+               (set-add (set-remove sys inequality)
+                        (leq* lhs* rhs*)))]
+           [_ (int-err "system*-def: invalid inequality ~a" inequality)])))
+     (cond
+       [(sli-trivially-valid? system*)
+        -top]
+       [(not (fme-sat? system*))
+        -bot]
+       [else
+        (*SLI new-path-set
+              system*)])]))
 
 (define (set-overlap? s1 s2)
-  (not (set-empty? (set-intersect s1 s2))))
+  (for/or ([a (in-set s1)])
+    (set-member? s2 a)))
 
 ;; SLI-try-join
 ;; combine two SLIs if they share any paths
@@ -361,142 +283,83 @@
 (define/cond-contract (SLI-try-join s1 s2)
   (-> SLI? SLI? (or/c #f  SLI? Top? Bot?))
   (match* (s1 s2)
-    [((SLI: sli1 ps1) (SLI: sli2 ps2))
+    [((SLI: ps1 sli1) (SLI: ps2 sli2))
      (cond 
        [(set-overlap? ps1 ps2)
         (define system* (set-union sli1 sli2))
         (cond
-          [(internal-sli-trivially-valid? system*)
+          [(sli-trivially-valid? system*)
            -top]
-          [(not (internal-sli-sat? system*))
+          [(not (fme-sat? system*))
            -bot]
-          [else (*SLI system* (set-union ps1 ps2))])]
+          [else
+           (define ps* (set-union ps1 ps2))
+           (unless (well-formed-paths+sys ps* system*) (error 'SLI-try-join "wrong remake3"))
+           (*SLI ps* system*)])]
        [else #f])]
     [(_ _) (int-err "invalid SLI(s) to SLI-try-join: ~a ~a" s1 s2)]))
 
 (define (SLI-empty? s)
-  (set-empty? (SLI-system s)))
+  (set-empty? (SLI-sys s)))
 
+(define (terms-contains-path-key? terms p-key)
+  (and (terms-ref terms p-key #f) #t))
 
-;; takes a list of leqs and builds
-;; the proper disjoint SLIs
-(define/cond-contract (leqs->SLIs initial-leqs)
-  (-> (listof leq?) (listof (or/c SLI? Top? Bot?)))
-  
-  ;; does an leq's paths overlap with an SLI's paths?
-  (define ((leq/SLI-overlap? l) s)
-    (set-overlap? (leq-paths l) (SLI-paths s)))
+;; does an leq's paths overlap with an SLI's paths?
+  ;; !curried! takes an leq, returns a function to call on SLIs
+(define (leq/SLI-overlap? l)
+  (match l
+    [(leq: (lexp: _ lhs-terms) (lexp: _ rhs-terms))
+     (λ (sys)
+       (for/or ([p (in-set (SLI-paths sys))])
+         (or (terms-contains-path-key? lhs-terms (Rep-seq p))
+             (terms-contains-path-key? rhs-terms (Rep-seq p)))))]
+    [_ (int-err "leq/SLI-overlap?: invalid leq ~a" l)]))
+
+;;; takes a list of leqs and builds
+;;; the proper disjoint SLIs
+(define/cond-contract (Leqs->SLIs initial-Leqs)
+  (-> (listof Leq?) (listof (or/c SLI? Top? Bot?)))
+
   ;; create an SLI by joining the list of SLIs and adding the leq
   ;; don't consider any details/satisfiability etc, just merge
-  (define (naive-merge-SLIs+leq slis ineq)
-    (define ineq-ps (leq-paths ineq))
-    (define-values (sys ps)
-      (for/fold ([system empty-leq-set]
-                 [paths empty-path-set])
-                ([s (in-list slis)])
-        (match s
-          [(SLI: sys ps) (values (set-union system sys)
-                                 (set-union ps paths))]
-          [_ (int-err "invalid SLI in naive-merge-SLIs: ~a" s)])))
-    (*SLI (set-add sys ineq) 
-          (set-union ps ineq-ps)))
+  (define (naive-merge-SLIs+Leq SLIs ineq)
+    (match-define (Leq l-ps l-exp) ineq)
+    (cond
+      [(pair? SLIs)
+       (define-values (ps sys)
+         (for/fold ([paths (SLI-paths (car SLIs))]
+                    [system (SLI-sys (car SLIs))])
+                   ([S (in-list (cdr SLIs))])
+           (match S
+             [(SLI: ps sys)
+              (values (set-union paths ps)
+                      (set-union system sys))]
+             [_ (int-err "invalid SLI in naive-merge-SLIs: ~a" S)])))
+       (*SLI (set-union ps l-ps)
+             (set-add sys l-exp))]
+      [else
+       (*SLI l-ps (set l-exp))]))
   
   ;; build the various SLIs based on overlap
   (define SLI-list
     (for/fold ([SLI-list null])
-              ([ineq (in-list initial-leqs)])
+              ([ineq (in-list initial-Leqs)])
       (define-values (related-SLIs unrelated-SLIs)
-        (partition (leq/SLI-overlap? ineq) SLI-list))
-      (define joined-SLI (naive-merge-SLIs+leq related-SLIs ineq))
+        (partition (leq/SLI-overlap? (Leq-exp ineq)) SLI-list))
+      (define joined-SLI (naive-merge-SLIs+Leq related-SLIs ineq))
       (cons joined-SLI unrelated-SLIs)))
   
   ;; now just simplify (if needed) the list of SLIs
   (for/list ([sli (in-list SLI-list)])
     (cond
-      [(SLI-trivially-valid? sli) -top]
+      [(sli-trivially-valid? (SLI-sys sli)) -top]
       [(not (SLI-satisfiable? sli)) -bot]
       [else sli])))
 
-;; internal-sli-partition
-;; partitions leq expressions into
-;; 3 lists of x-normalized inequalities:
-;;  value 1) set of (ax <= by + cz + ...) leqs
-;;  value 2) set of form (by + cz + ... <= ax) leqs
-;;  value 3) leqs w/o x
-(define/cond-contract (internal-sli-partition leqs x)
-  (-> immutable-leq-set? Path? 
-      (values immutable-leq-set? immutable-leq-set? immutable-leq-set?))
-  (define leqs* (for/set ([ineq (in-set leqs)])
-                  (leq-isolate-var ineq x)))
-  (for/fold ([xlhs empty-leq-set]
-             [xrhs empty-leq-set]
-             [nox empty-leq-set])
-            ([ineq (in-set leqs*)])
-    (cond
-      [(LExp-has-var? (leq-lhs ineq) x)
-       (values (set-add xlhs ineq) xrhs nox)]
-      [(LExp-has-var? (leq-rhs ineq) x)
-       (values xlhs (set-add xrhs ineq) nox)]
-      [else
-       (values xlhs xrhs (set-add nox ineq))])))
-
-;; cartesian-leq-set-map
-;; map of f over each pair of cartesian
-;; product of input sets
-;; order not guaranteed
-(define/cond-contract (cartesian-set-map f xs ys)
-  (-> procedure? immutable-leq-set? immutable-leq-set? immutable-leq-set?)
-  (for*/fold ([result (make-immutable-leq-set)]) 
-             ([x (in-set xs)] 
-              [y (in-set ys)])
-    (set-add result (f x y))))
-
-;; internal-sli-elim-path
-;; reduces the system of linear inequalties,
-;; removing x
-(define/cond-contract (internal-sli-elim-path sli p)
-  (-> immutable-leq-set? Path? immutable-leq-set?)
-  (define-values (pltleqs pgtleqs nopleqs) 
-    (internal-sli-partition sli p))
-  (set-union (cartesian-set-map (curryr leq-join p) 
-                                pltleqs
-                                pgtleqs)
-             nopleqs))
-
-;(define satisfiability-cache (make-hash))
-
-;; sli-satisfiable?
-(define/cond-contract (internal-sli-sat? sli)
-  (-> immutable-leq-set? boolean?)
-  
-  (define paths (internal-sli-path-set sli))
-  ;; build a system where all variables are eliminated
-  (define simplified-system
-    (for/fold ([s sli]) 
-              ([p (in-set paths)])
-      (internal-sli-elim-path s p)))
-  ;; if all are trivially valid, then the system
-  ;; is satisfiable
-  (define result
-    (for/and ([ineq (in-set simplified-system)])
-      (leq-trivially-valid? ineq)))
-  ;(hash-set! satisfiability-cache sli result)
-  result)
-
 (define/cond-contract (SLI-satisfiable? sli)
   (-> SLI? boolean?)
-  (define sys (SLI-system sli))
-  (internal-sli-sat? sys))
-
-(define/cond-contract (internal-sli-trivially-valid? sli)
-  (-> immutable-leq-set? boolean?)
-  (for/and ([ineq (in-set sli)])
-    (leq-trivially-valid? ineq)))
-
-(define/cond-contract (SLI-trivially-valid? sli)
-  (-> SLI? boolean?)
-  (internal-sli-trivially-valid? (SLI-system sli)))
-
+  (fme-sat? (SLI-sys sli)))
 
 ;; complementary-SLIs?
 ;; two SLIs s1 and s2 are complimentary iff
@@ -504,18 +367,18 @@
 ;; (i.e. just prove the Or of the two is a tautology)
 (define/cond-contract (complementary-SLIs? s1 s2)
   (-> SLI? SLI? boolean?)
-  (define sys1 (SLI-system s1))
-  (define sys2 (SLI-system s2))
+  (define sys1 (SLI-sys s1))
+  (define sys2 (SLI-sys s2))
   
   (and
    ;; ~s1 --> s2?
    (for/and ([leq1 (in-set sys1)])
-     (define sys* (make-immutable-leq-set (list (leq-negate leq1))))
-     (internal-sli-imp? sys* sys2))
+     (define sys* (set (leq-negate leq1)))
+     (fme-imp? sys* sys2))
    ;; ~s2 --> s1
    (for/and ([leq2 (in-set sys2)])
-     (define sys* (make-immutable-leq-set (list (leq-negate leq2))))
-     (internal-sli-imp? sys* sys1))
+     (define sys* (set (leq-negate leq2)))
+     (fme-imp? sys* sys1))
    #t))
 
 ;; tests if the SLI is stating some Path is
@@ -523,93 +386,67 @@
 ;; if not or the exact integer if it is
 (define/cond-contract (equals-constant-SLI? s)
   (-> SLI? (or/c #f exact-integer?))
+  (match-define (SLI: paths sys) s)
   (cond
-    [(not (= 2 (set-count (SLI-system s))))
+    [(not (= 2 (set-count sys)))
      #f]
-    [(not (= 1 (set-count (SLI-paths s))))
+    [(not (= 1 (set-count paths)))
      #f]
     [else
-     (match (set->list (SLI-system s))
-       [(list-no-order (leq: (? LExp-simple? lhs1)
-                             (app constant-LExp? (? exact-integer? n1)))
-                       (leq: (app constant-LExp? (? exact-integer? n2))
-                             (? LExp-simple? rhs2)))
-        (and (= n1 n2) n1)]
-       [_ #f])]))
+     (match-define (list ineq1 ineq2) (set->list sys))
+     (define p (set-first paths))
+     (match* (ineq1 ineq2)
+      [((leq: lhs1 rhs1) (leq: lhs2 rhs2))
+       (cond
+         [(let ([c-l1 (constant-lexp? lhs1)]
+                [simp1? (simple-lexp? rhs1)]
+                [simp2? (simple-lexp? lhs2)]
+                [c-r2 (constant-lexp? rhs2)])
+            (and c-l1 simp1? simp2? c-r2
+                 (= c-l1 c-r2)
+                 c-r2))]
+         [(let ([c-r1 (constant-lexp? rhs1)]
+                [simp1? (simple-lexp? lhs1)]
+                [simp2? (simple-lexp? rhs2)]
+                [c-r2 (constant-lexp? lhs2)])
+            (and c-r1 simp1? simp2? c-r2
+                 (= c-r1 c-r2)
+                 c-r2))]
+         [else #f])]
+       [(_ _) (int-err "equals-constant-SLI?:invalid ineq(s) ~a ~a" ineq1 ineq2)])]))
 
-;;**********************************************************************
-;; Logical Implication for Integer Linear Inequalities
-;; using Fourier-Motzkin elimination
-;;**********************************************************************
-
-(define/cond-contract (internal-sli-imp-leq? s ineq)
-  (-> immutable-leq-set? leq? boolean?)
-  (not (internal-sli-sat? (set-add s (leq-negate ineq)))))
-
-;;**********************************************************************
-;; Logical Implication for Systems of Integer Linear Inequalities
-;; using Fourier-Motzkin elimination
-;;**********************************************************************
-(define sli-imp-cache #f #;(make-hash))
-
-(define/cond-contract (internal-sli-imp? axioms goals)
-  (-> immutable-leq-set? immutable-leq-set? 
-      boolean?)
-  (define proof-state (cons axioms goals))
-  (cond
-    #;[(and sli-imp-cache
-          (hash-has-key? sli-imp-cache proof-state))
-     (hash-ref sli-imp-cache proof-state)]
-    ;; trivial implication
-    [(subset? goals axioms)
-     #t]
-    ;; solving implication
-    [else
-     (define result
-       (for/and ([ineq (in-set goals)])
-         (internal-sli-imp-leq? axioms ineq)))
-     (when sli-imp-cache
-       (hash-set! sli-imp-cache proof-state result))
-     result]))
 
 (define/cond-contract (SLI-implies? sli1 sli2)
   (-> SLI? SLI? boolean?)
   ;(printf "SLI-implies? || ~a  ||  ---->?  ||  ~a\n" sli1 sli2)
-  (internal-sli-imp? (SLI-system sli1) 
-                     (SLI-system sli2)))
+  (fme-imp? (SLI-sys sli1) 
+            (SLI-sys sli2)))
 
 (define/cond-contract (SLIs-imply? slis goal)
   (-> (listof SLI?) SLI? boolean?)
-  ;(printf "SLIs-imply? || ~a   || ---->?  ||  ~a\n" slis goal)
-  (match-define (SLI: goal-sys goal-ps) goal)
+  (match-define (SLI: goal-ps goal-sys) goal)
   
-  (define-values (axiom-sys _)
-    (for/fold ([system empty-leq-set]
-               [paths empty-path-set])
+  (define axiom-sys
+    (for/fold ([system #f])
               ([sli (in-list slis)])
-      (match-define (SLI: sys ps) sli)
+      (match-define (SLI: ps sys) sli)
       (cond
-        [(set-overlap? ps goal-ps)
-         (values (set-union system sys)
-                 (set-union paths ps))]
-        [else (values system paths)])))
+        [(set-overlap? goal-ps ps)
+         (if system
+             (set-union system sys)
+             sys)]
+        [else system])))
 
-  (cond
-    [(set-empty? axiom-sys) #f]
-    [else (internal-sli-imp? axiom-sys goal-sys)]))
+  (and axiom-sys
+       (not (set-empty? axiom-sys))
+       (fme-imp? axiom-sys goal-sys)))
 
 (define/cond-contract (SLIs-contain? slis s)
   (-> (listof SLI?) SLI? boolean?)
   (set-empty?
-   (for/fold ([s-sys (SLI-system s)])
+   (for/fold ([s-sys (SLI-sys s)])
              ([sli (in-list slis)])
-     (set-subtract s-sys (SLI-system sli)))))
-
-(define (SLI->LExp-pairs s)
-  (for/list ([ineq (in-set (SLI-system s))])
-    (match ineq
-      [(leq: lhs rhs) (cons lhs rhs)]
-      [_ (int-err "invalid leq? given from SLI-system: ~a" ineq)])))
+     (set-subtract s-sys (SLI-sys sli)))))
 
 
 (define/cond-contract (add-SLI new-sli slis)
@@ -632,48 +469,107 @@
     #:break (Bot? accumulation)
     (add-SLI new-sli accumulation)))
 
+
 (define (SLI->sexp s Path->sexp)
   (match s
-    [(SLI: sys _)
-     (define-values (eqs leqs)
-       (for/fold ([eqs empty-leq-set]
-                  [leqs empty-leq-set])
-                 ([lhs/rhs (in-set sys)])
-         (define inv (leq (leq-rhs lhs/rhs) (leq-lhs lhs/rhs)))
+    [(SLI: ps sys)
+     ;; build a function which converts Path-seq's to sexp
+     (define path-key->sexp
+       (let ([h (for/hasheq ([p (in-set ps)])
+                  (values (Rep-seq p) (Path->sexp p)))])
+         (λ (p) (hash-ref h p (λ _ (error 'SLI->sexp "path not in hash! ~a" p))))))
+     ;; build a function that turns lexp's into sexps
+     (define (lexp->sexp l)
+       (match l
+        [(lexp: c terms)
+         (define terms-sexp
+           (let ([terms-sexp
+                  (for/list ([(p-key p-coeff) (in-hash terms)])
+                    (if (= 1 p-coeff)
+                        (path-key->sexp p-key)
+                        `(* ,p-coeff ,(path-key->sexp p-key))))])
+             (if (zero? c) terms-sexp (cons c terms-sexp))))
          (cond
-           [(set-member? leqs inv)
-            (values (set-add eqs lhs/rhs)
-                    (set-remove leqs inv))]
-           [(set-member? eqs inv)
+           [(null? terms-sexp) 0] ;; not possible?
+           [(null? (cdr terms-sexp)) (car terms-sexp)] ;; just one term, no '+'
+           [else (cons '+ terms-sexp)])]
+         [_ (int-err "lexp->sexp: invalid lexp ~a" l)]))
+     ;; separate out equalities (pairs of inverted leqs) and regular leqs
+     ;; TODO?? -- add const normalization to leqs (ONLY if printing and other operations
+     ;; turn out to be a pain without it)
+     (define-values (eqs leqs)
+       (for/fold ([eqs (set)]
+                  [leqs (set)])
+                 ([ineq (in-set sys)])
+         (define inv-ineq (leq-negate ineq))
+         (cond
+           [(set-member? leqs inv-ineq)
+            (values (set-add eqs ineq)
+                    (set-remove leqs inv-ineq))]
+           [(set-member? eqs inv-ineq)
             (values eqs leqs)]
-           [else (values eqs (set-add leqs lhs/rhs))])))
+           [else (values eqs (set-add leqs ineq))])))
      
      (append
-      (for/list ([lhs/rhs (in-set eqs)])
-        (match-define (leq: lhs rhs) lhs/rhs)
-        `(= ,(LExp->sexp lhs Path->sexp) ,(LExp->sexp rhs Path->sexp)))
-      (for/list ([lhs/rhs (in-set leqs)])
-        (match-define (leq: lhs rhs) lhs/rhs)
-        (cond
-          [(= 1 (LExp-const lhs))
-           `(< ,(LExp->sexp (LExp-set-const lhs 0) Path->sexp) ,(LExp->sexp rhs Path->sexp))]
-          [else
-           `(≤ ,(LExp->sexp lhs Path->sexp) ,(LExp->sexp rhs Path->sexp))])))]
+      (for/list ([ineq (in-set eqs)])
+        (match ineq
+          [(leq: lhs rhs) `(= ,(lexp->sexp lhs) ,(lexp->sexp rhs))]
+          [_ (int-err "equality-ineqs->sexp: invalid ineq ~a" ineq)]))
+      (for/list ([ineq (in-set leqs)])
+        (match ineq
+         [(leq: lhs rhs) `(≤ ,(lexp->sexp lhs) ,(lexp->sexp rhs))]
+         [_ (int-err "ineqs->sexp: invalid ineq ~a" ineq)])))]
     [_ (int-err "invalid SLI given to SLI->sexp: ~a" s)]))
+
+
+(define (SLI->lexp-pairs sli)
+  (unless (SLI? sli)
+    (int-err "SLI->Leqs: invalid SLI for serialization ~a" sli))
+  
+  (match-define (SLI: ps sys) sli)
+
+  (define (lookup p-key)
+    (for/or ([p (in-set ps)])
+      (and (= p-key (Rep-seq p))
+           p)))
+
+  (define (lexp->LExp exp)
+    (match exp
+      [(lexp: const terms)
+       (apply -lexp (cons const (for/list ([(key coeff) (in-hash terms)])
+                                  (list coeff (lookup key)))))]
+      [_ (int-err "invalid exp to convert ~a" exp)]))
+  (define (leq->lexp-pairs ineq)
+    (match ineq
+      [(leq: lhs rhs) (cons (lexp->LExp lhs) (lexp->LExp rhs))]
+      [_ (int-err "invalid exp to convert ~a" exp)]))
+
+  (set-map sys leq->lexp-pairs))
 
 
 (define/cond-contract (SLI-negate sli)
   (-> SLI? Filter?)
   (match sli
-    [(SLI: sys ps)
+    [(SLI: ps sys)
      (apply -or (for/list ([ineq (in-set sys)])
-                  (define sys* (make-immutable-leq-set (list (leq-negate ineq))))
+                  (define sys* (set (leq-negate ineq)))
                   (cond
-                    [(internal-sli-trivially-valid? sys*)
+                    [(sli-trivially-valid? sys*)
                      -top]
-                    [(not (internal-sli-sat? sys*))
+                    [(not (fme-sat? sys*))
                      -bot]
-                    [else (*SLI sys* ps)])))]
+                    [else
+                     (match (set-first sys*)
+                      [(leq: (lexp: _ termsl) (lexp: _ termsr))
+                       (define ps* (for/fold ([new-ps empty-path-set])
+                                             ([p (in-set ps)])
+                                     (if (or (terms-ref termsl (Rep-seq p) #f)
+                                             (terms-ref termsr (Rep-seq p) #f))
+                                         (set-add new-ps p)
+                                         new-ps)))
+                       (unless (well-formed-paths+sys ps* sys*) (error 'naive-merge-SLIs+Leq "wrong remake6"))
+                       (*SLI ps* sys*)]
+                       [_ (int-err "SLI-negate: oops, set had bad elem? ~a" sys*)])])))]
     [_ (int-err "SLI-negate given invalid SLI?: ~a" sli)]))
 
 
@@ -681,7 +577,7 @@
 ;; Or, And, FilterSet, NoFilter
 
 (def-filter OrFilter ([fs (and/c (length>=/c 2)
-                                 (listof (or/c TypeFilter? NotTypeFilter? ImpFilter? SLI?)))])
+                                 (listof (or/c TypeFilter? NotTypeFilter? SLI?)))])
   [#:intern (map Rep-seq fs)]
   [#:fold-rhs (*OrFilter (map filter-rec-id fs))]
   [#:frees (λ (f) (combine-frees (map f fs)))])

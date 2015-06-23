@@ -169,12 +169,13 @@
             [(list) (loop rst)]
             [fs* (append fs* (loop rst))])]))]
     
-    [(OrFilter: fs)
-     (let* ([fs* (map (λ (f) (apply -and (logical-reduce Γ f))) fs)]
-            [f* (apply -or fs*)])
-       (if (Top? f*)
-           null
-           (list f*)))]
+    [(OrFilter: atoms)
+     (cond
+       [(for/or ([a (in-list atoms)])
+          (null? (logical-reduce Γ a)))
+        null]
+       [else
+        (list goal)])]
     [_ (int-err "invalid goal: ~a" goal)]))
 
 (define/cond-contract (full-proves Γ assumptions goal)

@@ -6,7 +6,7 @@
          (except-in racket/contract ->* -> )
          (env type-env-structs global-env mvar-env)
          (utils tc-utils)
-         (rep type-rep object-rep rep-utils filter-rep object-ops)
+         (rep type-rep object-rep rep-utils filter-rep)
          (only-in (rep type-rep) Type/c)
          (typecheck renamer)
          (prefix-in c: (contract-req))
@@ -78,8 +78,8 @@
                                     (-eqSLI l (-lexp (-arg-path 0 0)))))]
          [else
           (-refine x (integer-type)
-                   (apply -and (leqs->SLIs (list (leq l (-lexp (-id-path x)))
-                                                 (leq (-lexp (-id-path x)) l)))))])]
+                   (apply -and (leqs->SLIs (list (-leq l (-lexp (-id-path x)))
+                                                 (-leq (-lexp (-id-path x)) l)))))])]
     [_ #:when fail (fail o)]
     [_ (lookup-fail o)]))
 

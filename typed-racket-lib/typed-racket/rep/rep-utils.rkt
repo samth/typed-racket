@@ -382,6 +382,8 @@
   (eq? (Rep-seq s) (Rep-seq t)))
 (define (rep<? s t)
   (< (Rep-seq s) (Rep-seq t)))
+(define (rep>? s t)
+  (> (Rep-seq s) (Rep-seq t)))
 
 (provide
   Rep-values
@@ -393,6 +395,8 @@
   [rename rep-equal? type-equal? (Type? Type? . -> . boolean?)]
   [rename rep<? type<? (Type? Type? . -> . boolean?)]
   [rename rep<? filter<? (Filter? Filter? . -> . boolean?)]
+  [rename rep<? obj<? (Object? Object? . -> . boolean?)]
+  [rename rep>? obj>? (Object? Object? . -> . boolean?)]
   [struct Rep ([seq exact-nonnegative-integer?]
                [free-vars (hash/c symbol? variance?)]
                [free-idxs (hash/c symbol? variance?)]

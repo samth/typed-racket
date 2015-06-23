@@ -10,7 +10,7 @@
            (env tvar-env type-alias-env mvar-env)
            (utils tc-utils)
            (private parse-type)
-           (rep type-rep object-rep)
+           (rep type-rep object-rep filter-rep)
            (only-in (types filter-ops) -or -and)
            (submod typed-racket/base-env/base-types initialize)
            (rename-in (types union abbrev numeric-tower resolve)

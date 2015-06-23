@@ -8,7 +8,7 @@
          racket/list
          racket/set
          (path-up "rep/type-rep.rkt" "rep/filter-rep.rkt" "rep/object-rep.rkt"
-                  "rep/object-ops.rkt" "rep/rep-utils.rkt" "types/subtype.rkt"
+                  "rep/rep-utils.rkt" "types/subtype.rkt"
                   "types/match-expanders.rkt"
                   "types/numeric-tower.rkt"
                   "types/kw-types.rkt"

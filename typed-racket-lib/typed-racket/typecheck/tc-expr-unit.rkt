@@ -8,7 +8,7 @@
          (types utils abbrev union subtype type-table
                 filter-ops remove-intersect resolve generalize restrict)
          (private-in syntax-properties)
-         (rep type-rep filter-rep object-rep object-ops)
+         (rep type-rep filter-rep object-rep)
          (utils tc-utils)
          (env lexical-env lookup)
          racket/list
