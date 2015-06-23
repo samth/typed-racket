@@ -55,13 +55,13 @@
         (c:-> Type/c Type/c (or/c #f (listof PathElem?))
               Type/c))
   (λ (old-t new-t path-stack)
+    (define obj (make-Path (reverse path-stack) x))
     (cond
       ;; we're in a context where we shouldn't assume things (e.g. nested in a union type)
       [(not path-stack) new-t]
       ;; we are now a more specific int type w/ bounds -- go ahead and add the bounds!
       [(bounded-int-type? new-t)
        (define-values (new-low new-high) (int-type-bounds new-t))
-       (define obj (make-Path (reverse path-stack) x))
        (when new-low
          (define leqsli (-leqSLI (-lexp new-low) (-lexp (list 1 obj))))
          (unless (SLIs-contain? (env-SLIs env) leqsli)
@@ -76,17 +76,23 @@
       ;; we used to be a union and now we're not --- check if there are props
       ;; nested inside the union we can now assume to be true!
       [(and (Union? old-t) (not (Union? new-t)))
-       (define obj (make-Path (reverse path-stack) x))
        (define-values (t* nested-props) (extract-props-from-type obj new-t))
        (when (not (null? nested-props))
          (set-box! new-props-box (append nested-props (unbox new-props-box))))
        ((make-positive-notifier x new-props-box env) new-t t* path-stack)]
+      ;; we can infer the length of heterogeneous vectors from their list of types, of course!
+      [(HeterogeneousVector? new-t)
+       (define eqsli (-eqSLI (-lexp (-acc-path -len obj))
+                             (-lexp (length (HeterogeneousVector-elems new-t)))))
+       (unless (SLIs-contain? (env-SLIs env) eqsli)
+         (set-box! new-props-box
+                   (cons eqsli (unbox new-props-box))))
+       new-t]
       [else
        (match new-t
          ;; if we're now a refinement, assume the refining proposition and just return
          ;; the refined type (recursively, of course)
          [(Refine-unsafe: t p)
-          (define obj (make-Path (reverse path-stack) x))
           (define prop (subst-filter p (list 0 0) obj #t))
           (when (not (Top? p))
             (set-box! new-props-box (cons p (unbox new-props-box))))

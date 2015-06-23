@@ -96,21 +96,39 @@
        [t 
         (-pair (tc-literal #'i) (tc-literal #'r))])]
     [(~var i (3d vector?))
-     (match (and expected (resolve (restrict -VectorTop expected)))
-       [(Vector: t)
-        (make-Vector
-         (check-below
-          (apply Un
-                 (for/list ([l (in-vector (syntax-e #'i))])
-                   (tc-literal l t)))
-          t))]
-       [(HeterogeneousVector: ts)
-        (make-HeterogeneousVector
-         (for/list ([l (in-vector (syntax-e #'i))]
-                    [t (in-sequence-forever (in-list ts) #f)])
-           (cond-check-below (tc-literal l t) t)))]
-       [_ (make-HeterogeneousVector (for/list ([l (in-vector (syntax-e #'i))])
-                                      (generalize (tc-literal l #f))))])]
+     (define expected* (and expected (resolve (restrict -VectorTop expected))))
+     (match expected*
+       ;; TODO what about refined vectors as expected types??
+       [(or (Vector: t)
+            (Refine-type: (Vector: t)))
+        (define v-ts (for/list ([l (in-vector (syntax-e #'i))])
+                       (tc-literal l t)))
+        (define v-ty
+          (-refine vec
+                   (make-Vector (check-below (apply Un v-ts) t))
+                   (-eqSLI (-lexp (-acc-path -len vec))
+                           (-lexp (length v-ts)))))
+
+        (cond-check-below v-ty expected* (Refine? expected*))]
+       [(or (HeterogeneousVector: ts)
+            (Refine-type: (HeterogeneousVector: ts)))
+        (define v-ts (for/list ([l (in-vector (syntax-e #'i))]
+                                [t (in-sequence-forever (in-list ts) #f)])
+                       (cond-check-below (tc-literal l t) t)))
+        (define v-ty
+          (-refine vec
+                   (make-HeterogeneousVector v-ts)
+                   (-eqSLI (-lexp (-acc-path -len vec))
+                           (-lexp (length v-ts)))))
+        
+        (cond-check-below v-ty expected* (Refine? expected*))]
+       [_
+        (define v-ts (for/list ([l (in-vector (syntax-e #'i))])
+                       (generalize (tc-literal l #f))))
+        (-refine vec
+                 (make-HeterogeneousVector v-ts)
+                 (-eqSLI (-lexp (-acc-path -len vec))
+                         (-lexp (length v-ts))))])]
     [(~var i (3d hash?))
      (match (and expected (resolve (restrict -HashTop expected)))
        [(Hashtable: k v)
