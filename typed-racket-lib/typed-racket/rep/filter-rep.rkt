@@ -205,9 +205,9 @@
         [o (int-err "unknown object from function in SLI-map ~a" o)])))
   ;; perform FM-elimination for all paths that were mapped to Empty
   (define system-w/o-empties
-    (for/fold ([sys orig-system])
-              ([p (in-list elim-keys)])
-      (fme-elim sys p)))
+    (reduce-sli (for/fold ([sys orig-system])
+                          ([p (in-list elim-keys)])
+                  (fme-elim sys p))))
   ;; define a function which tests if the lexp needs updated
   ;; logic similar to LExp-path-map related functions on rep/object-rep.rkt
   (define (update-lexp linear-expression)
@@ -257,23 +257,25 @@
     ;; there were changes, we must update the system
     [else
      (define system*
-       (for/fold ([sys system-w/o-empties])
-                 ([inequality (in-set system-w/o-empties)])
-         ;; update each inequality individually
-         (match inequality
-          [(leq: lhs rhs)
-           (define lhs* (update-lexp lhs))
-           (define rhs* (update-lexp rhs))
-           ;; if it wasn't changed, leave the system be
-           ;; for this iteration
-           (if (and (eq? lhs lhs*) (eq? rhs rhs*))
-               sys
-               ;; otherwise remove the old inequality
-               ;; and put the new one in
-               (set-add (set-remove sys inequality)
-                        (leq* lhs* rhs*)))]
-           [_ (int-err "system*-def: invalid inequality ~a" inequality)])))
+       (reduce-sli
+        (for/fold ([sys system-w/o-empties])
+                  ([inequality (in-set system-w/o-empties)])
+          ;; update each inequality individually
+          (match inequality
+            [(leq: lhs rhs)
+             (define lhs* (update-lexp lhs))
+             (define rhs* (update-lexp rhs))
+             ;; if it wasn't changed, leave the system be
+             ;; for this iteration
+             (if (and (eq? lhs lhs*) (eq? rhs rhs*))
+                 sys
+                 ;; otherwise remove the old inequality
+                 ;; and put the new one in
+                 (set-add (set-remove sys inequality)
+                          (leq* lhs* rhs*)))]
+            [_ (int-err "system*-def: invalid inequality ~a" inequality)]))))
      (cond
+       [(not system*) -bot]
        [(sli-trivially-valid? system*)
         -top]
        [(not (fme-sat? system*))
@@ -295,14 +297,13 @@
     [((SLI: ps1 sli1) (SLI: ps2 sli2))
      (cond 
        [(set-overlap? ps1 ps2)
-        (define system* (set-union sli1 sli2))
+        (define system* (sli-union/sat? sli1 sli2))
         (cond
+          [(not system*) -bot]
           [(sli-trivially-valid? system*)
            -top]
-          [(not (fme-sat? system*))
-           -bot]
           [else
-           (define ps* (set-union ps1 ps2))
+           (define ps* (filter-path-set/sys (set-union ps1 ps2) system*))
            (*SLI ps* system*)])]
        [else #f])]
     [(_ _) (int-err "invalid SLI(s) to SLI-try-join: ~a ~a" s1 s2)]))
@@ -324,11 +325,22 @@
              (terms-contains-path-key? rhs-terms (Obj-seq p)))))]
     [_ (int-err "leq/SLI-overlap?: invalid leq ~a" l)]))
 
+(define (system-contains-path? sys path)
+  (define p-key (Obj-seq path))
+  (for/or ([ineq (in-set sys)])
+    (match ineq
+      [(leq: (lexp: _ lhs-terms) (lexp: _ rhs-terms))
+       (or (terms-contains-path-key? lhs-terms p-key)
+           (terms-contains-path-key? rhs-terms p-key))]
+      [_ (int-err "leq/SLI-overlap?: invalid leq ~a" ineq)])))
+
+;;; takes a list of leqs and builds
+;;; the proper disjoint SLIs
 ;;; takes a list of leqs and builds
 ;;; the proper disjoint SLIs
 (define/cond-contract (Leqs->SLIs initial-inequalities)
   (-> (listof Leq?) (listof (or/c SLI? Top? Bot?)))
-
+  
   (define initial-Leqs
     (let loop ([to-do initial-inequalities]
                [ineqs null])
@@ -378,10 +390,22 @@
      
      ;; now just simplify (if needed) the list of SLIs
      (for/list ([sli (in-list SLI-list)])
-       (cond
-         [(sli-trivially-valid? (SLI-sys sli)) -top]
-         [(not (SLI-satisfiable? sli)) -bot]
-         [else sli]))]))
+       (match-define (SLI: ps sys) sli)
+       (let ([sys (reduce-sli/sat? sys)])
+         (cond
+           [(not sys) -bot]
+           [(sli-trivially-valid? sys) -top]
+           ;; okay, we're keeping it. filter out paths that
+           ;; aren't there anymore
+           [else (*SLI (filter-path-set/sys ps sys)
+                       sys)])))]))
+
+(define (filter-path-set/sys ps sys)
+  (for/fold ([ps ps])
+            ([p (in-set ps)])
+    (if (system-contains-path? sys p)
+        ps
+        (set-remove ps p))))
 
 (define/cond-contract (SLI-satisfiable? sli)
   (-> SLI? boolean?)
@@ -486,27 +510,7 @@
              [(? Bot? b) b])]
        [(? SLI? new-s) (cons new-s slis*)]
        [(? Top?) slis*]
-       [(? Bot? b) b])])
-  #;(match new-sli
-    [(SLI: n-ps n-sys)
-     (define-values (new-ps new-sli others)
-       (for/fold ([new-ps n-ps] [new-sli n-sys] [others null])
-                 ([sli (in-list slis)])
-         (match-define (SLI: ps sys) sli)
-         (cond
-           [(set-overlap? new-ps ps)
-            (values (set-union new-ps ps)
-                    (set-union new-sli sys)
-                    others)]
-           [else (values new-ps new-sli (cons sli others))])))
-     (cond
-       [(sli-trivially-valid? new-sli)
-        others]
-       [(not (fme-sat? new-sli))
-        -bot]
-       [else
-        (cons (*SLI new-ps new-sli) others)])]
-    [_ (int-err "invalid arg to add-SLI ~a" new-sli)]))
+       [(? Bot? b) b])]))
 
 (define/cond-contract (add-SLIs new-slis slis)
   (-> (listof SLI?) (listof SLI?) (or/c Bot? (listof SLI?)))
@@ -567,7 +571,7 @@
          [_ (int-err "ineqs->sexp: invalid ineq ~a" ineq)])))]
     [_ (int-err "invalid SLI given to SLI->sexp: ~a" s)]))
 
-
+;; used for serialization (I think...)
 (define (SLI->lexp-pairs sli)
   (unless (SLI? sli)
     (int-err "SLI->Leqs: invalid SLI for serialization ~a" sli))
@@ -597,25 +601,25 @@
   (-> SLI? Filter?)
   (match sli
     [(SLI: ps sys)
-     (apply -or (for/list ([ineq (in-set sys)])
-                  (define sys* (set (leq-negate ineq)))
-                  (cond
-                    [(sli-trivially-valid? sys*)
-                     -top]
-                    [(not (fme-sat? sys*))
-                     -bot]
-                    [else
-                     (match (set-first sys*)
-                      [(leq: (lexp: _ termsl) (lexp: _ termsr))
-                       (define ps* (for/fold ([new-ps empty-path-set])
-                                             ([p (in-set ps)])
-                                     (if (or (terms-ref termsl (Obj-seq p) #f)
-                                             (terms-ref termsr (Obj-seq p) #f))
-                                         (set-add new-ps p)
-                                         new-ps)))
-                       (unless (well-formed-paths+sys ps* sys*) (error 'naive-merge-SLIs+Leq "wrong remake6"))
-                       (*SLI ps* sys*)]
-                       [_ (int-err "SLI-negate: oops, set had bad elem? ~a" sys*)])])))]
+     (apply -or
+            (for/list ([ineq (in-set sys)])
+              (define sys* (set (leq-negate ineq)))
+              (cond
+                [(sli-trivially-valid? sys*)
+                 -top]
+                [(not (fme-sat? sys*))
+                 -bot]
+                [else
+                 (match (set-first sys*)
+                   [(leq: (lexp: _ termsl) (lexp: _ termsr))
+                    (define ps* (for/fold ([new-ps empty-path-set])
+                                          ([p (in-set ps)])
+                                  (if (or (terms-ref termsl (Obj-seq p) #f)
+                                          (terms-ref termsr (Obj-seq p) #f))
+                                      (set-add new-ps p)
+                                      new-ps)))
+                    (*SLI ps* sys*)]
+                   [_ (int-err "SLI-negate: oops, set had bad elem? ~a" sys*)])])))]
     [_ (int-err "SLI-negate given invalid SLI?: ~a" sli)]))
 
 

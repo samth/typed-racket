@@ -1,6 +1,6 @@
 #lang racket/base
 (require (except-in "../utils/utils.rkt" infer)
-         racket/match racket/lazy-require 
+         racket/match racket/lazy-require ;racket/trace
          (except-in racket/contract ->* -> )
          (prefix-in c: (contract-req))
          (utils tc-utils)
@@ -224,8 +224,7 @@
             [x-obj-ty (and ty (id-ty+path->obj-ty ty π))])
        (and x-obj-ty
             (not (Error? x-obj-ty))
-            (with-lexical-env
-             (env-erase-id-type env x)
+            (with-empty-env
              (subtype x-obj-ty ft #:obj o))))]
     
     [(NotTypeFilter: ft (and o (Path: π (? identifier? x))))
@@ -237,7 +236,8 @@
         (env-erase-id-type env x)
         (or (and x-obj-ty-
                  (not (Error? x-obj-ty-))
-                 (subtype ft x-obj-ty- #:obj o))
+                 (with-empty-env
+                  (subtype ft x-obj-ty- #:obj o)))
             (and x-obj-ty+
                  (not (Error? x-obj-ty+))
                  (not (overlap x-obj-ty+ ft))))))]
@@ -245,12 +245,15 @@
     ;;TODO(amk) These should take into account the ranges
     ;; implied by the integer numeric-type when possible
     [(TypeFilter: ft (? LExp? l))
-     (with-lexical-env
-      env
-      (subtype (lookup-obj-type l env #:fail (λ _ (-unsafe-refine (integer-type) (-eqSLI l (-lexp (-arg-path 0 0))))))
+     (with-empty-env
+      (subtype (lookup-obj-type l env #:fail (λ _ (integer-type)))
                ft))]
     [(NotTypeFilter: ft (? LExp? l))
-     (with-lexical-env
-      env
+     (with-empty-env
       (not (overlap (lookup-obj-type l env #:fail (λ _ (integer-type))) ft)))]
     [_ (int-err "invalid witnesses goal ~a" goal)]))
+
+;(trace proves)
+;(trace logical-reduce)
+;(trace full-proves)
+;(trace witnesses)

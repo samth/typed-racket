@@ -1,6 +1,7 @@
 #lang racket/base
 (require (except-in "../utils/utils.rkt" infer)
          racket/match racket/function racket/lazy-require
+         ;racket/trace
          (except-in racket/contract ->* -> )
          (prefix-in c: (contract-req))
          (utils tc-utils)
@@ -17,7 +18,6 @@
  ("../types/type-ref-path.rkt" (try/obj-ty+path->ty))
  ("../types/numeric-tower.rkt" (integer-type int-type-bounds bounded-int-type?)) 
  ("../logic/type-update.rkt" (update-type))
- ("../types/subtype.rkt" (subtype))
  ("../types/union.rkt" (Un)))
 
 (provide update-env/atom update-env/obj-type atomic-prop?)
@@ -64,12 +64,12 @@
        (define-values (new-low new-high) (int-type-bounds new-t))
        (when new-low
          (define leqsli (-leqSLI (-lexp new-low) (-lexp (list 1 obj))))
-         (unless (SLIs-contain? (env-SLIs env) leqsli)
+         (unless (and (SLI? leqsli) (SLIs-contain? (env-SLIs env) leqsli))
            (set-box! new-props-box
                      (cons leqsli (unbox new-props-box)))))
        (when new-high
          (define leqsli (-leqSLI (-lexp (list 1 obj)) (-lexp new-high)))
-         (unless (SLIs-contain? (env-SLIs env) leqsli)
+         (unless (and (SLI? leqsli) (SLIs-contain? (env-SLIs env) leqsli))
            (set-box! new-props-box
                      (cons leqsli (unbox new-props-box)))))
        new-t]
@@ -84,7 +84,7 @@
       [(HeterogeneousVector? new-t)
        (define eqsli (-eqSLI (-lexp (-acc-path -len obj))
                              (-lexp (length (HeterogeneousVector-elems new-t)))))
-       (unless (SLIs-contain? (env-SLIs env) eqsli)
+       (unless (and (SLI? eqsli) (SLIs-contain? (env-SLIs env) eqsli))
          (set-box! new-props-box
                    (cons eqsli (unbox new-props-box))))
        new-t]
@@ -134,11 +134,11 @@
          [(not x-ty-)
           (with-lexical-env
            (env-erase-id-type env x)
-           (values (update-type x-ty+ new-o-ty #t π notify)
+           (values (with-empty-env
+                    (update-type x-ty+ new-o-ty #t π notify))
                    -Nothing))]
          [else
-          (with-lexical-env
-           (env-erase-id-type env x)
+          (with-empty-env
            (let* ([new-x-ty+ (update-type x-ty+ new-o-ty #t π notify)]
                   [new-x-ty+ (update-type new-x-ty+ x-ty- #f null notify)])
              (values new-x-ty+
@@ -164,8 +164,7 @@
      ;; grab the type we know l is currently and
      ;; combine it with the new type
      (define l-ty
-       (with-lexical-env
-        empty-env
+       (with-empty-env
         (restrict (lookup-obj-type l env #:fail (const (integer-type))) new-o-ty)))
      ;; grab bounds if they're new
      (when (bounded-int-type? l-ty)
@@ -200,15 +199,14 @@
      (define-values (new-x-ty+ new-x-ty-)
        (cond
          [(and x-ty+ x-ty-)
-          (with-lexical-env
-           (env-erase-id-type env x)
+          (with-empty-env
            (let ([new-x-ty+ (update-type (update-type x-ty+ new-o-ty #f π notify) x-ty- #f null notify)])
              (values new-x-ty+
                      (recalc-negative-type
                       new-x-ty+
                       (Un x-ty- (try/obj-ty+path->ty new-o-ty π #:fail-type -Nothing))))))]
          [x-ty+
-          (values (update-type x-ty+ new-o-ty #f π notify)
+          (values (with-empty-env (update-type x-ty+ new-o-ty #f π notify))
                   (try/obj-ty+path->ty new-o-ty π #:fail-type -Nothing))]
          [x-ty-
           (values -Any
@@ -236,7 +234,8 @@
      ;; note: not currently *storing* negative type info about lexps
      ;; this could change in the future...
      (define l-ty
-       (remove (lookup-obj-type l env #:fail (const (integer-type))) new-o-ty))
+       (with-empty-env
+        (remove (lookup-obj-type l env #:fail (const (integer-type))) new-o-ty)))
      ;; TODO(amk) maybe do something more complex here with LExp and SLI info?
      (cond
        [(Bottom? l-ty)
@@ -283,3 +282,7 @@
        env* new-props)
 
   (values env* new-props))
+
+;(trace update-env/atom)
+;(trace update-env/type+)
+;(trace update-env/type-)

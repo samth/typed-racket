@@ -48,9 +48,14 @@
          lexp:
          leq:
          leq-trivially-valid?
-         leq-trivially-invalid?)
+         leq-trivially-invalid?
+         sli-union
+         sli-union/sat?
+         reduce-sli
+         sli-add-leq
+         reduce-sli/sat?)
 
-(define-for-syntax enable-fme-contracts? #f)
+(define-for-syntax enable-fme-contracts? #t)
 
 (define-match-expander lexp:
   (lambda (stx)
@@ -725,6 +730,58 @@
                                  (lexp* '(1 z))))))
 
 ;;**********************************************************************
+;; Simple Inequality Implication   (does P imply Q)
+;;**********************************************************************
+(define/cond-fme-contract (leq-imp-leq? P Q) 
+  (-> leq? leq? boolean?)
+  (or (equal? P Q)
+      ;; (P -> Q)  ==  (~P or Q) == ~(P and ~Q)
+      (not (fme-sat? (set P (leq-negate Q))))))
+
+(module+ test
+  (check-true (leq-imp-leq? (leq (lexp* '(1 x))
+                                 (lexp* '(1 y)))
+                            (leq (lexp* '(1 x))
+                                 (lexp* '(1 y)))))
+  (check-true (leq-imp-leq? (leq (lexp* '(1 x))
+                                 (lexp* 14))
+                            (leq (lexp* '(1 x))
+                                 (lexp* 15))))
+  (check-true (leq-imp-leq? (leq (lexp* '(1 x) '(1 y))
+                                 (lexp* 14))
+                            (leq (lexp* '(1 x) '(1 y))
+                                 (lexp* 20))))
+  (check-false (leq-imp-leq? (leq (lexp* '(1 x) '(1 y))
+                                  (lexp* 14))
+                             (leq (lexp* '(1 x))
+                                  (lexp* 14)))))
+
+;;**********************************************************************
+;; Contradictory leqs?  ~(P and Q)
+;;**********************************************************************
+(define/cond-fme-contract (contradictory-leqs? P Q) 
+  (-> leq? leq? boolean?)
+  ;; (P -> Q)  ==  (~P or Q) == ~(P and ~Q)
+  (not (fme-sat? (set P Q))))
+
+(module+ test
+  (check-true (contradictory-leqs? (leq (lexp* 2)
+                                        (lexp* 1))
+                                   (leq (lexp* '(1 y))
+                                        (lexp* '(1 x)))))
+  (check-true (contradictory-leqs? (leq (lexp* '(1 x))
+                                        (lexp* '(1 y)))
+                                   (leq (lexp* 1 '(1 y))
+                                        (lexp* '(1 x)))))
+  (check-false (contradictory-leqs? (leq (lexp* '(1 x))
+                                         (lexp* '(1 y)))
+                                    (leq (lexp* '(1 x))
+                                         (lexp* '(1 y)))))
+  (check-false (contradictory-leqs? (leq (lexp* 1)
+                                         (lexp* 2))
+                                    (leq (lexp* 2)
+                                         (lexp* 3)))))
+;;**********************************************************************
 ;; Logical Implication for Systems of Integer Linear Inequalities
 ;; using Fourier-Motzkin elimination
 ;;**********************************************************************
@@ -869,3 +926,129 @@
                                    (lexp* '(1 x) '(1 r) '(1 q))))
                          (set (leq (lexp* '(1 t))
                                    (lexp*))))))
+
+
+;; adds a new leq to an sli,
+;; ensuring we are not 'duplicating' info
+;; that is obvious or already assumed
+;; returns #f if new contradicts a particular leq
+;; NOTE: this assumes 's' already has similarly been
+;; treated in the past and does not contain
+;; obviously duplicate info. i.e. if we find a weaker
+;; statement, we assume it's the only weaker one in the set
+(define/cond-fme-contract (sli-add-leq s new)
+  (-> sli? leq? (or/c #f sli?))
+  (cond
+    [(or (leq-trivially-valid? new)
+         (set-member? s new)) s]
+    [else
+     (let loop ([sys s]
+                [to-do s])
+       (if (set-empty? to-do)
+           (set-add sys new) ;; we got to the end w/o problems, add new
+           (let ([ineq (set-first to-do)])
+             (cond
+               ;; new is weaker than our current assumptions, return sys
+               [(leq-imp-leq? ineq new)
+                sys]
+               ;; an inequality in our system is weaker than the new one
+               [(leq-imp-leq? new ineq)
+                (set-add (set-remove sys ineq) new)]
+               [(contradictory-leqs? ineq new)
+                #f]
+               [else (loop sys (set-rest to-do))]))))]))
+
+(module+ test
+  (check-equal? (sli-add-leq (set)
+                             (leq (lexp*)
+                                  (lexp* '(1 x))))
+                (set (leq (lexp*)
+                          (lexp* '(1 x)))))
+  (check-equal? (sli-add-leq (set (leq (lexp*)
+                                       (lexp* '(1 x)))
+                                  (leq (lexp*)
+                                       (lexp* '(1 y))))
+                             (leq (lexp*)
+                                  (lexp* '(1 y))))
+                (set (leq (lexp*)
+                          (lexp* '(1 x)))
+                     (leq (lexp*)
+                          (lexp* '(1 y)))))
+  (check-equal? (sli-add-leq (set (leq (lexp*)
+                                       (lexp* '(1 x)))
+                                  (leq (lexp*)
+                                       (lexp* '(1 y))))
+                             (leq (lexp* 1)
+                                  (lexp* '(1 y))))
+                (set (leq (lexp*)
+                          (lexp* '(1 x)))
+                     (leq (lexp* 1)
+                          (lexp* '(1 y)))))
+  (check-equal? (sli-add-leq (set (leq (lexp*)
+                                       (lexp* '(1 x)))
+                                  (leq (lexp* 1)
+                                       (lexp* '(1 y))))
+                             (leq (lexp* 0)
+                                  (lexp* '(1 y))))
+                (set (leq (lexp*)
+                          (lexp* '(1 x)))
+                     (leq (lexp* 1)
+                          (lexp* '(1 y)))))
+  (check-false (sli-add-leq (set (leq (lexp* 0)
+                                      (lexp* '(1 y))))
+                            (leq (lexp* '(1 y))
+                                 (lexp* -1)))))
+
+
+
+(define/cond-fme-contract (sli-union orig addition)
+  (-> sli? sli? (or/c #f sli?))
+  (let loop ([sys orig]
+             [additions addition])
+    (cond
+      [(not sys) #f]
+      [(set-empty? additions) sys]
+      [else
+       (loop (sli-add-leq sys (set-first additions))
+             (set-rest additions))])))
+
+(module+ test
+  (check-false (sli-union (set (leq (lexp* 0)
+                                    (lexp* '(1 y))))
+                          (set (leq (lexp* '(1 y))
+                                    (lexp* -1))))))
+
+
+(define/cond-fme-contract (sli-union/sat? orig addition)
+  (-> sli? sli? (or/c #f sli?))
+  (let ([sys* (sli-union orig addition)])
+    (if (and sys* (fme-sat? sys*))
+        sys*
+        #f)))
+
+;; takes an sli that may contain duplicate
+;; information (e.g. x <= 0 and x <= 1)
+;; and reduces is
+(define (reduce-sli s)
+  (let loop ([s (set)]
+             [ineqs s])
+    (cond
+    [(not s) #f]
+    [(set-empty? ineqs) s]
+    [else (loop (sli-add-leq s (set-first ineqs)) (set-rest ineqs))])))
+
+(module+ test
+  (check-false (reduce-sli (set (leq (lexp* 0)
+                                     (lexp* '(1 y)))
+                                (leq (lexp* '(1 y))
+                                     (lexp* -1))))))
+
+(define (reduce-sli/sat? s)
+  (let ([s (reduce-sli s)])
+    (and s (fme-sat? s) s)))
+
+(module+ test
+  (check-false (reduce-sli/sat? (set (leq (lexp* 0)
+                                          (lexp* '(1 y)))
+                                     (leq (lexp* '(1 y))
+                                          (lexp* -1))))))

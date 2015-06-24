@@ -20,9 +20,10 @@
          racket/extflonum
          ;; Needed for current implementation of typechecking letrec-syntax+values
          ;; and for *'s special case
-         (for-template (only-in racket/base letrec-values *)
+         (for-template (only-in racket/base letrec-values * vector-ref vector-set!)
                        ;; see tc-app-contracts.rkt
                        racket/contract/private/provide)
+         (for-template typed/safe/ops)
 
          (for-label (only-in '#%paramz [parameterization-key pz:pk])
                     (only-in racket/private/class-internal find-method/who)))
@@ -203,6 +204,46 @@
                  fs
                  obj)]
            [else res]))]
+
+      ;; SAFE-VECTOR-REF-TEST!
+      #;[(#%plain-app (~literal vector-ref) v-exp i-exp)
+       ;; try safe-vector-ref
+       (define safe-result?
+         (parameterize ([current-type-error? #f])
+           (with-handlers ([exn:fail:syntax? (λ (_) #f)])
+             (dynamic-wind
+              (λ () (save-errors!))
+              (λ ()
+                (let ([result (tc/app (syntax/loc form (#%plain-app safe-vector-ref v-exp i-exp))
+                                      expected)])
+                  (and (not (current-type-error?)) result)))
+              (λ () (restore-errors!))))))
+       
+       (cond
+         [safe-result? (eprintf "\nSAFE-VECTOR-REF ^ SUCCESS ^ ~a\n" form)
+                       safe-result?]
+         [else (eprintf "\nSAFE-VECTOR-REF ^ FAILURE ^ ~a\n" form)
+               (tc/app form expected)])]
+
+      ;; SAFE-VECTOR-SET!-TEST!
+      #;[(#%plain-app (~literal vector-set!) v-exp i-exp val-exp)
+       ;; try safe-vector-ref
+       (define safe-result?
+         (parameterize ([current-type-error? #f])
+           (with-handlers ([exn:fail:syntax? (λ (_) #f)])
+             (dynamic-wind
+              (λ () (save-errors!))
+              (λ ()
+                (let ([result (tc/app (syntax/loc form (#%plain-app safe-vector-set! v-exp i-exp val-exp))
+                                      expected)])
+                  (and (not (current-type-error?)) result)))
+              (λ () (restore-errors!))))))
+       
+       (cond
+         [safe-result? (eprintf "\nSAFE-VECTOR-SET! ^ SUCCESS ^ ~a\n" form)
+                       safe-result?]
+         [else (eprintf "\nSAFE-VECTOR-SET! ^ FAILURE ^ ~a\n" form)
+               (tc/app form expected)])]
 
       ;; application
       [(#%plain-app . _)

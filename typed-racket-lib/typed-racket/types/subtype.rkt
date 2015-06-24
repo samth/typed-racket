@@ -34,7 +34,6 @@
 ;; is s a subtype of t?
 ;; type type -> boolean
 (define (subtype s t #:env [env #f] #:obj [obj -empty-obj])
-  
   (and (subtype* (current-seen) s t env obj) #t))
 
 ;; are all the s's subtypes of all the t's?

@@ -2,10 +2,11 @@
 
 (require "../utils/utils.rkt"
          racket/list racket/match
+         racket/lazy-require ;racket/trace
          (prefix-in c: (contract-req))
          (rep type-rep filter-rep object-rep rep-utils)
+         (env type-env-structs)
          (types union subtype remove-intersect abbrev tc-result restrict))
-
 (provide/cond-contract
   [-and (c:->* () #:rest (c:listof Filter/c) Filter/c)]
   [-or (c:->* () #:rest (c:listof Filter/c) Filter/c)]
@@ -29,9 +30,9 @@
 (define (contradictory? f1 f2)
   (match* (f1 f2)
     [((TypeFilter: t1 p) (NotTypeFilter: t2 p))
-     (subtype t1 t2)]
+     (subtype t1 t2 #:env empty-env)]
     [((NotTypeFilter: t2 p) (TypeFilter: t1 p))
-     (subtype t1 t2)]
+     (subtype t1 t2 #:env empty-env)]
     [((TypeFilter: t1 p) (TypeFilter: t2 p))
      (not (overlap t1 t2))]
     [((Bot:) _) #t]
@@ -45,13 +46,12 @@
 (define (complementary? f1 f2)
   (match* (f1 f2)
     [((TypeFilter: t1 p) (NotTypeFilter: t2 p))
-     (subtype t2 t1)]
+     (subtype t2 t1 #:env empty-env)]
     [((NotTypeFilter: t2 p) (TypeFilter: t1 p))
-     (subtype t2 t1)]
+     (subtype t2 t1 #:env empty-env)]
     [((Top:) (Top:)) #t]
     [((? SLI? s1) (? SLI? s2)) (complementary-SLIs? s1 s2)]
     [(_ _) #f]))
-
 (define (name-ref=? a b)
   (or (equal? a b)
       (and (identifier? a)
@@ -75,9 +75,9 @@
      (for/or ([f (in-list fs)])
        (filter-equal? f f1))]
     [((TypeFilter: t1 p) (TypeFilter: t2 p))
-     (subtype t2 t1)]
+     (subtype t2 t1 #:env empty-env)]
     [((NotTypeFilter: t2 p) (NotTypeFilter: t1 p))
-     (subtype t2 t1)]
+     (subtype t2 t1 #:env empty-env)]
     [((NotTypeFilter: t1 p) (TypeFilter: t2 p))
      (not (overlap t1 t2))]
     [((? SLI? Q) (? SLI? P))
@@ -124,8 +124,6 @@
           (list -bot)
           (filter-not Top? raw-results))))
 
-
-
 ;; invert-filter: Filter/c -> Filter/c
 ;; Logically inverts a filter.
 (define (invert-filter p)
@@ -138,6 +136,8 @@
     [(OrFilter: fs) (apply -and (map invert-filter fs))]
     [(ImpFilter: f1 f2) (-and f1 (invert-filter f2))]
     [(? SLI? s) (SLI-negate s)]))
+
+
 
 ;; -imp: Filter/c Filter/c -> Filter/c
 ;; Smart constructor for make-ImpFilter
@@ -317,3 +317,12 @@
           (for/list ([f (in-list ts)]) -no-filter)
           (for/list ([f (in-list ts)]) -no-obj)
           dty dbound)]))
+
+
+;(trace contradictory?)
+;(trace complementary?)
+;(trace implied-atomic?)
+;(trace compact)
+;(trace invert-filter)
+;(trace -or)
+;(trace -and)

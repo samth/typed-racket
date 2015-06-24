@@ -7,7 +7,6 @@
 ;; but split here for performance
 
 (require "../utils/utils.rkt"
-         racket/keyword-transform racket/list racket/lazy-require
          (for-syntax syntax/parse racket/base)
          (contract-req)                       
          (env lookup global-env mvar-env type-env-structs)
@@ -20,7 +19,8 @@
 
 (provide lexical-env 
          with-lexical-env 
-         update-type/lexical)
+         update-type/lexical
+         with-empty-env)
 (provide/cond-contract
  [lookup-type/lexical ((identifier?) (env? #:fail (or/c #f (-> any/c (or/c Type/c #f)))) 
                                      . ->* . (or/c Type/c #f))]
@@ -32,6 +32,9 @@
 ;; run code in a new env
 (define-syntax-rule (with-lexical-env e . b)
   (parameterize ([lexical-env e]) . b))
+
+(define-syntax-rule (with-empty-env . b)
+  (parameterize ([lexical-env empty-env]) . b))
 
 
 ;; find the type of identifier i, looking first in the lexical env, then in the top-level env

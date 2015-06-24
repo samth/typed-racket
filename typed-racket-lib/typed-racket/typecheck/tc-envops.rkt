@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require (rename-in "../utils/utils.rkt" [infer infer-in]))
-(require racket/match racket/list
+(require racket/match racket/list ;racket/trace
          (only-in unstable/list list-update)
          (for-syntax racket/base syntax/parse)
          (contract-req)
@@ -242,4 +242,5 @@
 ;; WARNING! does not reason about nested props in refinements
 (define-syntax-rule (with-lexical-env/naive-extend-types ids types . b)
   (with-lexical-env (naive-extend/id-types (lexical-env) (map cons ids types)) . b))
+
 
