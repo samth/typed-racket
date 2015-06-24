@@ -61,27 +61,27 @@
 ;; is f1 implied by f2?
 (define (implied-atomic? f1 f2)
   (match* (f1 f2)
-    [(f f) #t]
+    [(_ _) #:when (= (Rep-seq f1) (Rep-seq f2)) #t]
     [((Top:) _) #t]
     [(_ (Bot:)) #t]
+    [((? SLI? Q) (? SLI? P))
+     (SLI-implies? P Q)]
     [((OrFilter: ps) (OrFilter: qs))
      (for/and ([q (in-list qs)])
        (for/or ([p (in-list ps)])
-         (filter-equal? p q)))]
+         (implied-atomic? p q)))]
     [((OrFilter: fs) f2)
      (for/or ([f (in-list fs)])
-       (filter-equal? f f2))]
+       (implied-atomic? f f2))]
     [(f1 (AndFilter: fs))
      (for/or ([f (in-list fs)])
-       (filter-equal? f f1))]
+       (implied-atomic? f1 f))]
     [((TypeFilter: t1 p) (TypeFilter: t2 p))
      (subtype t2 t1 #:env empty-env)]
     [((NotTypeFilter: t2 p) (NotTypeFilter: t1 p))
      (subtype t2 t1 #:env empty-env)]
     [((NotTypeFilter: t1 p) (TypeFilter: t2 p))
      (not (overlap t1 t2))]
-    [((? SLI? Q) (? SLI? P))
-     (SLI-implies? P Q)]
     [(_ _) #f]))
 
 (define (hash-name-ref i)
@@ -167,41 +167,40 @@
              [result null])
     (match fs
       [(list) (distribute (compact result #t))]
-      [(cons f fs*)
-       (match f
-         [(Top:) f]
-         [(OrFilter: disjs) (loop (append disjs fs*) result)]
-         [(Bot:) (loop fs* result)]
-         [_ (cond 
-              ;; check for complements of 'f' in the rest of 'fs'
-              [(for/or ([f* (in-list fs*)])
-                 (complementary? f* f))
-               -top]
-              ;; check for complements or stronger statements 
-              ;; than 'f' in 'result'
-              [(let*-values 
-                   ([(f-seq) (Rep-seq f)]
-                    [(_ res) (for/fold ([stop? #f]
-                                        [ret-thunk #f])
-                                       ([f* (in-list result)])
-                               #:break stop?
-                               (cond
-                                 ;; if there is a complement of 'f'
-                                 ;; stop processing, return -top
-                                 [(complementary? f f*)
-                                  (values #t (λ () -top))]
-                                 ;; if 'f' implies something in 'result'
-                                 ;; continue in case there is a complement
-                                 ;; but save the fact that we'll not include 'f'
-                                 [(and (not ret-thunk)
-                                       (or (= (Rep-seq f*) f-seq)
-                                           (implied-atomic? f* f)))
-                                  (values #f (λ () (loop fs* result)))]
-                                 ;; no issues with 'f' yet, continue
-                                 [else (values #f ret-thunk)]))])
-                 res) => (λ (thunk) (thunk))]
-              [else
-               (loop fs* (cons f result))])])])))
+      [(cons f rst)
+       (cond
+         [(Top? f) f]
+         [(OrFilter? f) (loop (append (OrFilter-fs f) rst) result)]
+         [(Bot? f) (loop rst result)]
+         ;; check for complements of 'f' in the other props
+         [(let ([complement? (λ (f*) (complementary? f f*))])
+            (or (ormap complement? rst)
+                (ormap complement? result)))
+          -top]
+         [else
+          ;; get rid of duplicate info
+          (define-values (keeping-f? result*)
+            (let loop ([to-check result]
+                       [checked null])
+              (match to-check
+                [(list) (values #t checked)]
+                [(cons p ps)
+                 (cond
+                   ;; the new prop is more specific than a prop we already know
+                   ;; so we're done (we don't want the more specific in our disjunct)
+                   [(implied-atomic? p f)
+                    (values #f result)]
+                   ;; we found an already processed prop more specific than this new prop
+                   ;; so we'll keep the new prop instead of this more specific old one
+                   [(implied-atomic? f p)
+                    (loop ps checked)]
+                   ;; the props are unrelated, keep em both
+                   [else (loop ps (cons p checked))])])))
+          (cond
+            ;; f should be in our disjunct (as far as we care to check), add it to our sifted results
+            [keeping-f? (loop rst (cons f result*))]
+            ;; f is more specific than something already in our disjunct
+            [else (loop rst result*)])])])))
 
 (define (-and . args)
   (define mk
@@ -215,11 +214,15 @@
         [(cons (AndFilter: fs*) fs) (loop fs (append fs* results))]
         [(cons f fs) (loop fs (cons f results))])))
   ;; Move all the type filters up front as they are the stronger props
-  (define-values (filters other-args)
-    (partition (λ (f) (or (TypeFilter? f) (NotTypeFilter? f)))
-               (flatten-ands (remove-duplicates args eq? #:key Rep-seq))))
-  (define-values (type-filters not-type-filters)
-    (partition TypeFilter? filters))
+  ;; this reverse really shouldn't be necc, but is at the moment...
+  ;; (else let related typecheck unit test fails) TODO: investigate!
+  (define-values (type-filters not-type-filters other-args)
+    (for/fold ([tfs null] [ntfs null] [ofs null])
+              ([f (in-list (reverse (flatten-ands (remove-duplicates args eq? #:key Rep-seq))))])
+      (cond
+        [(TypeFilter? f) (values (cons f tfs) ntfs ofs)]
+        [(NotTypeFilter? f) (values tfs (cons f ntfs) ofs)]
+        [else (values tfs ntfs (cons f ofs))])))
   (let loop ([fs (append type-filters not-type-filters other-args)]
              [slis null]
              [result null])
@@ -229,41 +232,43 @@
        (if (memf Bot? ps)
            -bot
            (apply mk (append slis ps)))]
-      [(cons f fs*)
-       (match f
-         [(and t (Bot:))
-          t]
-         [(Top:) (loop fs* slis result)]
-         [(? SLI? s)
-         (let ([slis* (add-SLI s slis)])
-            (if (Bot? slis*)
-                -bot
-                (loop fs* slis* result)))]
-         [t (cond 
-              ;; check for contraditions with 'f' in the rest of 'fs'
-              [(for/or ([f (in-list fs*)])
-                 (contradictory? f t))
-               -bot]
-              ;; check for contradictions or stronger statements 
-              ;; than 'f' in 'result'
-              [(let ([t-seq (Rep-seq t)])
-                 (let inner-loop ([l result]
-                                  [thunk #f])
-                   (match l
-                     [(list) thunk]
-                     [(cons f l*) 
-                      (cond
-                        [(contradictory? f t) 
-                         -bot]
-                        [(and (not thunk)
-                              (or (= (Rep-seq f) t-seq)
-                                  (implied-atomic? t f)))
-                         (inner-loop l* (λ () (loop fs* slis result)))]
-                        [else (inner-loop l* thunk)])])))
-               => (λ (thunk) (thunk))]
-              ;; 'f' must be new info (as far as we care to check),
-              ;; continue w/ 'f' in the result
-              [else (loop fs* slis (cons t result))])])])))
+      [(cons f rst)
+       (cond
+         [(Bot? f) f] ;; bottom, bail
+         [(Top? f) (loop rst slis result)] ;; top, continue
+         [(SLI? f) ;; SLI, add it to the other SLis
+          (define slis* (add-SLI f slis))
+          (if (Bot? slis*) -bot (loop rst slis* result))]
+         ;; check for 'contradictory?' props in the results thus far
+         [(let ([contradiction? (λ (f*) (contradictory? f f*))])
+            (or (ormap contradiction? rst)
+                (ormap contradiction? result)))
+          -bot]
+         [else
+          ;; get rid of any props in result weaker than this one,
+          ;; or if this is weaker than one we already have in results
+          ;; omit it
+          (define-values (keeping-f? result*)
+            (let loop ([to-check result]
+                       [checked null])
+              (match to-check
+                [(list) (values #t checked)]
+                [(cons p ps)
+                 (cond
+                   ;; this new prop is actually weaker than one we already know!
+                   ;; just forget about it and continue along our way
+                   [(implied-atomic? f p)
+                    (values #f result)]
+                   ;; this prop we already knew is weaker than the new one, so
+                   ;; ditch the old weaker prop
+                   [(implied-atomic? p f)
+                    (loop ps checked)]
+                   [else (loop ps (cons p checked))])])))
+          (cond
+            ;; f is new (as far as we care to check), add it to our sifted results
+            [keeping-f? (loop rst slis (cons f result*))]
+            ;; f is already known
+            [else (loop rst slis result*)])])])))
 
 ;; add-unconditional-prop: tc-results? Filter/c? -> tc-results?
 ;; Ands the given proposition to the filters in the tc-results.

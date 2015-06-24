@@ -55,7 +55,7 @@
          sli-add-leq
          reduce-sli/sat?)
 
-(define-for-syntax enable-fme-contracts? #t)
+(define-for-syntax enable-fme-contracts? #f)
 
 (define-match-expander lexp:
   (lambda (stx)
