@@ -53,7 +53,8 @@
          sli-union/sat?
          reduce-sli
          sli-add-leq
-         reduce-sli/sat?)
+         reduce-sli/sat?
+         fme-imp-leq?)
 
 (define-for-syntax enable-fme-contracts? #f)
 

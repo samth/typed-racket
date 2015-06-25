@@ -28,7 +28,7 @@
   (match cs
     [(struct cset (maps))
      (make-cset (for/list ([(map dmap) (in-pairs maps)])
-                  (cons (hash-set map var (make-c S T obj))
+                  (cons (hash-set map var (make-c S T (or obj -empty-obj)))
                         dmap)))]))
 
 ;; meet: Type Type -> Type
@@ -47,9 +47,10 @@
 
 (define (join-objs o o*)
   (cond
-    [(or (object-equal? o o*)
-         (and (non-empty-obj? o)
-              (not (non-empty-obj? o*))))
+    [(and o
+          (or (object-equal? o o*)
+              (and (non-empty-obj? o)
+                   (not (non-empty-obj? o*)))))
      o]
     [else -empty-obj]))
 

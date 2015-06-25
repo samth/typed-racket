@@ -6,6 +6,7 @@
                     -> ->* one-of/c)
          (rep type-rep filter-rep object-rep rep-utils)
          (typecheck tc-subst check-below)
+         (types remove-intersect) ; for overlap
          (contract-req))
 
 (provide abstract-results
@@ -110,14 +111,49 @@
     [(tc-results (list (tc-result: _ (FilterSet: f+ f-) _) ...) _)
      (apply -and (map -or f+ f-))]))
 
+
+(define (extract-SLIs prop)
+  (match prop
+    [(? SLI?) (values -top (list prop))]
+    [(AndFilter: fs)
+     (define-values (slis non-slis) (partition SLI? fs))
+     (cond
+       [(null? slis) (values prop (list))]
+       [(null? non-slis) (values -top slis)]
+       [(null? (cdr non-slis)) (values (car non-slis) slis)]
+       [else (values (make-AndFilter non-slis) slis)])]
+    [_ (values prop (list))]))
+
 (define (merge-tc-results results)
-  (define/match (merge-tc-result r1 r2)
-    [((tc-result: t1 (FilterSet: f1+ f1-) o1)
-      (tc-result: t2 (FilterSet: f2+ f2-) o2))
-     (tc-result
-       (Un t1 t2)
-       (-FS (-or f1+ f2+) (-or f1- f2-))
-       (if (equal? o1 o2) o1 -empty-obj))])
+  (define (merge-tc-result r1 r2)
+    (match* (r1 r2)
+      [((tc-result: t1 (FilterSet: f1+ f1-) o1)
+        (tc-result: t2 (FilterSet: f2+ f2-) o2))
+       (define merged-ty (Un t1 t2))
+       (let-values ([(f1+ slis1+) (extract-SLIs f1+)]
+                    [(f2+ slis2+) (extract-SLIs f2+)]
+                    [(f1- slis1-) (extract-SLIs f1-)]
+                    [(f2- slis2-) (extract-SLIs f2-)])
+         ;; Do not put SLIs in disjuctions. Check that they must be true,
+         ;; or do not include them (this is to avoid blow up in files
+         ;; with lots of numeric reasoning -- there may be a more principled
+         ;; approach to handling this...)
+         (define slis+
+           (cond
+             [(or (Bot? f1+) (type-equal? t1 (-val #f))) slis2+]
+             [(or (Bot? f2+) (type-equal? t2 (-val #f))) slis1+]
+             [else (filter (λ (s) (memf (λ (s*) (object-equal? s* s)) slis1+)) slis2+)]))
+         (define slis-
+           (cond
+             [(or (Bot? f1-) (not (overlap t1 (-val #f)))) slis2-]
+             [(or (Bot? f2-) (not (overlap t2 (-val #f)))) slis1-]
+             [else (filter (λ (s) (memf (λ (s*) (object-equal? s* s)) slis1-)) slis2-)]))
+         (define f+ (apply -and (-or f1+ f2+) slis+))
+         (define f- (apply -and (-or f1- f2-) slis-))
+         (tc-result
+          merged-ty
+          (-FS f+ f-)
+          (if (equal? o1 o2) o1 -empty-obj)))]))
 
   (define/match (same-dty? r1 r2)
     [(#f #f) #t]

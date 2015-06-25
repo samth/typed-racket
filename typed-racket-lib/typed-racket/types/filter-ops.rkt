@@ -30,15 +30,15 @@
 (define (contradictory? f1 f2)
   (match* (f1 f2)
     [((TypeFilter: t1 p) (NotTypeFilter: t2 p))
-     (subtype t1 t2 #:env empty-env)]
+     (subtype t1 t2)]
     [((NotTypeFilter: t2 p) (TypeFilter: t1 p))
-     (subtype t1 t2 #:env empty-env)]
+     (subtype t1 t2)]
     [((TypeFilter: t1 p) (TypeFilter: t2 p))
      (not (overlap t1 t2))]
     [((Bot:) _) #t]
     [(_ (Bot:)) #t]
     [((? SLI? s1) (? SLI? s2))
-     (Bot? (SLI-try-join s1 s2))]
+     (conservative-contradictory-SLIs? s1 s2)]
     [(_ _) #f]))
 
 ;; complementary: Filter/c Filter/c -> boolean?
@@ -46,11 +46,12 @@
 (define (complementary? f1 f2)
   (match* (f1 f2)
     [((TypeFilter: t1 p) (NotTypeFilter: t2 p))
-     (subtype t2 t1 #:env empty-env)]
+     (subtype t2 t1)]
     [((NotTypeFilter: t2 p) (TypeFilter: t1 p))
-     (subtype t2 t1 #:env empty-env)]
+     (subtype t2 t1)]
     [((Top:) (Top:)) #t]
-    [((? SLI? s1) (? SLI? s2)) (complementary-SLIs? s1 s2)]
+    [((? SLI? s1) (? SLI? s2))
+     (conservative-complementary-SLIs? s1 s2)]
     [(_ _) #f]))
 (define (name-ref=? a b)
   (or (equal? a b)
@@ -66,20 +67,24 @@
     [(_ (Bot:)) #t]
     [((? SLI? Q) (? SLI? P))
      (SLI-implies? P Q)]
-    [((OrFilter: ps) (OrFilter: qs))
-     (for/and ([q (in-list qs)])
-       (for/or ([p (in-list ps)])
-         (implied-atomic? p q)))]
-    [((OrFilter: fs) f2)
-     (for/or ([f (in-list fs)])
-       (implied-atomic? f f2))]
+    [((OrFilter: qs) (OrFilter: ps))
+     (for/and ([p (in-list ps)])
+       (for/or ([q (in-list qs)])
+         (or (filter-equal? q p)
+             (and (SLI? q) (SLI? p)
+                  (SLI-implies? p q)))))]
+    [((OrFilter: qs) p)
+     (for/or ([q (in-list qs)])
+       (or (filter-equal? q p)
+           (and (SLI? q) (SLI? p)
+                (SLI-implies? p q))))]
     [(f1 (AndFilter: fs))
      (for/or ([f (in-list fs)])
-       (implied-atomic? f1 f))]
+       (filter-equal? f f1))]
     [((TypeFilter: t1 p) (TypeFilter: t2 p))
-     (subtype t2 t1 #:env empty-env)]
+     (subtype t2 t1)]
     [((NotTypeFilter: t2 p) (NotTypeFilter: t1 p))
-     (subtype t2 t1 #:env empty-env)]
+     (subtype t2 t1)]
     [((NotTypeFilter: t1 p) (TypeFilter: t2 p))
      (not (overlap t1 t2))]
     [(_ _) #f]))

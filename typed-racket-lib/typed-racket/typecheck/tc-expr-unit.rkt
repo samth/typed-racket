@@ -21,6 +21,7 @@
          ;; Needed for current implementation of typechecking letrec-syntax+values
          ;; and for *'s special case
          (for-template (only-in racket/base letrec-values * vector-ref vector-set!)
+                       (only-in racket/unsafe/ops unsafe-vector-ref unsafe-vector-set!)
                        ;; see tc-app-contracts.rkt
                        racket/contract/private/provide)
          (for-template typed/safe/ops)
@@ -109,6 +110,21 @@
                           (string-append (syntax-e msg) "; missing coverage of ~a")
                           t))]
          [else (tc-error/expr #:stx stx (syntax-e msg))]))
+
+
+(define safe-counter 0)
+(define (safe-counter++!)
+  (set! safe-counter (add1 safe-counter)))
+
+(define safe-check-box (box 'uninit))
+(define (safe-checking?)
+  (define val (unbox safe-check-box))
+  (cond
+    [(eq? val 'uninit)
+     (let ([env-val (getenv "PLT_DTR_SAFECHECK")])
+       (set-box! safe-check-box env-val)
+       env-val)]
+    [else val]))
 
 ;; tc-expr/check/internal : syntax maybe[tc-results] -> tc-results
 (define/cond-contract (tc-expr/check/internal form expected)
@@ -205,8 +221,12 @@
                  obj)]
            [else res]))]
 
-      ;; SAFE-VECTOR-REF-TEST!
-      #;[(#%plain-app (~literal vector-ref) v-exp i-exp)
+      ;; 'SAFE-VECTOR-REF?' TEST!
+      [(#%plain-app (~and vec-ref:id (~or (~literal vector-ref)
+                                          (~literal unsafe-vector-ref)))
+                    v-exp
+                    i-exp)
+       #:when (safe-checking?)
        ;; try safe-vector-ref
        (define safe-result?
          (parameterize ([current-type-error? #f])
@@ -218,15 +238,32 @@
                                       expected)])
                   (and (not (current-type-error?)) result)))
               (λ () (restore-errors!))))))
-       
+       (safe-counter++!)
        (cond
-         [safe-result? (eprintf "\nSAFE-VECTOR-REF ^ SUCCESS ^ ~a\n" form)
+         [safe-result? (eprintf "\n[~a] ^ ~a ^ YES ^ ~a ^ ~a\n"
+                                safe-counter
+                                (syntax->datum #'vec-ref)
+                                (syntax->datum form)
+                                (or (syntax-source form)
+                                    (syntax-source #'v-exp)
+                                    (syntax-source #'i-exp)))
                        safe-result?]
-         [else (eprintf "\nSAFE-VECTOR-REF ^ FAILURE ^ ~a\n" form)
+         [else (eprintf "\n[~a] ^ ~a ^ NO ^ ~a ^ ~a\n"
+                        safe-counter
+                        (syntax->datum #'vec-ref)
+                        (syntax->datum form)
+                        (or (syntax-source form)
+                            (syntax-source #'v-exp)
+                            (syntax-source #'i-exp)))
                (tc/app form expected)])]
 
       ;; SAFE-VECTOR-SET!-TEST!
-      #;[(#%plain-app (~literal vector-set!) v-exp i-exp val-exp)
+      [(#%plain-app (~and vec-set:id (~or (~literal vector-set!)
+                                          (~literal unsafe-vector-set!)))
+                    v-exp
+                    i-exp
+                    val-exp)
+       #:when (safe-checking?)
        ;; try safe-vector-ref
        (define safe-result?
          (parameterize ([current-type-error? #f])
@@ -238,11 +275,23 @@
                                       expected)])
                   (and (not (current-type-error?)) result)))
               (λ () (restore-errors!))))))
-       
+       (safe-counter++!)
        (cond
-         [safe-result? (eprintf "\nSAFE-VECTOR-SET! ^ SUCCESS ^ ~a\n" form)
+         [safe-result? (eprintf "\n[~a] ^ ~a ^ YES ^ ~a ^ ~a\n"
+                                safe-counter
+                                (syntax->datum #'vec-set)
+                                (syntax->datum form)
+                                (or (syntax-source form)
+                                    (syntax-source #'v-exp)
+                                    (syntax-source #'i-exp)))
                        safe-result?]
-         [else (eprintf "\nSAFE-VECTOR-SET! ^ FAILURE ^ ~a\n" form)
+         [else (eprintf "\n[~a] ^ ~A ^ NO ^ ~a ^ ~a\n"
+                        safe-counter
+                        (syntax->datum #'vec-set)
+                        (syntax->datum form)
+                        (or (syntax-source form)
+                            (syntax-source #'v-exp)
+                            (syntax-source #'i-exp)))
                (tc/app form expected)])]
 
       ;; application

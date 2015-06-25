@@ -5,7 +5,8 @@
          (env lexical-env)
          (private type-annotation)
          (rep type-rep)
-         (for-label racket/base))
+         (types numeric-tower)
+         (for-label racket/base racket/unsafe/ops typed/safe/ops))
 
 (provide/cond-contract [find-annotation (syntax? identifier? . -> . (or/c #f Type/c))])
 
@@ -42,7 +43,7 @@
            #:with (expr ...) #'()))
 
 (define-literal-set find-annotation-literals #:for-label
-    (reverse))
+    (reverse vector-ref unsafe-vector-ref safe-vector-ref vector-set! unsafe-vector-set! safe-vector-set!))
 
 (define (unrefine t)
   (and t
@@ -58,24 +59,38 @@
 ;; where x has a type annotation, return that annotation, otherwise #f
 (define (find-annotation stx name)
   (define (find s) (find-annotation s name))
-  (define (match? b)
+  (define ((match? body) b)
     (syntax-parse b
       #:literal-sets (kernel-literals find-annotation-literals)
       [c:lv-clause
        #:with n:id #'c.e
        #:with (v) #'(c.v ...)
        #:fail-unless (free-identifier=? name #'n) #f
-       (unrefine (or (type-annotation #'v) (lookup-type/lexical #'v #:fail (lambda _ #f))))]
+       (unrefine (or (type-annotation #'v)
+                     (lookup-type/lexical #'v #:fail (lambda _ #f))
+                     (and (let ([t (find-annotation body #'v)])
+                            (and t (type-equal? -Nat t)))
+                          -Nat)))]
       [c:lv-clause
        #:with (#%plain-app reverse n:id) #'c.e
        #:with (v) #'(c.v ...)
        #:fail-unless (free-identifier=? name #'n) #f
        (unrefine (or (type-annotation #'v) (lookup-type/lexical #'v #:fail (lambda _ #f))))]
+      [c:lv-clause
+       #:with rhs:expr #'c.e
+       #:with (v) #'(c.v ...)
+       (unrefine (find #'rhs))]
       [_ #f]))
   (syntax-parse stx
-    #:literal-sets (kernel-literals)
+    #:literal-sets (kernel-literals find-annotation-literals)
     [(let-values cls:lv-clauses body)
-     (or (ormap match? (syntax->list #'cls))
-	 (find #'body))]
+     (or (ormap (match? #'body) (syntax->list #'cls))
+         (find #'body))]
+    [(#%plain-app (~or vector-ref unsafe-vector-ref safe-vector-ref) _ n:id)
+     #:when (free-identifier=? name #'n)
+     -Nat]
+    [(#%plain-app (~or vector-set! unsafe-vector-set! safe-vector-set!) _ n:id _)
+     #:when (free-identifier=? name #'n)
+     -Nat]
     [e:core-expr
      (ormap find (syntax->list #'(e.expr ...)))]))

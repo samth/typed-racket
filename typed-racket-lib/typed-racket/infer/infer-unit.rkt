@@ -391,7 +391,7 @@
           [(dcon-exact fixed rest)
            (dcon-exact (map elim-in-c fixed) (elim-in-c rest))]
           [(dcon-dotted cs c bound)
-           (dcon-exact (map elim-in-c cs) (elim-in-c c) bound)])))))
+           (dcon-dotted (map elim-in-c cs) (elim-in-c c) bound)])))))
   
   (cons cm* dm*))
 
@@ -454,7 +454,7 @@
        ;; immutable - covariant
        [((fld: s _ #f) (fld: t _ #f)) (cgen context s t)]))))
 
-(define (cgen/inv context s t #:obj [obj -empty-obj])
+(define (cgen/inv context s t #:obj [obj -empty-obj]) ;; MARK
   (% cset-meet (cgen context s t #:obj obj) (cgen context t s #:obj obj)))
 
 
@@ -464,10 +464,11 @@
 ;; produces a cset which determines a substitution that makes S a subtype of T
 ;; implements the V |-_X S <: T => C judgment from Pierce+Turner, extended with
 ;; the index variables from the TOPLAS paper
-(define/cond-contract (cgen context S T #:obj [obj -empty-obj])
+(define/cond-contract (cgen context S T #:obj [current-object -empty-obj])
   ((context? (or/c Values/c ValuesDots? AnyValues?) (or/c Values/c ValuesDots? AnyValues?))
    (#:obj Object?)
    . ->* . (or/c #f cset?))
+  (define obj (or current-object -empty-obj))
   ;; useful quick loop
   (define/cond-contract (cg S T obj)
     (Type/c Type/c Object? . -> . (or/c #f cset?))
@@ -539,7 +540,7 @@
          
          ;; they're subtypes. easy.
          [(a b) 
-          #:when (subtype a b #:obj obj)
+          #:when (subtype a b #:obj current-object)
           empty]
          
          ;; Lists delegate to sequences
@@ -548,7 +549,7 @@
          
          ;; refinements are erased to their bound
          [((Refinement: S _) T)
-          (cg S T obj)]
+          (cg S T current-object)]
          
          ;; variables that are in X and should be constrained
          ;; all other variables are compatible only with themselves
@@ -560,7 +561,7 @@
             [_ #f])
           #f
           ;; constrain v to be below T (but don't mention bounds)
-          (singleton (Un) v (var-demote T (context-bounds context)) obj)]
+          (singleton (Un) v (var-demote T (context-bounds context)) current-object)]
          
          [(S (F: (? (inferable-var? context) v)))
           #:return-when
@@ -569,20 +570,20 @@
             [_ #f])
           #f
           ;; constrain v to be above S (but don't mention bounds)
-          (singleton (var-promote S (context-bounds context)) v Univ obj)]
+          (singleton (var-promote S (context-bounds context)) v Univ current-object)]
          
          ;; recursive names should get resolved as they're seen
          [(s (? Name? t))
-          (cg s (resolve-once t) obj)]
+          (cg s (resolve-once t) current-object)]
          [((? Name? s) t)
-          (cg (resolve-once s) t obj)]
+          (cg (resolve-once s) t current-object)]
          
          ;; constrain b1 to be below T, but don't mention the new vars
-         [((Poly: v1 b1) T) (cgen (context-add context #:bounds v1) b1 T #:obj obj)]
+         [((Poly: v1 b1) T) (cgen (context-add context #:bounds v1) b1 T #:obj current-object)]
          
          ;; constrain *each* element of es to be below T, and then combine the constraints
          [((Union: es) T)
-          (define cs (for/list/fail ([e (in-list es)]) (cg e T obj)))
+          (define cs (for/list/fail ([e (in-list es)]) (cg e T current-object)))
           (and cs (cset-meet* (cons empty cs)))]
          
          ;; find *an* element of es which can be made to be a supertype of S
@@ -591,7 +592,7 @@
          [(S (Union: es))
           (cset-join
            (for*/list ([e (in-list es)]
-                       [v (in-value (cg S e obj))]
+                       [v (in-value (cg S e current-object))]
                        #:when v)
              v))]
          
@@ -622,11 +623,11 @@
          [((Name: n _ #t) (Name: n* _ #t))
           (if (free-identifier=? n n*)
               empty ;; just succeed now
-              (% cg (resolve-once S) (resolve-once T) obj))]
+              (% cg (resolve-once S) (resolve-once T) current-object))]
          ;; pairs are pointwise
          [((Pair: a b) (Pair: a* b*))
-          (let ([lhs-cs (cg a a* (-car-of obj))]
-                 [rhs-cs (cg b b* (-cdr-of obj))])
+          (let ([lhs-cs (cg a a* (-car-of current-object))]
+                 [rhs-cs (cg b b* (-cdr-of current-object))])
             (% cset-meet lhs-cs rhs-cs))]
          
          ;; sequences are covariant
@@ -636,17 +637,17 @@
           (cg t t* -empty-obj)]
          [((Pair: t1 t2) (Sequence: (list t*)))
           (% cset-meet
-             (cg t1 t* (-car-of obj))
-             (cg t2 (-lst t*) (-cdr-of obj)))]
+             (cg t1 t* (-car-of current-object))
+             (cg t2 (-lst t*) (-cdr-of current-object)))]
          [((MListof: t) (Sequence: (list t*)))
           (cg t t* -empty-obj)]
          ;; To check that mutable pair is a sequence we check that the cdr is
          ;; both an mutable list and a sequence
          [((MPair: t1 t2) (Sequence: (list t*)))
           (% cset-meet
-             (cg t1 t* (-car-of obj))
-             (cg t2 T (-cdr-of obj))
-             (cg t2 (Un -Null (make-MPairTop)) (-cdr-of obj)))]
+             (cg t1 t* (-car-of current-object))
+             (cg t2 T (-cdr-of current-object))
+             (cg t2 (Un -Null (make-MPairTop)) (-cdr-of current-object)))]
          [((List: ts) (Sequence: (list t*)))
           (% cset-meet* (for/list/fail ([t (in-list ts)])
                                        (cg t t* -empty-obj)))]
@@ -682,7 +683,7 @@
          [((Base: _ _ _ #t) (Sequence: (list t*)))
           (define type
             (for/or ([t (in-list (list -Byte -Index -NonNegFixnum -Nat))])
-              (and (subtype S t #:obj obj) t)))
+              (and (subtype S t #:obj current-object) t)))
           (% cg type t* -empty-obj)]
          [((Hashtable: k v) (Sequence: (list k* v*)))
           (cgen/list context (list k v) (list k* v*))]
@@ -691,20 +692,20 @@
          
          ;; Mu's just get unfolded
          ;; We unfold S first so that unions are handled in S before T
-         [((? Mu? s) t) (cg (unfold s) t obj)]
-         [(s (? Mu? t)) (cg s (unfold t) obj)]
+         [((? Mu? s) t) (cg (unfold s) t current-object)]
+         [(s (? Mu? t)) (cg s (unfold t) current-object)]
          
          ;; resolve applications
          [((App: _ _ _) _)
-          (% cg (resolve-once S) T obj)]
+          (% cg (resolve-once S) T current-object)]
          [(_ (App: _ _ _))
-          (% cg S (resolve-once T) obj)]
+          (% cg S (resolve-once T) current-object)]
          
          ;; If the struct names don't match, try the parent of S
          ;; Needs to be done after App and Mu in case T is actually the current struct
          ;; but not currently visible
          [((Struct: nm (? Type? parent) _ _ _ _) other)
-          (cg parent other obj)]
+          (cg parent other current-object)]
          
          ;; Invariant here because struct types aren't subtypes just because the
          ;; structs are (since you can make a constructor from the type).
@@ -721,8 +722,8 @@
           (cg/inv e e* -empty-obj)]
          [((MPair: s t) (MPair: s* t*))
           (% cset-meet
-             (cg/inv s s* (-car-of obj))
-             (cg/inv t t* (-cdr-of obj)))]
+             (cg/inv s s* (-car-of current-object))
+             (cg/inv t t* (-cdr-of current-object)))]
          [((Channel: e) (Channel: e*))
           (cg/inv e e* -empty-obj)]
          [((Async-Channel: e) (Async-Channel: e*))
@@ -800,7 +801,7 @@
          ;; Refined Types
          [(t1 t2)
           #:when (or (Refine? t1) (Refine? t2))
-          (define o (or obj (-id-path (genid))))
+          (define o (if (non-empty-obj? current-object) current-object (-id-path (genid))))
           (match t1
             ;; t1 is a refined type
             [(Refine/obj: o rt1 rp1)

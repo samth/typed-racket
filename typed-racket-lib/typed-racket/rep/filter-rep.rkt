@@ -6,7 +6,7 @@
          "free-variance.rkt" "fme.rkt"
          racket/contract/base
          racket/match racket/dict
-         racket/list
+         racket/list racket/fixnum
          racket/lazy-require racket/set
          racket/function racket/stream
          (for-syntax racket/base)
@@ -23,7 +23,7 @@
          SLI-satisfiable?
          SLI-implies?
          SLIs-imply?
-         complementary-SLIs?
+         conservative-complementary-SLIs?
          SLI-paths
          add-SLI
          add-SLIs
@@ -34,6 +34,7 @@
          *Top
          equals-constant-SLI?
          SLIs-contain?
+         conservative-contradictory-SLIs?
          ;; the rest of the world doesn't know about 'Leq' vs 'leq'...
          ;; so they can just keep talking about leqs
          -leq
@@ -415,21 +416,18 @@
 ;; two SLIs s1 and s2 are complimentary iff
 ;; ~s1 --> s2  and  ~s2 --> s1
 ;; (i.e. just prove the Or of the two is a tautology)
-(define/cond-contract (complementary-SLIs? s1 s2)
+(define/cond-contract (conservative-complementary-SLIs? s1 s2)
   (-> SLI? SLI? boolean?)
-  (define sys1 (SLI-sys s1))
-  (define sys2 (SLI-sys s2))
+  (match-define (SLI: ps1 sys1) s1)
+  (match-define (SLI: ps2 sys2) s2)
   
   (and
-   ;; ~s1 --> s2?
-   (for/and ([leq1 (in-set sys1)])
-     (define sys* (set (leq-negate leq1)))
-     (fme-imp? sys* sys2))
-   ;; ~s2 --> s1
-   (for/and ([leq2 (in-set sys2)])
-     (define sys* (set (leq-negate leq2)))
-     (fme-imp? sys* sys1))
-   #t))
+   (equal? ps1 ps2)
+   (= 1 (set-count sys1) (set-count sys2))
+   ;; s2 --> ~s1?
+   (fme-imp-leq? (set (leq-negate (set-first sys1))) (set-first sys2))
+   ;; s1 --> ~s2?
+   (fme-imp-leq? (set (leq-negate (set-first sys2))) (set-first sys1))))
 
 ;; tests if the SLI is stating some Path is
 ;; equal to some exact integer, returning #f
@@ -466,11 +464,42 @@
        [(_ _) (int-err "equals-constant-SLI?:invalid ineq(s) ~a ~a" ineq1 ineq2)])]))
 
 
+;; ======== SLI cache -- DO NOT TOUCH PLZ ========
+(define SLI-cache (make-hasheq))
+(define (cache-answer->bool ans)
+  (match ans
+    ['yes #t]
+    ['no #f]))
+(define (SLI-cached? P Q)
+  (cond
+    [(hash-ref SLI-cache (Rep-seq P) #f)
+     => (λ (P-cache)
+          (hash-ref P-cache (Rep-seq Q) #f))]
+    [else #f]))
+(define (SLI-cache-set! P Q ans)
+  (when (> 25 (hash-count SLI-cache))
+    (set! SLI-cache (make-hasheq)))
+  (define Pkey (Rep-seq P))
+  (cond
+    [(hash-ref SLI-cache Pkey #f)
+     => (λ (P-cache)
+          (hash-set! P-cache (Rep-seq Q) (if ans 'yes 'no)))]
+    [else
+     (define P-cache (make-hasheq))
+     (hash-set! P-cache (Rep-seq Q) (if ans 'yes 'no))
+     (hash-set! SLI-cache Pkey P-cache)]))
+;; ========= END OF SLI cache ========
+
 (define/cond-contract (SLI-implies? sli1 sli2)
   (-> SLI? SLI? boolean?)
-  ;(printf "SLI-implies? || ~a  ||  ---->?  ||  ~a\n" sli1 sli2)
-  (fme-imp? (SLI-sys sli1) 
-            (SLI-sys sli2)))
+  (cond
+    [(SLI-cached? sli1 sli2)
+     => cache-answer->bool]
+    [else
+     (let ([imp? (fme-imp? (SLI-sys sli1) 
+                           (SLI-sys sli2))])
+       (SLI-cache-set! sli1 sli2 imp?)
+       imp?)]))
 
 (define/cond-contract (SLIs-imply? slis goal)
   (-> (listof SLI?) SLI? boolean?)
@@ -519,6 +548,11 @@
     #:break (Bot? accumulation)
     (add-SLI new-sli accumulation)))
 
+
+(define (conservative-contradictory-SLIs? s1 s2)
+  (match-let ([(SLI: _ sys1) s1]
+              [(SLI: _ sys2) s2])
+    (not (sli-union sys1 sys2))))
 
 (define (SLI->sexp s Path->sexp)
   (match s
