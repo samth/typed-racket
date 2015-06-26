@@ -7,7 +7,7 @@
          syntax/parse racket/match racket/list
          unstable/sequence unstable/syntax
          (typecheck signatures find-annotation)
-         (types abbrev utils generalize type-table)
+         (types abbrev utils generalize type-table numeric-tower)
          (private type-annotation syntax-properties)
          ;; Needed to construct args to tc/let-values
          (for-template racket/base)
@@ -63,12 +63,12 @@
       (actual actuals ...))
      #:when
      (and (free-identifier=? #'val #'val*)
-          (ormap (lambda (a) (find-annotation #'inner-body a))
+          (ormap (lambda (a) (find-annotation #'inner-body a #:try-vec-nat? #f))
                  (syntax->list #'(acc ...))))
      (let* ([ts1 (generalize (tc-expr/t #'actual))]
             [ann-ts (for/list ([a (in-syntax #'(acc ...))]
                                [ac (in-syntax #'(actuals ...))])
-                      (let ([type (find-annotation #'inner-body a)])
+                      (let ([type (find-annotation #'inner-body a #:try-vec-nat? #f)])
                         (if type
                             (tc-expr/check/t ac (ret type))
                             (generalize (tc-expr/t ac)))))]
@@ -111,10 +111,20 @@
      (let ([ts (for/list ([ac (in-syntax actuals)]
                           [f (in-syntax args)])
                  (let* ([infer-t (or (type-annotation f #:infer #t)
-                                     (find-annotation #'(begin . body*) f))])
-                   (if infer-t
-                       (tc-expr/check/t ac (ret infer-t))
-                       (generalize (tc-expr/t ac)))))])
+                                     (find-annotation #'(begin . body*) f #:try-vec-nat? #t))])
+                   (match infer-t
+                     ;; no type found, generalize arg
+                     [#f (let ([t (find-annotation #'(begin . body*) f #:try-vec-nat? #f)])
+                           (if t
+                               (tc-expr/check/t? ac (ret t))
+                               (generalize (tc-expr/t ac))))]
+                     ;; we found no type, but did observe that this was used
+                     ;; (directly or indirectly) as a vector index. try Nat...
+                     ['vec (cond
+                             [(tc-expr/check/t? ac (ret -Nat))]
+                             [else (generalize (tc-expr/t ac))])]
+                     ;; found a type, use it
+                     [t (tc-expr/check/t ac (ret t))])))])
        (define-values (fun-results body-results)
          (tc/rec-lambda/check args body lp ts expected))
        (add-typeof-expr lam fun-results)

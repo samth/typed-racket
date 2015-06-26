@@ -682,7 +682,7 @@
                p-)))
   (define -FSb< (int-bcomp-props -ltSLI -gteqSLI))
   (define -FSb<= (int-bcomp-props -leqSLI -gtSLI))
-  (define -FSb= (int-bcomp-props -eqSLI (λ _ -top)))
+  (define -FSb= (int-bcomp-props -eqSLI -neqSLI))
   (define -FSb> (int-bcomp-props -gtSLI -leqSLI))
   (define -FSb>= (int-bcomp-props -gteqSLI -ltSLI))
 

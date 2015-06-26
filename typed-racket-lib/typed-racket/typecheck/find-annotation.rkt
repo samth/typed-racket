@@ -4,7 +4,7 @@
          (contract-req)
          (env lexical-env)
          (private type-annotation)
-         (rep type-rep)
+         (rep type-rep rep-utils)
          (types numeric-tower)
          (for-label racket/base racket/unsafe/ops typed/safe/ops))
 
@@ -57,8 +57,13 @@
 ;; (let ([x (reverse name)]) e) or
 ;; (let ([x name]) e)
 ;; where x has a type annotation, return that annotation, otherwise #f
-(define (find-annotation stx name)
-  (define (find s) (find-annotation s name))
+(define (find-annotation stx name #:try-vec-nat? try-vec-nat?)
+  (define t (find-annotation* stx name try-vec-nat?))
+  (cond
+    [try-vec-nat? t]
+    [else (and (Type? t) t)]))
+(define (find-annotation* stx name try-vec-nat?)
+  (define (find s) (find-annotation* s name try-vec-nat?))
   (define ((match? body) b)
     (syntax-parse b
       #:literal-sets (kernel-literals find-annotation-literals)
@@ -68,9 +73,9 @@
        #:fail-unless (free-identifier=? name #'n) #f
        (unrefine (or (type-annotation #'v)
                      (lookup-type/lexical #'v #:fail (lambda _ #f))
-                     (and (let ([t (find-annotation body #'v)])
-                            (and t (type-equal? -Nat t)))
-                          -Nat)))]
+                     (and try-vec-nat?
+                          (let ([t (find-annotation* body #'v try-vec-nat?)])
+                            (and t (eq? 'vec t) 'vec)))))]
       [c:lv-clause
        #:with (#%plain-app reverse n:id) #'c.e
        #:with (v) #'(c.v ...)
@@ -79,7 +84,9 @@
       [c:lv-clause
        #:with rhs:expr #'c.e
        #:with (v) #'(c.v ...)
-       (unrefine (find #'rhs))]
+       #:fail-unless try-vec-nat? #f
+       (let ([t (unrefine (find #'rhs))])
+         (and t (eq? 'vec t) 'vec))]
       [_ #f]))
   (syntax-parse stx
     #:literal-sets (kernel-literals find-annotation-literals)
@@ -87,10 +94,10 @@
      (or (ormap (match? #'body) (syntax->list #'cls))
          (find #'body))]
     [(#%plain-app (~or vector-ref unsafe-vector-ref safe-vector-ref) _ n:id)
-     #:when (free-identifier=? name #'n)
-     -Nat]
+     #:when (and try-vec-nat? (free-identifier=? name #'n))
+     'vec]
     [(#%plain-app (~or vector-set! unsafe-vector-set! safe-vector-set!) _ n:id _)
-     #:when (free-identifier=? name #'n)
-     -Nat]
+     #:when (and try-vec-nat? (free-identifier=? name #'n))
+     'vec]
     [e:core-expr
      (ormap find (syntax->list #'(e.expr ...)))]))
