@@ -856,11 +856,12 @@
   ;(trace infer)
   (λ (x y s t r [e #f])
     (match-define-values ((list res) time real gc) (time-apply inf (list x y s t r e)))
-    (when (> (- time gc) 100)
+    (when #t ; (> (- time gc) 100)
       (printf "INFER TIME: ~a\n" (list time real gc))
-      (printf "\n>>> STX: ~a\n" (current-orig-stx))
-      (printf "\n>>> RESULT: ~a\n" res)
-      (printf "\n>>> ARGS: ~a\n" (list x y s t r e)))
+      ; (printf "\n>>> STX: ~a\n" (current-orig-stx))
+      ; (printf "\n>>> RESULT: ~a\n" res)
+      ; (printf "\n>>> ARGS: ~a\n" (list x y s t r e))
+    )
     res))) ;to export a variable binding and not syntax
 
 ;; like infer, but T-var is the vararg type:
