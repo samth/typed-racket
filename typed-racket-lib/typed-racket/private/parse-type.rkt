@@ -746,7 +746,7 @@
                    (parse-values-type #'rng)
                    #:kws (map force (attribute kws.Keyword)))))))]
       [(:~>^ ([xs:id :colon^ doms:non-keyword-ty] ...)
-             rng:non-keyword-ty)
+             rng)
        (define maybe-dup (check-duplicate-identifier (syntax->list #'(xs ...))))
        (when maybe-dup
          (parse-error #:delayed? #t
@@ -754,9 +754,10 @@
                       "variable" (syntax-e maybe-dup)))
        (let* ([arg-ids (syntax->list #'(xs ...))]
               [pt (parse-type/ids (append arg-ids ids))]
+              [pts (parse-values-type/ids (append arg-ids ids))]
               [dom-ts (for/list ([t (in-list (stx-map pt #'(doms ...)))])
                         (abstract-idents arg-ids t))]
-              [rng (abstract-idents arg-ids (pt #'rng))])
+              [rng (abstract-idents arg-ids (pts #'rng))])
          (with-arity (length arg-ids)
            (make-Function (list (make-arr dom-ts rng #:dep? #t)))))]
       ;; This case needs to be at the end because it uses cut points to give good error messages.
