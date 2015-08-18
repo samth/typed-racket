@@ -365,8 +365,10 @@
     [(_ dom (dty dbound) rng : filters)
      (make-Function (list (make-arr* dom rng #:drest (cons dty 'dbound) #:filters filters)))]))
 
-(define (simple-> doms rng)
-  (->* doms rng))
+(define (simple-> doms rng [dep? #f])
+  (if dep?
+      (dep->* doms rng)
+      (->* doms rng)))
 
 (define (->acc dom rng path #:var [var (list 0 0)])
   (define obj (-acc-path path (-id-path var)))
