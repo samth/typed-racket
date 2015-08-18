@@ -63,7 +63,7 @@
     [(Listof: elem-ty)
      `(-lst ,(sub elem-ty))]
     [(Function: (list (arr: dom (Values: (list (Result: t (FilterSet: (Top:) (Top:)) (Empty:)))) #f #f '() dep?))) ;; TODO(AMK)
-     `(simple-> (list ,@(map sub dom)) ,(sub t))]
+     `(simple-> (list ,@(map sub dom)) ,(sub t) ,dep?)]
     [(Function: (list (arr: dom (Values: (list (Result: t (FilterSet: (TypeFilter: ft pth)
                                                                       (NotTypeFilter: ft pth))
                                                         (Empty:))))
