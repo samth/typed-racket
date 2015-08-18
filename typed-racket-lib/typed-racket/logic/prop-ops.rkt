@@ -59,72 +59,51 @@
        (loop (cons f* ps))]
       [x (int-err "invalid list of objs/props! ~a" x)])))
 
-;; TODO(amk) turn unions w/ nested refinements
-;; into logical propositions instead!
-(define/cond-contract (extract-props-from-type x ty #:int-bounds? [int-bounds? #f])
-  (c:->* ((c:or/c identifier? Object?) Type?)
-         (#:int-bounds? boolean?)
-         (values Type? (c:listof Filter/c)))
-  
-  (define stack empty)
-  (define (push obj prop)
-    (set! stack (cons (cons obj prop)
-                      stack)))
-  (define (pop)
-    (match stack
-      ['() #f]
-      [(cons x xs) (begin (set! stack xs)
-                          x)]))
-  
-  (define obj (if (identifier? x) (-id-path x) x))
-  (define ty* (extract-nested-props ty obj push #:int-bounds? int-bounds?))
-  
-  (let loop ([ps '()])
-      (match (pop)
-        [#f (values ty* ps)]
-        [(cons obj f) 
-         (define f* (extract-nested-props f obj push #:int-bounds? int-bounds?))
-         (loop (cons f* ps))]
-        [x (int-err "invalid list of objs/props! ~a" x)])))
-
 (define/cond-contract (extract-nested-props a obj save #:int-bounds? [int-bounds? #f])
   (c:->* ((c:or/c Type? Filter/c) (c:or/c #f Object?) (c:-> Object? Filter/c void?))
          (#:int-bounds? boolean?)
          (c:or/c Type? Filter/c))
   
   (define ((sift-t obj) ty)
-    (type-case 
-        (#:Type (sift-t #f) #:Filter (sift-f #f) #:Object values)
-      ty
-      [#:arr dom rng rest drest kws dep?   ty]
-      [#:Union elems   ty]
-      ;; TODO(AMK) Any other types we have to ignore the inside of?
-      ;; Listof should get covered by union... right? maybe ignore Mu? or any
-      ;; that needs resolved?
-      [#:Refine-unsafe type prop (if obj
-                                     (begin (save obj (subst-filter prop (list 0 0) obj #t))
-                                            ((sift-t obj) type))
-                                     ty)]
-      
-      [#:Pair t1 t2 (if obj
-                        (-pair ((sift-t (-car-of obj)) t1)
-                               ((sift-t (-cdr-of obj)) t2))
-                        ty)]
-      
-      [#:MPair t1 t2 (if obj
-                         (-mpair ((sift-t (-car-of obj)) t1)
-                                 ((sift-t (-cdr-of obj)) t2))
-                         ty)]
-      ;;TODO(amk) support these
-      #;[#:Syntax t (if obj
-                        (-syntax ((sift-t (-syntax-of obj)) t))
-                        ty)]
-      
-      #;[#:Promise t (if obj
-                         (-promise ((sift-t (-force-of obj)) t))
-                         ty)]
-      ;; TODO(amk) recurse into each struct field w/ approp path?
-      #;[#:Struct ]))
+    (cond
+      [(and int-bounds?
+            obj
+            (bounded-int-type? ty))
+       (save obj (apply -and(get-int-bound-props obj ty)))
+       ty]
+      [else
+       (type-case 
+           (#:Type (sift-t #f) #:Filter (sift-f #f) #:Object values)
+         ty
+         [#:arr dom rng rest drest kws dep?   ty]
+         [#:Union elems   ty]
+         ;; TODO(AMK) Any other types we have to ignore the inside of?
+         ;; Listof should get covered by union... right? maybe ignore Mu? or any
+         ;; that needs resolved?
+         [#:Refine-unsafe type prop (if obj
+                                        (begin (save obj (subst-filter prop (list 0 0) obj #t))
+                                               ((sift-t obj) type))
+                                        ty)]
+         
+         [#:Pair t1 t2 (if obj
+                           (-pair ((sift-t (-car-of obj)) t1)
+                                  ((sift-t (-cdr-of obj)) t2))
+                           ty)]
+         
+         [#:MPair t1 t2 (if obj
+                            (-mpair ((sift-t (-car-of obj)) t1)
+                                    ((sift-t (-cdr-of obj)) t2))
+                            ty)]
+         ;;TODO(amk) support these
+         #;[#:Syntax t (if obj
+                           (-syntax ((sift-t (-syntax-of obj)) t))
+                           ty)]
+         
+         #;[#:Promise t (if obj
+                            (-promise ((sift-t (-force-of obj)) t))
+                            ty)]
+         ;; TODO(amk) recurse into each struct field w/ approp path?
+         #;[#:Struct ])]))
   (define ((sift-f obj) f)
     
     (filter-case (#:Type values #:Filter (sift-f obj) #:Object values)
