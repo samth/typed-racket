@@ -272,8 +272,10 @@
    [unsafe-vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [unsafe-vector*-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [vector-copy! (-poly (a) ((-vec a) index-type (-vec a) [index-type index-type] . ->opt . -Void))]
-   [make-vector (-poly (a) (cl-> [(index-type) (-vec (Un -Zero a))]
-                                 [(index-type a) (-vec a)]))]
+   [make-vector (-poly (a) (cl-> [(index-type) (-refine v (-vec (Un -Zero a)) (-eqSLI (-lexp (-arg-path 0 1))
+                                                                                      (-lexp (-acc-path -len (-id-path v)))))]
+                                 [(index-type a) (-refine v (-vec a) (-eqSLI (-lexp (-arg-path 0 1))
+                                                                             (-lexp (-acc-path -len (-id-path v)))))]))]
 
    ;; flvector ops
 
