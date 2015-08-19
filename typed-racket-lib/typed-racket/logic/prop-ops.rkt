@@ -97,7 +97,7 @@
   (define ((sift-t obj) ty)
     (cond
       [(and int-bounds?
-            obj
+            (non-empty-obj? obj)
             (bounded-int-type? ty))
        (save obj (apply -and (get-int-bound-props obj ty)))
        ty]
