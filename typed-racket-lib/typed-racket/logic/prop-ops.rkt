@@ -23,7 +23,7 @@
        (cond
          [(Path? obj) (-lexp (list 1 obj))]
          [(LExp? obj) obj]
-         [else (int-err 'get-int-bound-props "unsupported obj ~a" obj)]))
+         [else (int-err "unsupported obj for get-int-bound-props ~a" obj)]))
      (define-values (new-low new-high) (int-type-bounds new-t))
      (cond
        [(and new-low new-high)
@@ -99,7 +99,7 @@
       [(and int-bounds?
             obj
             (bounded-int-type? ty))
-       (save obj (apply -and(get-int-bound-props obj ty)))
+       (save obj (apply -and (get-int-bound-props obj ty)))
        ty]
       [else
        (type-case 
@@ -142,12 +142,14 @@
                   t obj*
                   (match obj*
                     [(Path: π (list lvl arg)) f]
-                    [int-bounds?
-                     (apply -and
-                            (cons (-filter ((sift-t obj*) t) obj*)
-                                  (get-int-bound-props obj* t)))]
-                    [else
-                     (-filter ((sift-t obj*) t) obj*)])]
+                    [_
+                     (cond
+                       [int-bounds?
+                        (apply -and
+                               (cons (-filter ((sift-t obj*) t) obj*)
+                                     (get-int-bound-props obj* t)))]
+                       [else
+                        (-filter ((sift-t obj*) t) obj*)])])]
                  [#:AndFilter
                   fs
                   (apply -and (map (sift-f obj) fs))]
