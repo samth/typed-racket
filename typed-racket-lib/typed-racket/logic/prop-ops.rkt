@@ -13,6 +13,8 @@
 
 (provide flatten-nested-props extract-props-from-type)
 
+(provide flatten-nested-props extract-props-from-type)
+
 (define/cond-contract (get-int-bound-props obj new-t)
   (c:-> (or/c Path? LExp?) Type? (listof Filter?))
   (cond
@@ -58,6 +60,34 @@
        (define f* (extract-nested-props f obj push))
        (loop (cons f* ps))]
       [x (int-err "invalid list of objs/props! ~a" x)])))
+
+;; TODO(amk) turn unions w/ nested refinements
+;; into logical propositions instead!
+(define/cond-contract (extract-props-from-type x ty #:int-bounds? [int-bounds? #f])
+  (c:->* ((c:or/c identifier? Object?) Type?)
+         (#:int-bounds? boolean?)
+         (values Type? (c:listof Filter/c)))
+  
+  (define stack empty)
+  (define (push obj prop)
+    (set! stack (cons (cons obj prop)
+                      stack)))
+  (define (pop)
+    (match stack
+      ['() #f]
+      [(cons x xs) (begin (set! stack xs)
+                          x)]))
+  
+  (define obj (if (identifier? x) (-id-path x) x))
+  (define ty* (extract-nested-props ty obj push #:int-bounds? int-bounds?))
+  
+  (let loop ([ps '()])
+      (match (pop)
+        [#f (values ty* ps)]
+        [(cons obj f) 
+         (define f* (extract-nested-props f obj push #:int-bounds? int-bounds?))
+         (loop (cons f* ps))]
+        [x (int-err "invalid list of objs/props! ~a" x)])))
 
 (define/cond-contract (extract-nested-props a obj save #:int-bounds? [int-bounds? #f])
   (c:->* ((c:or/c Type? Filter/c) (c:or/c #f Object?) (c:-> Object? Filter/c void?))
