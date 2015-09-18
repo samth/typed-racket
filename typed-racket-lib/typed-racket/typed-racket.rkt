@@ -23,9 +23,11 @@
       (lazy-require (typed-racket/core (sym ...))))
     (define-syntax (name stx)
       (do-time (format "Calling ~a driver" 'name))      
+      (start-infer-timer (syntax-source stx))
       (do-time (format "Loaded core ~a" 'sym))
       (begin0 (sym stx)
-              (do-time "Finished, returning to Racket")))
+        (do-infer-time "Finished with Typed Racket")
+        (do-time "Finished, returning to Racket")))
     ...))
 
 (drivers [module-begin mb-core] [top-interaction ti-core] [with-type wt-core])

@@ -10,7 +10,7 @@
 (require "../utils/utils.rkt"
          (except-in
           (combine-in
-           (utils tc-utils)
+           (utils tc-utils timing)
            (rep free-variance type-rep filter-rep object-rep rep-utils)
            (types utils abbrev numeric-tower union subtype resolve
                   substitute generalize prefab)
@@ -857,7 +857,7 @@
   (λ (x y s t r [e #f])
     (match-define-values ((list res) time real gc) (time-apply inf (list x y s t r e)))
     (when #t ; (> (- time gc) 100)
-      (printf "INFER TIME: ~a\n" (list time real gc))
+      (do-infer-time (format "INFER TIME: ~a ~a" (list time real gc) (current-orig-stx)))
       ; (printf "\n>>> STX: ~a\n" (current-orig-stx))
       ; (printf "\n>>> RESULT: ~a\n" res)
       ; (printf "\n>>> ARGS: ~a\n" (list x y s t r e))
