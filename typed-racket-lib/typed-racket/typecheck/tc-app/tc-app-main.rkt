@@ -77,20 +77,16 @@
        (define (has-drest/filter? arrs)
          (for/or ([arr (in-list arrs)])
            (or (has-filter? arr) (arr-drest arr))))
-
+       ;; check arg types w/o expected (in case more precise type is available)
+       (define arg-ts (map (curryr tc-expr/check? #f) args*))
+       
        (define initial-arg-res-list
          (match f-ty
-           ;; TODO(AMK) support multi-arr functions w/ dependent types
            [(Function: (list (arr: doms rng rest drest kws #t)))
-            ;; here we check argument types before bounding them w/ expected
-            ;; results if possible, so more precise types in the domain
-            ;; can refine dependent types
-            (define arg-ts (map (curryr tc-expr/check? #f) args*))
-            (define arg-ts* (for/list ([t (in-list arg-ts)]
-                                       [a (in-list args*)]
-                                       [dom-t (in-list doms)])
-                              (or t (tc-expr/check a (ret dom-t)))))
-            arg-ts*]
+            (for/list ([arg-t (in-list arg-ts)]
+                       [a (in-list args*)]
+                       [dom-t (in-list doms)])
+              (or arg-t (tc-expr/check a (ret dom-t))))]
            [(Function: (? has-drest/filter?))
             (map single-value args*)]
            [(Function:
@@ -101,11 +97,13 @@
                (apply in-parallel
                       (for/list ((dom (in-list doms)) (rest (in-list rests)))
                         (in-sequences (in-list dom) (in-cycle (in-value rest)))))))
-            (for/list ([a (in-list args*)] [types matching-domains])
+            (for/list ([arg-t (in-list arg-ts)]
+                       [a (in-list args*)]
+                       [types matching-domains])
               (match-define (cons t ts) types)
               (if (for/and ((t2 (in-list ts))) (equal? t t2))
-                  (tc-expr/check a (ret t))
-                  (single-value a)))]
+                  (or arg-t (tc-expr/check a (ret t)))
+                  (or arg-t (single-value a))))]
            [_ (map single-value args*)]))
 
        (tc/funapp #'f #'args f-ty initial-arg-res-list expected))]))
