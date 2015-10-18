@@ -5,7 +5,7 @@
          "utils.rkt"
          syntax/parse syntax/stx racket/match
          (typecheck signatures tc-funapp)
-         (types abbrev union utils)
+         (types abbrev union utils filter-ops)
          (rep type-rep)
 
          (for-label racket/base racket/bool))
@@ -52,15 +52,22 @@
         (alt eq? eq?-able)
         (alt eqv? eqv?-able)
         (alt equal? equal?-able)))
+  ;(Refine-type: (Value: (? ok?)))
   (match* ((single-value v1) (single-value v2))
-    [((tc-result1: t _ o)
-      (tc-result1: (and val-t (or (Value: (? ok?))
-                                  (Refine-type: (Value: (? ok?)))))))
-     (ret -Boolean (-FS (-filter val-t o) (-not-filter val-t o)))]
-    [((tc-result1: (and val-t (or (Value: (? ok?))
-                                  (Refine-type: (Value: (? ok?))))))
-      (tc-result1: t _ o))
-     (ret -Boolean (-FS (-filter val-t o) (-not-filter val-t o)))]
+    [((tc-result1: (or (Value: (? ok? val1))
+                       (Refine-type: (Value: (? ok? val1)))) _ o1)
+      (tc-result1: (or (Value: (? ok? val2))
+                       (Refine-type: (Value: (? ok? val2)))) _ o2))
+     (ret -Boolean (-FS (-and (-filter (-val val2) o1)
+                              (-filter (-val val1) o2))
+                        (-and (-not-filter (-val val1) o1)
+                              (-not-filter (-val val2) o2))))]
+    [((tc-result1: t _ o) (tc-result1: (or (Value: (? ok? val))
+                                           (Refine-type: (Value: (? ok? val))))))
+     (ret -Boolean (-FS (-filter (-val val) o) (-not-filter (-val val) o)))]
+    [((tc-result1: (or (Value: (? ok? val))
+                       (Refine-type: (Value: (? ok? val))))) (tc-result1: t _ o))
+     (ret -Boolean (-FS (-filter (-val val) o) (-not-filter (-val val) o)))]
     [((tc-result1: t _ o)
       (or (and (? (lambda _ (id=? #'member comparator)))
                (tc-result1: (List: (list (and ts (or (Value: _)

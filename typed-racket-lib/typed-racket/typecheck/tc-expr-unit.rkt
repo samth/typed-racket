@@ -243,7 +243,8 @@
                                 (syntax->datum form)
                                 (or (syntax-source form)
                                     (syntax-source #'v-exp)
-                                    (syntax-source #'i-exp)))
+                                    (syntax-source #'i-exp)
+                                    (locate-stx form)))
                        safe-result?]
          [else (eprintf "~a ` NO ` ~a ` ~a\n"
                         (syntax->datum #'vec-ref)
@@ -251,16 +252,13 @@
                         (or (syntax-source form)
                             (syntax-source #'vec-ref)
                             (syntax-source #'v-exp)
-                            (syntax-source #'i-exp)))
+                            (syntax-source #'i-exp)
+                            (locate-stx form)))
                (tc/app form expected)])]
 
       [(#%plain-app (~and vec-ref:id (~literal unsafe-vector-ref))
                     v-exp
                     i-exp)
-       #:when (or (syntax-source form)
-                  (syntax-source #'vec-ref)
-                  (syntax-source #'v-exp)
-                  (syntax-source #'i-exp))
        ;; try safe-vector-ref
        (define safe-result?
          (parameterize ([current-type-error? #f])
@@ -278,14 +276,16 @@
                                 (syntax->datum form)
                                 (or (syntax-source form)
                                     (syntax-source #'v-exp)
-                                    (syntax-source #'i-exp)))
+                                    (syntax-source #'i-exp)
+                                    (locate-stx form)))
                        safe-result?]
          [else (eprintf "~a ` NO ` ~a ` ~a\n"
                         (syntax->datum #'vec-ref)
                         (syntax->datum form)
                         (or (syntax-source form)
                             (syntax-source #'v-exp)
-                            (syntax-source #'i-exp)))
+                            (syntax-source #'i-exp)
+                            (locate-stx form)))
                (tc/app form expected)])]
 
       ;; SAFE-VECTOR-SET!-TEST!
@@ -312,24 +312,22 @@
                                 (or (syntax-source form)
                                     (syntax-source #'vec-set)
                                     (syntax-source #'v-exp)
-                                    (syntax-source #'i-exp)))
+                                    (syntax-source #'i-exp)
+                                    (locate-stx form)))
                        safe-result?]
          [else (eprintf "~a ` NO ` ~a ` ~a\n"
                         (syntax->datum #'vec-set)
                         (syntax->datum form)
                         (or (syntax-source form)
                             (syntax-source #'v-exp)
-                            (syntax-source #'i-exp)))
+                            (syntax-source #'i-exp)
+                            (locate-stx form)))
                (tc/app form expected)])]
 
       [(#%plain-app (~and vec-set:id (~literal unsafe-vector-set!))
                     v-exp
                     i-exp
                     val-exp)
-       #:when (or (syntax-source form)
-                  (syntax-source #'vec-set)
-                  (syntax-source #'v-exp)
-                  (syntax-source #'i-exp))
        ;; try safe-vector-ref
        (define safe-result?
          (parameterize ([current-type-error? #f])
@@ -348,14 +346,16 @@
                                 (or (syntax-source form)
                                     (syntax-source #'vec-set)
                                     (syntax-source #'v-exp)
-                                    (syntax-source #'i-exp)))
+                                    (syntax-source #'i-exp)
+                                    (locate-stx form)))
                        safe-result?]
          [else (eprintf "~a ` NO ` ~a ` ~a\n"
                         (syntax->datum #'vec-set)
                         (syntax->datum form)
                         (or (syntax-source form)
                             (syntax-source #'v-exp)
-                            (syntax-source #'i-exp)))
+                            (syntax-source #'i-exp)
+                            (locate-stx form)))
                (tc/app form expected)])]
 
       ;; application
