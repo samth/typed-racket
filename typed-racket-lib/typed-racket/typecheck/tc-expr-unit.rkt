@@ -71,7 +71,7 @@
   (--> syntax? Type/c tc-results/c)
   (tc-expr/check form (ret expected)))
 
-(define (tc-expr/check form expected)
+(define (tc-expr/check form expected #:more-specific [specific? #f])
   (parameterize ([current-orig-stx form])
     ;; the argument must be syntax
     (unless (syntax? form)
@@ -83,7 +83,10 @@
               form (lexical-env) t expected)
     
     (add-typeof-expr form t)
-    (cond-check-below t expected)))
+    (let ([res (cond-check-below t expected)])
+      (if specific?
+          t
+          res))))
 
 ;; typecheck and return a truth value indicating a typecheck failure (#f)
 ;; or success (any non-#f value)
