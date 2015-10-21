@@ -149,7 +149,7 @@
 (define tc-result-equal? equal?)
 
 (provide tc-result: tc-results: tc-any-results: tc-result1: Result1: Results:
-         tc-results)
+         tc-results tc-any-results?)
 (provide/cond-contract
  [rename -tc-result tc-result
    (c:case->

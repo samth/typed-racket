@@ -116,7 +116,9 @@
         env*
         (tc/funapp* f-stx args-stx f-ty* args-res expected*))]
       [expected*
-       expected*]
+       (if (tc-any-results? expected*)
+           (ret Univ)
+           expected*)]
       [else
        (define trivial-args
          (map (const (ret -Nothing (-PS -bot -bot) -empty-obj)) args-res))

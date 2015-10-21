@@ -8,7 +8,8 @@
          (types numeric-tower)
          (for-label racket/base racket/unsafe/ops typed/safe/ops))
 
-(provide/cond-contract [find-annotation (syntax? identifier? . -> . (or/c #f Type/c))])
+(provide/cond-contract [find-annotation ((syntax? identifier? #:try-vec-nat? boolean?)
+                                         . ->* . (or/c #f Type/c 'vec))])
 
 (define-syntax-class lv-clause
   #:transparent

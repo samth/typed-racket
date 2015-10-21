@@ -258,8 +258,16 @@
    [split-at-right
     (-poly (a) ((-lst a) index-type . -> . (-values (list (-lst a) (-lst a)))))]
 
-   [vector-ref (-poly (a) (cl->* ((-vec a) index-type . -> . a)
-                                 (-VectorTop index-type . -> . Univ)))]
+   [vector-ref (-poly (a) (cl->* ((list (-vec a) index-type) . ->* . a
+                                           : (-FS-taut (-and (-leqSLI (-lexp 0)
+                                                                      (-lexp (-arg-path 0 1)))
+                                                             (-ltSLI (-lexp (-arg-path 0 1))
+                                                                     (-lexp (-acc-path -len (-arg-path 0 0)))))))
+                                 ((list -VectorTop index-type) . ->* . Univ
+                                             : (-FS-taut (-and (-leqSLI (-lexp 0)
+                                                                        (-lexp (-arg-path 0 1)))
+                                                               (-ltSLI (-lexp (-arg-path 0 1))
+                                                                       (-lexp (-acc-path -len (-arg-path 0 0)))))))))]
    [unsafe-vector-ref (-poly (a) (cl->* ((-vec a) index-type . -> . a)
                                         (-VectorTop index-type . -> . Univ)))]
    [unsafe-vector*-ref (-poly (a) (cl->* ((-vec a) index-type . -> . a)
@@ -267,8 +275,12 @@
    [build-vector (-poly (a) (~> ([i : index-type]
                                  [f : (-Index . -> . a)])
                                 (-refine v (-vec a) (-eqSLI (-lexp (-id-path i))
-                                                            (-lexp (-acc-path -len (-id-path v)))))))]
-   [vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
+                                                            (-lexp (-acc-path -len (-arg-path 0 0)))))))]
+   [vector-set! (-poly (a) (->* (list (-vec a) index-type a) -Void
+                                : (-FS-taut (-and (-leqSLI (-lexp 0)
+                                                           (-lexp (-arg-path 0 1)))
+                                                  (-ltSLI (-lexp (-arg-path 0 1))
+                                                          (-lexp (-acc-path -len (-arg-path 0 0))))))))]
    [unsafe-vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [unsafe-vector*-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [vector-copy! (-poly (a) ((-vec a) index-type (-vec a) [index-type index-type] . ->opt . -Void))]

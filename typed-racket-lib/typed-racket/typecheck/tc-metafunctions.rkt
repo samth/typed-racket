@@ -75,6 +75,9 @@
    (values (listof (or/c ImpFilter? OrFilter?)) 
            (listof (or/c TypeFilter? NotTypeFilter?))
            (listof SLI?)))
+
+  (when (ormap Object? new-props) (error 'combine-props "object in new-props!"))
+  (when (ormap Object? old-props) (error 'combine-props "object in old-props!"))
   
   (define-values (new-atoms new-formulas) 
     (partition (λ (p) (or (TypeFilter? p) 
@@ -102,7 +105,10 @@
           (loop (cons p derived-formulas) derived-atoms ps slis)]
          [(AndFilter: and-ps) (loop derived-formulas derived-atoms (append and-ps ps) slis)]
          [(Top:) (loop derived-formulas derived-atoms ps slis)]
-         [(Bot:) (exit)])])))
+         [(Bot:) (exit)]
+         [else (error 'combine-props "invalid worklist! ~a, what is it? ~a"
+                      else
+                      (struct->vector else))])])))
 
 
 (define (unconditional-prop res)
@@ -142,12 +148,12 @@
            (cond
              [(or (Bot? f1+) (type-equal? t1 (-val #f))) slis2+]
              [(or (Bot? f2+) (type-equal? t2 (-val #f))) slis1+]
-             [else (filter (λ (s) (memf (λ (s*) (object-equal? s* s)) slis1+)) slis2+)]))
+             [else (filter (λ (s) (memf (λ (s*) (filter-equal? s* s)) slis1+)) slis2+)]))
          (define slis-
            (cond
              [(or (Bot? f1-) (not (overlap t1 (-val #f)))) slis2-]
              [(or (Bot? f2-) (not (overlap t2 (-val #f)))) slis1-]
-             [else (filter (λ (s) (memf (λ (s*) (object-equal? s* s)) slis1-)) slis2-)]))
+             [else (filter (λ (s) (memf (λ (s*) (filter-equal? s* s)) slis1-)) slis2-)]))
          (define f+ (apply -and (-or f1+ f2+) slis+))
          (define f- (apply -and (-or f1- f2-) slis-))
          (tc-result

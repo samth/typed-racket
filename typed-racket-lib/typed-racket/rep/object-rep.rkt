@@ -63,7 +63,9 @@
 ;; should only be used for parsing type annotations and expected types
 (def-object NoObject () [#:fold-rhs #:base])
 
-(define (object-equal? o1 o2) (= (Obj-seq o1) (Obj-seq o2)))
+(define/cond-contract (object-equal? o1 o2)
+  (Object? Object? . -> . boolean?)
+  (= (Obj-seq o1) (Obj-seq o2)))
 
 (define-custom-set-types path-set
   object-equal?

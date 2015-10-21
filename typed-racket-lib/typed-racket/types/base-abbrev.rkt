@@ -157,6 +157,9 @@
       ;; empty object, just leave it
       [else o])))
 
+(define (-FS-taut p)
+  (-FS p p))
+
 (define/cond-contract (-FS + -)
   (c:-> Filter/c Filter/c FilterSet?)
   (make-FilterSet + -))

@@ -240,24 +240,16 @@
                                       expected)])
                   (and (not (current-type-error?)) result)))
               (λ () (restore-errors!))))))
-       (cond
-         [safe-result? (eprintf "~a ` YES ` ~a ` ~a\n"
-                                (syntax->datum #'vec-ref)
-                                (syntax->datum form)
-                                (or (syntax-source form)
-                                    (syntax-source #'v-exp)
-                                    (syntax-source #'i-exp)
-                                    (locate-stx form)))
-                       safe-result?]
-         [else (eprintf "~a ` NO ` ~a ` ~a\n"
-                        (syntax->datum #'vec-ref)
-                        (syntax->datum form)
-                        (or (syntax-source form)
-                            (syntax-source #'vec-ref)
-                            (syntax-source #'v-exp)
-                            (syntax-source #'i-exp)
-                            (locate-stx form)))
-               (tc/app form expected)])]
+       (eprintf "~a ` ~a ` ~a ` ~a\n"
+                (syntax->datum #'vec-ref)
+                (if safe-result? "YES" "NO")
+                (syntax->datum form)
+                (or (syntax-source form)
+                    (syntax-source #'v-exp)
+                    (syntax-source #'i-exp)
+                    (locate-stx form)))
+       (or safe-result?
+           (tc/app form expected))]
 
       [(#%plain-app (~and vec-ref:id (~literal unsafe-vector-ref))
                     v-exp
@@ -273,23 +265,16 @@
                                       expected)])
                   (and (not (current-type-error?)) result)))
               (λ () (restore-errors!))))))
-       (cond
-         [safe-result? (eprintf "~a ` YES ` ~a ` ~a\n"
-                                (syntax->datum #'vec-ref)
-                                (syntax->datum form)
-                                (or (syntax-source form)
-                                    (syntax-source #'v-exp)
-                                    (syntax-source #'i-exp)
-                                    (locate-stx form)))
-                       safe-result?]
-         [else (eprintf "~a ` NO ` ~a ` ~a\n"
-                        (syntax->datum #'vec-ref)
-                        (syntax->datum form)
-                        (or (syntax-source form)
-                            (syntax-source #'v-exp)
-                            (syntax-source #'i-exp)
-                            (locate-stx form)))
-               (tc/app form expected)])]
+       (eprintf "~a ` ~a ` ~a ` ~a\n"
+                (syntax->datum #'vec-ref)
+                (if safe-result? "YES" "NO")
+                (syntax->datum form)
+                (or (syntax-source form)
+                    (syntax-source #'v-exp)
+                    (syntax-source #'i-exp)
+                    (locate-stx form)))
+       (or safe-result?
+           (tc/app form expected))]
 
       ;; SAFE-VECTOR-SET!-TEST!
       [(#%plain-app (~and vec-set:id (~literal vector-set!))
@@ -302,30 +287,23 @@
          (parameterize ([current-type-error? #f])
            (with-handlers ([exn:fail:syntax? (λ (_) #f)])
              (dynamic-wind
-              (λ () (save-errors!))
-              (λ ()
-                (let ([result (tc/app (syntax/loc form (#%plain-app safe-vector-set! v-exp i-exp val-exp))
-                                      expected)])
-                  (and (not (current-type-error?)) result)))
-              (λ () (restore-errors!))))))
-       (cond
-         [safe-result? (eprintf "~a ` YES ` ~a ` ~a\n"
-                                (syntax->datum #'vec-set)
-                                (syntax->datum form)
-                                (or (syntax-source form)
-                                    (syntax-source #'vec-set)
-                                    (syntax-source #'v-exp)
-                                    (syntax-source #'i-exp)
-                                    (locate-stx form)))
-                       safe-result?]
-         [else (eprintf "~a ` NO ` ~a ` ~a\n"
-                        (syntax->datum #'vec-set)
-                        (syntax->datum form)
-                        (or (syntax-source form)
-                            (syntax-source #'v-exp)
-                            (syntax-source #'i-exp)
-                            (locate-stx form)))
-               (tc/app form expected)])]
+               (λ () (save-errors!))
+               (λ ()
+                 (let ([result (tc/app (syntax/loc form (#%plain-app safe-vector-set! v-exp i-exp val-exp))
+                                       expected)])
+                   (and (not (current-type-error?)) result)))
+               (λ () (restore-errors!))))))
+       (eprintf "~a ` ~a ` ~a ` ~a\n"
+                (syntax->datum #'vec-set)
+                (if safe-result? "YES" "NO")
+                (syntax->datum form)
+                (or (syntax-source form)
+                    (syntax-source #'vec-set)
+                    (syntax-source #'v-exp)
+                    (syntax-source #'i-exp)
+                    (locate-stx form)))
+       (or safe-result?
+           (tc/app form expected))]
 
       [(#%plain-app (~and vec-set:id (~literal unsafe-vector-set!))
                     v-exp
@@ -342,24 +320,17 @@
                                       expected)])
                   (and (not (current-type-error?)) result)))
               (λ () (restore-errors!))))))
-       (cond
-         [safe-result? (eprintf "~a ` YES ` ~a ` ~a\n"
-                                (syntax->datum #'vec-set)
-                                (syntax->datum form)
-                                (or (syntax-source form)
-                                    (syntax-source #'vec-set)
-                                    (syntax-source #'v-exp)
-                                    (syntax-source #'i-exp)
-                                    (locate-stx form)))
-                       safe-result?]
-         [else (eprintf "~a ` NO ` ~a ` ~a\n"
-                        (syntax->datum #'vec-set)
-                        (syntax->datum form)
-                        (or (syntax-source form)
-                            (syntax-source #'v-exp)
-                            (syntax-source #'i-exp)
-                            (locate-stx form)))
-               (tc/app form expected)])]
+       (eprintf "~a ` ~a ` ~a ` ~a\n"
+                (syntax->datum #'vec-set)
+                (if safe-result? "YES" "NO")
+                (syntax->datum form)
+                (or (syntax-source form)
+                    (syntax-source #'vec-set)
+                    (syntax-source #'v-exp)
+                    (syntax-source #'i-exp)
+                    (locate-stx form)))
+       (or safe-result?
+           (tc/app form expected))]
 
       ;; application
       [(#%plain-app . _)

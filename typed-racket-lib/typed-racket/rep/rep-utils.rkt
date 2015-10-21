@@ -392,12 +392,12 @@
               [Rep-free-idxs free-idxs*]))
 
 (provide/cond-contract
-  [rename rep-equal? type-equal? (Type? Type? . -> . boolean?)]
-  [rename rep<? type<? (Type? Type? . -> . boolean?)]
-  [rename rep<? filter<? (Filter? Filter? . -> . boolean?)]
-  [rename rep<? obj<? (Object? Object? . -> . boolean?)]
-  [rename Rep-seq Obj-seq (Object? . -> . any/c)]
-  [struct Rep ([seq exact-nonnegative-integer?]
-               [free-vars (hash/c symbol? variance?)]
-               [free-idxs (hash/c symbol? variance?)]
-               [stx (or/c #f syntax?)])])
+ [rename rep-equal? type-equal? (Type? Type? . -> . boolean?)]
+ [rename rep<? type<? (Type? Type? . -> . boolean?)]
+ [rename rep<? filter<? (Filter? Filter? . -> . boolean?)]
+ [rename rep<? obj<? (Object? Object? . -> . boolean?)]
+ [rename Rep-seq Obj-seq (Object? . -> . any/c)]
+ [struct Rep ([seq exact-nonnegative-integer?]
+              [free-vars (hash/c symbol? variance?)]
+              [free-idxs (hash/c symbol? variance?)]
+              [stx (or/c #f syntax?)])])

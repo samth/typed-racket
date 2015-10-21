@@ -1449,51 +1449,81 @@
     (varop-1+ N))]
 
 [max
- (from-cases (map varop (list -Zero -One))
-             (commutative-case -One -Zero)
-             (commutative-case -PosByte -Byte)
-             (commutative-case -PosIndex -Index)
-             (commutative-case -PosFixnum -Fixnum)
-             (commutative-case -NonNegFixnum -Fixnum)
-             (map varop (list -NegFixnum -NonPosFixnum -PosFixnum -NonNegFixnum -Fixnum))
-             (commutative-case -PosInt -Int)
-             (commutative-case -Nat -Int)
-             (map varop (list -NegInt -NonPosInt -PosInt -Nat -Int))
-             ;; we could have more cases here. for instance, when mixing PosInt
-             ;; and NegRats, we get a result of type PosInt (not just PosRat)
-             ;; there's a lot of these, but they may not be worth including
-             (commutative-case -PosRat -Rat)
-             (commutative-case -NonNegRat -Rat)
-             (map varop (list -NegRat -NonPosRat -PosRat -NonNegRat -Rat
-                                 -FlonumPosZero -FlonumNegZero -FlonumZero))
-             ;; inexactness is contagious: (max 3 2.3) => 3.0
-             ;; we could add cases to encode that
-             (commutative-case -PosFlonum -Flonum)
-             (commutative-case -NonNegFlonum -Flonum)
-             (map varop (list -NegFlonum -NonPosFlonum -PosFlonum -NonNegFlonum -Flonum
-                              -SingleFlonumPosZero -SingleFlonumNegZero -SingleFlonumZero))
-             (varop -PosSingleFlonum)
-             (commutative-case -PosSingleFlonum -SingleFlonum)
-             (varop -NonNegSingleFlonum)
-             (commutative-case -NonNegSingleFlonum -SingleFlonum)
-             (map varop (list -NegSingleFlonum -NonPosSingleFlonum -SingleFlonum
-                              -InexactRealPosZero -InexactRealNegZero -InexactRealZero))
-             (commutative-case -PosInexactReal -InexactReal)
-             (commutative-case -NonNegInexactReal -InexactReal)
-             (map varop (list -NegInexactReal -NonPosInexactReal -PosInexactReal -NonNegInexactReal
-                              -InexactReal -RealZero))
-             (commutative-case -PosReal -Real)
-             (commutative-case -NonNegReal -Real)
-             (map varop (list -NegReal -NonPosReal -PosReal -NonNegReal -Real)))]
+ (let* ([max-ref (-and (-leqSLI (-lexp (list 1 (-lvl-arg-obj 1 0)))
+                               (-lexp (list 1 (-lvl-arg-obj 0 0))))
+                       (-leqSLI (-lexp (list 1 (-lvl-arg-obj 1 1)))
+                               (-lexp (list 1 (-lvl-arg-obj 0 0)))))]
+        [commutative-int-case (λ (d1 d2) (commutative-case d1 d2 (-unsafe-refine d1 max-ref)))])
+   (from-cases (map varop (list -Zero -One))
+               (commutative-int-case -One -Zero)
+               (commutative-int-case -PosByte -Byte)
+               (commutative-int-case -PosIndex -Index)
+               (commutative-int-case -PosFixnum -Fixnum)
+               (commutative-int-case -NonNegFixnum -Fixnum)
+               (commutative-int-case -NegFixnum -NegFixnum)
+               (commutative-int-case -NonPosFixnum -NonPosFixnum)
+               (commutative-int-case -PosFixnum -PosFixnum)
+               (commutative-int-case -NonNegFixnum -NonNegFixnum)
+               (commutative-int-case -Fixnum -Fixnum)
+               (map varop (list -NegFixnum -NonPosFixnum -PosFixnum -NonNegFixnum -Fixnum))
+               (commutative-int-case -PosInt -Int)
+               (commutative-int-case -Nat -Int)
+               (commutative-int-case -NegInt -NegInt)
+               (commutative-int-case -NonPosInt -NonPosInt)
+               (commutative-int-case -PosInt -PosInt)
+               (commutative-int-case -Nat -Nat)
+               (commutative-int-case -Int -Int)
+               (map varop (list -NegInt -NonPosInt -PosInt -Nat -Int))
+               ;; we could have more cases here. for instance, when mixing PosInt
+               ;; and NegRats, we get a result of type PosInt (not just PosRat)
+               ;; there's a lot of these, but they may not be worth including
+               (commutative-case -PosRat -Rat)
+               (commutative-case -NonNegRat -Rat)
+               (map varop (list -NegRat -NonPosRat -PosRat -NonNegRat -Rat
+                                -FlonumPosZero -FlonumNegZero -FlonumZero))
+               ;; inexactness is contagious: (max 3 2.3) => 3.0
+               ;; we could add cases to encode that
+               (commutative-case -PosFlonum -Flonum)
+               (commutative-case -NonNegFlonum -Flonum)
+               (map varop (list -NegFlonum -NonPosFlonum -PosFlonum -NonNegFlonum -Flonum
+                                -SingleFlonumPosZero -SingleFlonumNegZero -SingleFlonumZero))
+               (varop -PosSingleFlonum)
+               (commutative-case -PosSingleFlonum -SingleFlonum)
+               (varop -NonNegSingleFlonum)
+               (commutative-case -NonNegSingleFlonum -SingleFlonum)
+               (map varop (list -NegSingleFlonum -NonPosSingleFlonum -SingleFlonum
+                                -InexactRealPosZero -InexactRealNegZero -InexactRealZero))
+               (commutative-case -PosInexactReal -InexactReal)
+               (commutative-case -NonNegInexactReal -InexactReal)
+               (map varop (list -NegInexactReal -NonPosInexactReal -PosInexactReal -NonNegInexactReal
+                                -InexactReal -RealZero))
+               (commutative-case -PosReal -Real)
+               (commutative-case -NonNegReal -Real)
+               (map varop (list -NegReal -NonPosReal -PosReal -NonNegReal -Real))))]
 [min
- (from-cases (map varop (list -Zero -One))
-             (commutative-case -Zero -One)
+ (let* ([max-ref (-and (-gteqSLI (-lexp (list 1 (-lvl-arg-obj 1 0)))
+                               (-lexp (list 1 (-lvl-arg-obj 0 0))))
+                       (-gteqSLI (-lexp (list 1 (-lvl-arg-obj 1 1)))
+                               (-lexp (list 1 (-lvl-arg-obj 0 0)))))]
+        [commutative-int-case (λ (d1 d2) (commutative-case d1 d2 (-unsafe-refine d1 max-ref)))])
+   (from-cases (map varop (list -Zero -One))
+             (commutative-int-case -Zero -One)
              (map varop (list -PosByte -Byte -PosIndex -Index -PosFixnum -NonNegFixnum))
-             (commutative-case -NegFixnum -Fixnum)
-             (commutative-case -NonPosFixnum -Fixnum)
+             (commutative-int-case -NegFixnum -Fixnum)
+             (commutative-int-case -NonPosFixnum -Fixnum)
+             (commutative-int-case -NegFixnum -NegFixnum)
+             (commutative-int-case -NonPosFixnum -NonPosFixnum)
+             (commutative-int-case -PosFixnum -PosFixnum)
+             (commutative-int-case -NonNegFixnum -NonNegFixnum)
+             (commutative-int-case -Fixnum -Fixnum)
              (map varop (list -NegFixnum -NonPosFixnum -Fixnum -PosInt -Nat))
-             (commutative-case -NegInt -Int)
-             (commutative-case -NonPosInt -Int)
+             (commutative-int-case -NegInt -Int)
+             (commutative-int-case -NonPosInt -Int)
+             (commutative-int-case -NegInt -NegInt)
+             (commutative-int-case -NonPosInt -NonPosInt)
+             (commutative-int-case -PosInt -PosInt)
+             (commutative-int-case -Nat -Nat)
+             (commutative-int-case -Int -Int)
              (map varop (list -NegInt -NonPosInt -Int -PosRat -NonNegRat))
              (commutative-case -NegRat -Rat)
              (commutative-case -NonPosRat -Rat)
@@ -1516,7 +1546,7 @@
                               -RealZero -PosReal -NonNegReal))
              (commutative-case -NegReal -Real)
              (commutative-case -NonPosReal -Real)
-             (map varop (list -NegReal -NonPosReal -Real)))]
+             (map varop (list -NegReal -NonPosReal -Real))))]
 
 [add1 (from-cases
        (dep-> -Zero (int+1 -One))
