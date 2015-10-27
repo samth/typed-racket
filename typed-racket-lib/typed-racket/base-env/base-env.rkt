@@ -846,10 +846,15 @@
                                 ((-vec b) b) . ->... .(-vec c)))]
 [vector-map! (-polydots (a b) ((list ((list a) (b b) . ->... . a) (-vec a))
                                ((-vec b) b) . ->... .(-vec a)))]
-[vector-append (cl->* (-poly (a) (-> (-vec a) (-vec a) (-unsafe-refine (-vec a) (-eqSLI (-lexp (list 1 (-acc-path -len (-lvl-arg-obj 1 0)))
-                                                                                               (list 1 (-acc-path -len (-lvl-arg-obj 1 1))))
-                                                                                        (-lexp (list 1 (-acc-path -len (-lvl-arg-obj 0 0))))))))
-                      (-poly (a) (->* (list) (-vec a) (-vec a))))]
+[vector-append (-poly
+                (a)
+                (cl->* (-> (-vec a) (-vec a)
+                           (-unsafe-refine
+                            (-vec a)
+                            (-eqSLI (-lexp (list 1 (-acc-path -len (-lvl-arg-obj 1 0)))
+                                           (list 1 (-acc-path -len (-lvl-arg-obj 1 1))))
+                                    (-lexp (list 1 (-acc-path -len (-lvl-arg-obj 0 0)))))))
+                       (->* (list) (-vec a) (-vec a))))]
 [vector-take   (-poly (a) ((-vec a) -Integer . -> . (-vec a)))]
 [vector-drop   (-poly (a) ((-vec a) -Integer . -> . (-vec a)))]
 [vector-take-right   (-poly (a) ((-vec a) -Integer . -> . (-vec a)))]
