@@ -5,6 +5,7 @@
          "utils.rkt"
          syntax/parse racket/match racket/function
          syntax/parse/experimental/reflect racket/list
+         racket/stream
          (typecheck signatures tc-funapp tc-subst)
          (types abbrev utils)
          (env lexical-env)
@@ -67,6 +68,13 @@
     [else #t]))
 
 
+(define (maybe-res-obj res)
+  (match res
+    [(tc-result1: t fs o)
+     #:when (non-empty-obj? o)
+     o]
+    [else #f]))
+
 (define (tc/app-regular form expected)
   (syntax-case form ()
     [(f . args)
@@ -81,25 +89,61 @@
        (define initial-arg-res-list
          (match f-ty
            [(Function: (list (arr: doms rng rest drest kws #t)))
-            (for/list ([a (in-list args*)]
-                       [dom-t (in-list doms)])
-              (tc-expr/check a (ret dom-t) #:more-specific #t))]
+            ;; typecheck each arg against the respective domain
+            ;; while substituting objects for DB indexes of later domain types
+            (let loop ([remaining-args-stx args*]
+                       [remaining-doms doms]
+                       [args-res null]
+                       [idx 0])
+              (cond
+                [(or (null? remaining-args-stx)
+                     (null? remaining-doms))
+                 (reverse args-res)]
+                [else
+                 (match-define (cons a-stx rst-as-stx) remaining-args-stx)
+                 (match-define (cons dom-t rst-doms) remaining-doms)
+                 (define arg-t (tc-expr/check a-stx (ret dom-t) #:more-specific #t))
+                 (define obj (maybe-res-obj arg-t))
+                 (loop rst-as-stx
+                       (if obj
+                           (map (λ (d) (subst-type d (list 0 idx) obj #t)) rst-doms)
+                           rst-doms)
+                       (cons arg-t args-res)
+                       (add1 idx))]))]
            [(Function: (? has-drest/filter?))
             (map single-value args*)]
            [(Function:
              (app matching-arities
                   (list (arr: doms ranges rests drests _ _) ..1)))
             (define matching-domains
-              (in-values-sequence
-               (apply in-parallel
-                      (for/list ((dom (in-list doms)) (rest (in-list rests)))
-                        (in-sequences (in-list dom) (in-cycle (in-value rest)))))))
-            (for/list ([a (in-list args*)]
-                       [types matching-domains])
-              (match-define (cons t ts) types)
-              (if (for/and ((t2 (in-list ts))) (equal? t t2))
-                  (tc-expr/check a (ret t) #:more-specific #t)
-                  (single-value a)))]
+              (sequence->stream
+               (in-values-sequence
+                (apply in-parallel
+                       (for/list ((dom-ts (in-list doms)) (rest (in-list rests)))
+                         (in-sequences (in-list dom-ts) (in-cycle (in-value rest))))))))
+            (let loop ([remaining-args-stx args*]
+                       [remaining-domss matching-domains]
+                       [args-res null]
+                       [idx 0]
+                       [subst values])
+              (cond
+                [(or (null? remaining-args-stx)
+                     (stream-empty? remaining-domss))
+                 (reverse args-res)]
+                [else
+                 (match-define (cons a-stx rst-as-stx) remaining-args-stx)
+                 (match-define (cons (app subst t) (app (λ (pre-ts) (map subst pre-ts)) ts))
+                   (stream-first remaining-domss))
+                 (define res-typess (stream-rest remaining-domss))
+                 (define arg-t (if (for/and ((t2 (in-list ts))) (equal? t t2))
+                                   (tc-expr/check a-stx (ret t) #:more-specific #t)
+                                   (single-value a-stx)))
+                 (define obj (maybe-res-obj arg-t))
+                 (loop rst-as-stx
+                       res-typess
+                       (cons arg-t args-res)
+                       (add1 idx)
+                       (if (not obj) subst (λ (t) (subst-type (subst t) (list 0 idx) obj #t))))]))]
            [_ (map single-value args*)]))
 
        (tc/funapp #'f #'args f-ty initial-arg-res-list expected))]))

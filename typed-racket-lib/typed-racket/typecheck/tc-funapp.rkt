@@ -62,10 +62,9 @@
   ;; and any associated props discussing their types
   
   (define-values
-    (args-res arg-objs arg-tys props temp-ids)
+    (args-res arg-objs props temp-ids)
     (for/fold ([res-l null]
                [obj-l null]
-               [ty-l null]
                [prop-l null]
                [temp-id-l null])
               ([r (in-list (reverse initial-args-res))])
@@ -74,7 +73,6 @@
         [(non-empty-obj? o)
          (values (cons r res-l)
                  (cons o obj-l)
-                 (cons t ty-l)
                  prop-l
                  temp-id-l)]
         [else
@@ -82,10 +80,9 @@
          (define o* (-id-path temp-id))
          (values (cons (ret t fs o*) res-l)
                  (cons o* obj-l)
-                 (cons t ty-l)
                  (cons (-is-type o* t) prop-l)
                  (cons temp-id temp-id-l))])))
-
+  
   (LOG "<~a><<TC/FUNAPP 2>>\n --NEW-ARGS--\n ~a\n\n"
        counter args-res)
   
