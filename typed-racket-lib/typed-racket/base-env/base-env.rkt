@@ -67,10 +67,21 @@
 
 ;; Section 4.2.2.7 (Random Numbers)
 [random
-  (cl->* (->opt -PosFixnum [-Pseudo-Random-Generator] (-unsafe-refine -NonNegFixnum (-ltSLI (-lexp (list 1 (-lvl-arg-obj 0 0)))
-                                                                                            (-lexp (list 1 (-lvl-arg-obj 1 0))))))
-         (->opt -PosInt [-Pseudo-Random-Generator] (-unsafe-refine -Nat (-ltSLI (-lexp (list 1 (-lvl-arg-obj 0 0)))
-                                                                                (-lexp (list 1 (-lvl-arg-obj 1 0))))))
+  (cl->* (->opt -PosFixnum [-Pseudo-Random-Generator]
+                (-unsafe-refine -NonNegFixnum (-and (-leqSLI (-lexp 0)
+                                                             (-lexp (list 1 (-lvl-arg-obj 0 0))))
+                                                    (-ltSLI (-lexp (list 1 (-lvl-arg-obj 0 0)))
+                                                            (-lexp (list 1 (-lvl-arg-obj 1 0)))))))
+         (->opt -PosInt [-Pseudo-Random-Generator]
+                (-unsafe-refine -Nat (-and (-leqSLI (-lexp 0)
+                                                    (-lexp (list 1 (-lvl-arg-obj 0 0))))
+                                           (-ltSLI (-lexp (list 1 (-lvl-arg-obj 0 0)))
+                                                   (-lexp (list 1 (-lvl-arg-obj 1 0)))))))
+         (->opt -Nat [-Pseudo-Random-Generator]
+                (-unsafe-refine -Nat (-and (-leqSLI (-lexp 0)
+                                                    (-lexp (list 1 (-lvl-arg-obj 0 0))))
+                                           (-ltSLI (-lexp (list 1 (-lvl-arg-obj 0 0)))
+                                                   (-lexp (list 1 (-lvl-arg-obj 1 0)))))))
          (->opt -Int [-Pseudo-Random-Generator] -Nat)
          (->opt [-Pseudo-Random-Generator] -Flonum))]
 

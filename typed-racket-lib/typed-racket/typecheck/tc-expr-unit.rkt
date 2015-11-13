@@ -2,7 +2,7 @@
 
 
 (require (rename-in "../utils/utils.rkt" [private private-in])
-         racket/match (prefix-in - (contract-req))
+         racket/match racket/format (prefix-in - (contract-req))
          "signatures.rkt"
          "check-below.rkt" "../types/kw-types.rkt"
          (types utils abbrev union subtype type-table
@@ -119,7 +119,7 @@
 (define (safe-counter++!)
   (set! safe-counter (add1 safe-counter)))
 
-(define safe-check-box (box #t #;'uninit))
+(define safe-check-box (box 'uninit))
 (define (safe-checking?)
   (define val (unbox safe-check-box))
   (cond
@@ -225,10 +225,15 @@
            [else res]))]
 
       ;; 'SAFE-VECTOR-REF?' TEST!
-      [(#%plain-app (~and vec-ref:id (~literal vector-ref))
+      [(#%plain-app (~and vec-ref:id (~or (~literal vector-ref)
+                                          (~literal unsafe-vector-ref)))
                     v-exp
                     i-exp)
        #:when (safe-checking?)
+       (define stx-w/loc (locate-stx form))
+       (define loc (~a (syntax-source stx-w/loc) ":"
+                       (syntax-line stx-w/loc) ":"
+                       (syntax-column stx-w/loc)))
        ;; try safe-vector-ref
        (define safe-result?
          (parameterize ([current-type-error? #f])
@@ -240,49 +245,25 @@
                                       expected)])
                   (and (not (current-type-error?)) result)))
               (λ () (restore-errors!))))))
-       (eprintf "~a ` ~a ` ~a ` ~a\n"
-                (syntax->datum #'vec-ref)
+       (eprintf "~a , ~a , ~a, ~a \n"
+                "ref"
                 (if safe-result? "YES" "NO")
                 (syntax->datum form)
-                (or (syntax-source form)
-                    (syntax-source #'v-exp)
-                    (syntax-source #'i-exp)
-                    (locate-stx form)))
+                loc)
        (or safe-result?
            (tc/app form expected))]
-
-      [(#%plain-app (~and vec-ref:id (~literal unsafe-vector-ref))
-                    v-exp
-                    i-exp)
-       ;; try safe-vector-ref
-       (define safe-result?
-         (parameterize ([current-type-error? #f])
-           (with-handlers ([exn:fail:syntax? (λ (_) #f)])
-             (dynamic-wind
-              (λ () (save-errors!))
-              (λ ()
-                (let ([result (tc/app (syntax/loc form (#%plain-app safe-vector-ref v-exp i-exp))
-                                      expected)])
-                  (and (not (current-type-error?)) result)))
-              (λ () (restore-errors!))))))
-       (eprintf "~a ` ~a ` ~a ` ~a\n"
-                (syntax->datum #'vec-ref)
-                (if safe-result? "YES" "NO")
-                (syntax->datum form)
-                (or (syntax-source form)
-                    (syntax-source #'v-exp)
-                    (syntax-source #'i-exp)
-                    (locate-stx form)))
-       (or safe-result?
-           (tc/app form expected))]
-
       ;; SAFE-VECTOR-SET!-TEST!
-      [(#%plain-app (~and vec-set:id (~literal vector-set!))
+      [(#%plain-app (~and vec-set:id (~or (~literal vector-set!)
+                                          (~literal unsafe-vector-set!)))
                     v-exp
                     i-exp
                     val-exp)
        #:when (safe-checking?)
        ;; try safe-vector-ref
+       (define stx-w/loc (locate-stx form))
+       (define loc (~a (syntax-source stx-w/loc) ":"
+                       (syntax-line stx-w/loc) ":"
+                       (syntax-column stx-w/loc)))
        (define safe-result?
          (parameterize ([current-type-error? #f])
            (with-handlers ([exn:fail:syntax? (λ (_) #f)])
@@ -293,45 +274,13 @@
                                        expected)])
                    (and (not (current-type-error?)) result)))
                (λ () (restore-errors!))))))
-       (eprintf "~a ` ~a ` ~a ` ~a\n"
-                (syntax->datum #'vec-set)
+       (eprintf "~a , ~a , ~a, ~a, \n"
+                "set!"
                 (if safe-result? "YES" "NO")
                 (syntax->datum form)
-                (or (syntax-source form)
-                    (syntax-source #'vec-set)
-                    (syntax-source #'v-exp)
-                    (syntax-source #'i-exp)
-                    (locate-stx form)))
+                loc)
        (or safe-result?
            (tc/app form expected))]
-
-      [(#%plain-app (~and vec-set:id (~literal unsafe-vector-set!))
-                    v-exp
-                    i-exp
-                    val-exp)
-       ;; try safe-vector-ref
-       (define safe-result?
-         (parameterize ([current-type-error? #f])
-           (with-handlers ([exn:fail:syntax? (λ (_) #f)])
-             (dynamic-wind
-              (λ () (save-errors!))
-              (λ ()
-                (let ([result (tc/app (syntax/loc form (#%plain-app safe-vector-set! v-exp i-exp val-exp))
-                                      expected)])
-                  (and (not (current-type-error?)) result)))
-              (λ () (restore-errors!))))))
-       (eprintf "~a ` ~a ` ~a ` ~a\n"
-                (syntax->datum #'vec-set)
-                (if safe-result? "YES" "NO")
-                (syntax->datum form)
-                (or (syntax-source form)
-                    (syntax-source #'vec-set)
-                    (syntax-source #'v-exp)
-                    (syntax-source #'i-exp)
-                    (locate-stx form)))
-       (or safe-result?
-           (tc/app form expected))]
-
       ;; application
       [(#%plain-app . _)
        (tc/app form expected)]
