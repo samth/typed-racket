@@ -853,8 +853,13 @@
         (cl->* ((-vec a) . -> . (-vec a))
                ((-vec a) -Integer . -> . (-vec a))
                ((-vec a) -Integer -Integer . -> . (-vec a))))]
-[vector-map (-polydots (c a b) ((list ((list a) (b b) . ->... . c) (-vec a))
-                                ((-vec b) b) . ->... .(-vec c)))]
+[vector-map
+ (-polydots (c a b)
+            ((list ((list a) (b b) . ->... . c) (-vec a))
+             ((-vec b) b) . ->...
+             .(-unsafe-refine (-vec c)
+                              (-eqSLI (-lexp (list 1 (-acc-path -len (-lvl-arg-obj 1 1))))
+                                      (-lexp (list 1 (-acc-path -len (-lvl-arg-obj 0 0))))))))]
 [vector-map! (-polydots (a b) ((list ((list a) (b b) . ->... . a) (-vec a))
                                ((-vec b) b) . ->... .(-vec a)))]
 [vector-append (-poly
