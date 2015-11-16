@@ -28,7 +28,6 @@
     (define (extract-functions struct-type)
       (define-values (sym init auto ref set! imms par skip?)
         (struct-type-info struct-type))
-      (when skip? (fail neg-party s)) ;; "Opaque struct type!")
       (define-values (fun/chap-list _)
         (for/fold ([res null]
                    [imms imms])
@@ -52,7 +51,7 @@
         [par (append fun/chap-list (extract-functions par))]
         [else fun/chap-list]))
     (define-values (type skipped?) (struct-info s))
-    (when skipped? (fail neg-party s));  "Opaque struct type!"
+    ;; It's ok to just ignore skipped? -- see https://github.com/racket/typed-racket/issues/203
     (apply chaperone-struct s (extract-functions type)))
  
   (define (any-wrap/traverse neg-party v)
