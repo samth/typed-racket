@@ -4,7 +4,7 @@
 
 (module untyped racket/base
  (define (color? x)
-   (memq x '(red green blue)))
+   (and (memq x '(red green blue)) #t))
  (provide color?))
 
 (module typed typed/racket/base
