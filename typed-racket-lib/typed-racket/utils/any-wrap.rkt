@@ -1,21 +1,50 @@
 #lang racket/base
 
 (require racket/match racket/contract/combinator
+         racket/class racket/unit
          racket/fixnum racket/flonum racket/extflonum
          racket/set
          racket/undefined
+         (only-in racket/udp udp?)
+         (only-in racket/future future? fsemaphore?)
+         (only-in racket/pretty pretty-print-style-table?)
          (only-in (combine-in racket/private/promise)
                   promise?
                   prop:force promise-forcer))
 
 (define (base-val? e)
   (or (number? e) (string? e) (char? e) (symbol? e)
-      (null? e) (regexp? e) (eq? undefined e) (path? e)
-      (regexp? e) (keyword? e) (bytes? e) (boolean? e) (void? e)
+      (null? e) (eq? undefined e) (path? e) (eof-object? e)
+      (regexp? e) (pregexp? e) (byte-regexp? e) (byte-pregexp? e)
+      (keyword? e) (bytes? e) (boolean? e) (void? e)
+      (continuation-prompt-tag? e) (continuation-mark-key? e)
+      (module-path? e) (resolved-module-path? e)
+      (pretty-print-style-table? e) (namespace-anchor? e)
+      (variable-reference? e) (impersonator-property? e)
+      (semaphore? e) (fsemaphore? e)
+      (bytes-converter? e)
+      (pseudo-random-generator? e)
+      (logger? e)
+      (continuation-mark-set? e)
       ;; Base values because you can only store flonums/fixnums in these
       ;; and not any higher-order values. This isn't sound if we ever
       ;; introduce bounded polymorphism for Flvector/Fxvector.
-      (flvector? e) (fxvector? e) (extflvector? e)))
+      (flvector? e) (fxvector? e) (extflvector? e) (extflonum? e)))
+
+(define (unsafe-val? e)
+  (or (syntax? e) (namespace? e) (weak-box? e) (ephemeron? e)
+      (mpair? e) (thread-cell? e) (class? e) (unit? e)
+      (compiled-module-expression? e) (compiled-expression? e)
+      (struct-type-property? e)
+      (special-comment? e)
+      (udp? e) (custodian? e) (parameterization? e)
+      (internal-definition-context? e)
+      (thread-group? e)
+      (inspector? e)
+      (security-guard? e)
+      (future? e)
+      (custodian-box? e)
+  ))
 
 (define (val-first-projection b)
   (define (fail neg-party v)
@@ -58,6 +87,8 @@
     (match v
       [(? base-val?)
        v]
+      [(? unsafe-val?)
+       (fail neg-party v)]
       [(cons x y) (cons (any-wrap/traverse neg-party x) (any-wrap/traverse neg-party y))]
       [(? vector? (? immutable?))
        ;; fixme -- should have an immutable for/vector
@@ -65,6 +96,9 @@
         (for/vector #:length (vector-length v)
           ([i (in-vector v)]) (any-wrap/traverse neg-party i)))]
       [(? box? (? immutable?)) (box-immutable (any-wrap/traverse neg-party (unbox v)))]
+      [(? box?) (chaperone-box v
+                               (lambda (v e) (any-wrap/traverse neg-party e))
+                               (lambda (v e) (fail neg-party v)))]
       ;; fixme -- handling keys properly makes it not a chaperone
       ;; [(? hasheq? (? immutable?))
       ;;  (for/hasheq ([(k v) (in-hash v)]) (values k v))]
@@ -79,9 +113,6 @@
       [(? vector?) (chaperone-vector v
                                      (lambda (v i e) (any-wrap/traverse neg-party e))
                                      (lambda (v i e) (fail neg-party v)))]
-      [(? box?) (chaperone-box v
-                               (lambda (v e) (any-wrap/traverse neg-party e))
-                               (lambda (v e) (fail neg-party v)))]
       [(? hash?) (chaperone-hash v
                                  (lambda (h k)
                                    (values k (lambda (h k v) (any-wrap/traverse neg-party v)))) ;; ref
@@ -109,7 +140,12 @@
            (λ (promise)
              (values (λ (val) (any-wrap/traverse neg-party val))
                      promise)))))]
-      [_ (fail neg-party v)]))
+      [(? channel?)
+       ;;bg; Should be able to take `Any` from the channel, but can't put anything in
+       (chaperone-channel v
+                          (lambda (e) (values v (any-wrap/traverse neg-party v)))
+                          (lambda (e) (fail neg-party v)))]
+      [_ (chaperone-struct v)]))
   (λ (v) (λ (neg-party) (any-wrap/traverse neg-party v))))
 
 (define any-wrap/c
