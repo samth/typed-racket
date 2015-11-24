@@ -30,38 +30,30 @@
  ;[ExtFlonum-Negative-Zero (->extfl -0) extflround]
  ;[ExtFlonum-Positive-Zero (->extfl 0) extflround]
  ;[Single-Flonum-Complex 1f0+1i add1]
- ;[Undefined undefined boolean?]
- ;[Nothing (Un)]
- ;[Prompt-TagTop (default-continuation-prompt-tag) continuation-prompt-available?]
- ;[Struct-TypeTop (let () (struct s ()) (s)) (lambda (x) x)]
- ;[Module-Path-Index (let ([x 4]) (variable-reference->module-path-index x)) module-path-index-resolve]
- ;[Compiled-Module-Expression (compile-syntax #'(module foo racket/base (void))) #f]
  ;[Read-Table (or (current-readtable) (error 'pr241 "Failed to make a readtable")) #f]
- ;[Namespace-Anchor (let () (define-namespace-anchor x) x) namespace-anchor->empty-namespace]
  ;[Internal-Definition-Context (syntax-local-make-definition-context) #f]
  ;;bg; subprocess prints to console
  ;[Subprocess (let-values ([(sp _out _in _err) (subprocess (current-output-port) (current-input-port) (current-output-port) ":")]) sp) choice-evt]
  ;[Place (place hi (void)) place-kill]
 
  ;; --- Types that should NOT be passes as 'Any' are marked with #f
- [Namespace (make-empty-namespace) #f]
- [Syntax-E (syntax-e (syntax 'A)) #f]
- [Syntax (syntax 'B) #f]
- [Compiled-Expression (compile-syntax #'#t) #f]
- [Weak-BoxTop (make-weak-box 3) #f]
- [Identifier (syntax exit) #f]
- [Thread-CellTop (make-thread-cell 'X) #f]
  [ClassTop object% #f]
- [UnitTop (unit (import) (export)) #f]
+ [Continuation-Mark-KeyTop (make-continuation-mark-key) #f]
+ [Continuation-Mark-Set (current-continuation-marks) #f]
+ [Custodian (current-custodian) #f]
+ [Identifier (syntax exit) #f]
+ [MPairTop (mcons 1 1) #f]
+ [Namespace (make-empty-namespace) #f]
+ [Parameterization (current-parameterization) #f]
+ [Security-Guard (current-security-guard) #f]
  [Special-Comment (make-special-comment 'hi) #f]
  [Struct-Type-Property (let-values ([(n g s) (make-struct-type-property 'foo)]) n) #f]
- [UDP-Socket (udp-open-socket) #f]
- [Custodian (current-custodian) #f]
- [Parameterization (current-parameterization) #f]
- [Inspector (current-inspector) #f]
- [Security-Guard (current-security-guard) #f]
- [Thread-Group (current-thread-group) #f]
- [MPairTop (mcons 1 1) #f]
+ [Syntax (syntax 'B) #f]
+ [Syntax-E (syntax-e (syntax 'A)) #f]
+ [Thread-CellTop (make-thread-cell 'X) #f]
+ [UnitTop (unit (import) (export)) #f]
+ [Variable-Reference (let ([x 4]) (#%variable-reference x)) #f]
+ [Weak-BoxTop (make-weak-box 3) #f]
 
  ;; -- Normal base types
  [Complex 0 add1]
@@ -141,57 +133,59 @@
  [Positive-ExtFlonum (->extfl 1) extflround]
  [ExtFlonum-Nan +nan.t (lambda (n) (extfl= n n))]
 
- [Void (void) void?]
- [Boolean #f not]
- [Symbol 'a symbol->string]
- [String "yolo" string->symbol]
  [Any 'a boolean?]
- [Port (current-input-port) port?]
+ [Async-ChannelTop (make-async-channel) async-channel-try-get]
+ [Boolean #f not]
+ [BoxTop (box 5) boolean?]
+ [Byte-PRegexp (byte-pregexp #"\\d\\d") (lambda (p) (regexp-match? p "013a"))]
+ [Byte-Regexp (byte-regexp #"hi$") (lambda (p) (regexp-match? p "hi"))]
+ [Bytes #"hello" bytes-length]
+ [Bytes-Converter (or (bytes-open-converter "UTF-8" "UTF-8") (error 'pr241 "Failed to make bytes converter")) bytes-close-converter]
+ [ChannelTop (make-channel) channel-try-get]
+ [Char #\space char->integer]
+ [Compiled-Expression (compile-syntax #'#t) compiled-expression?]
+ [Datum 'A (lambda (x) (datum->syntax #f x))]
+ [EOF eof eof-object?]
+ [ExtFlVector (extflvector pi.t) extflvector-length]
+ [FSemaphore (make-fsemaphore 0) fsemaphore-post]
+ [False #f not]
+ [FlVector (flvector 1.14 2.14 3.14) flvector-length]
+ [FxVector (fxvector 1) fxvector-length]
+ [HashTableTop (hash) (lambda (h) (hash-ref h 'a #f))]
+ [Impersonator-Property (let-values ([(i i? i-val) (make-impersonator-property 'i)]) i) (lambda (i) (impersonate-procedure (lambda () (void)) #f i 2))]
+ [Input-Port (current-input-port) port?]
+ [Inspector (current-inspector) (lambda (i) (parameterize ([current-inspector i]) (void)))]
+ [Keyword (string->keyword "hi") keyword->string]
+ [Log-Level 'info symbol->string]
+ [Log-Receiver (make-log-receiver (current-logger) 'info) choice-evt]
+ [Logger (current-logger) (lambda (l) (log-level? l 'info))]
+ [Module-Path "hello.rkt" module-path?]
+ [Null '() length]
+ [Output-Port (current-output-port) port?]
+ [PRegexp #px"\\d\\d" (lambda (p) (regexp-match? p "013a"))]
  [Path (current-directory) path->string]
  [Path-For-Some-System (current-directory) path->string]
  [Path-String "foo/bar" relative-path?]
- [Regexp #rx"hi$" (lambda (p) (regexp-match? p "hi"))]
- [PRegexp #px"\\d\\d" (lambda (p) (regexp-match? p "013a"))]
- [Byte-Regexp (byte-regexp #"hi$") (lambda (p) (regexp-match? p "hi"))]
- [Byte-PRegexp (byte-pregexp #"\\d\\d") (lambda (p) (regexp-match? p "013a"))]
- [Char #\space char->integer]
- [Input-Port (current-input-port) port?]
- [Output-Port (current-output-port) port?]
- [Bytes #"hello" bytes-length]
- [EOF eof eof-object?]
- [Datum 'A (lambda (x) (datum->syntax #f x))]
- [Sexp (syntax->datum (syntax 'foo)) (lambda (x) x)]
- [Procedure (lambda (x) x) (lambda (f) (procedure-arity-includes? f 1))]
- [BoxTop (box 5) boolean?]
- [ChannelTop (make-channel) channel-try-get]
- [Async-ChannelTop (make-async-channel) async-channel-try-get]
- [VectorTop (vector 1 2 3) (lambda (x) (vector-ref x 0))]
- [HashTableTop (hash) (lambda (h) (hash-ref h 'a #f))]
- [Continuation-Mark-KeyTop (make-continuation-mark-key) (lambda (x) x)]
- [Keyword (string->keyword "hi") keyword->string]
- [Thread (thread (lambda () (void))) choice-evt]
- [Resolved-Module-Path (make-resolved-module-path (current-directory)) resolved-module-path-name]
- [Module-Path "hello.rkt" module-path?]
- [Pretty-Print-Style-Table (pretty-print-current-style-table) (lambda (x) (pretty-print-extend-style-table x '() '()))]
- [TCP-Listener (tcp-listen 0) choice-evt]
- [Variable-Reference (let ([x 4]) (#%variable-reference x)) variable-reference->empty-namespace]
- [Impersonator-Property (let-values ([(i i? i-val) (make-impersonator-property 'i)]) i) (lambda (i) (impersonate-procedure (lambda () (void)) #f i 2))]
- [Semaphore (make-semaphore) semaphore-post]
- [FSemaphore (make-fsemaphore 0) fsemaphore-post]
- [Bytes-Converter (or (bytes-open-converter "UTF-8" "UTF-8") (error 'pr241 "Failed to make bytes converter")) bytes-close-converter]
- [Pseudo-Random-Generator (current-pseudo-random-generator) pseudo-random-generator->vector]
- [Logger (current-logger) (lambda (l) (log-level? l 'info))]
- [Log-Receiver (make-log-receiver (current-logger) 'info) choice-evt]
- [Log-Level 'info symbol->string]
  [Place-Channel (let-values ([(p1 p2) (place-channel)]) p1) choice-evt]
- [Will-Executor (make-will-executor) choice-evt]
- [FlVector (flvector 1.14 2.14 3.14) flvector-length]
- [ExtFlVector (extflvector pi.t) extflvector-length]
- [FxVector (fxvector 1) fxvector-length]
- [Continuation-Mark-Set (current-continuation-marks) continuation-mark-set->context]
- [False #f not]
+ [Port (current-input-port) port?]
+ [Pretty-Print-Style-Table (pretty-print-current-style-table) (lambda (x) (pretty-print-extend-style-table x '() '()))]
+ [Procedure (lambda (x) x) (lambda (f) (procedure-arity-includes? f 1))]
+ [Prompt-TagTop (make-continuation-prompt-tag) continuation-prompt-available?]
+ [Pseudo-Random-Generator (current-pseudo-random-generator) pseudo-random-generator->vector]
+ [Regexp #rx"hi$" (lambda (p) (regexp-match? p "hi"))]
+ [Resolved-Module-Path (make-resolved-module-path (current-directory)) resolved-module-path-name]
+ [Semaphore (make-semaphore) semaphore-post]
+ [Sexp (syntax->datum (syntax 'foo)) (lambda (x) x)]
+ [String "yolo" string->symbol]
+ [Symbol 'a symbol->string]
+ [TCP-Listener (tcp-listen 0) choice-evt]
+ [Thread (thread (lambda () (void))) choice-evt]
+ [Thread-Group (current-thread-group) make-thread-group]
  [True #t not]
- [Null '() length]
+ [UDP-Socket (udp-open-socket) udp-close]
+ [VectorTop (vector 1 2 3) (lambda (x) (vector-ref x 0))]
+ [Void (void) void?]
+ [Will-Executor (make-will-executor) choice-evt]
 ))
 
 (define-values-for-syntax (base-untyped* base-typed*)
@@ -230,32 +224,42 @@
 (define-for-syntax known-poly-types '(
   ;; --- TODO need value for these types
   ;[Async-Channelof (Async-Channelof Any) (make-async-channel) async-channel-try-get]
-  ;[Prompt-Tagof (Prompt-Tagof Any Any) (default-continuation-prompt-tag) #f]
-  ;[Evtof (Evtof String) (make-log-receiver (current-logger)) choice-evt]
 
   ;; --- Higher-Order polymorphic types
-  [Syntaxof (Syntaxof Integer) #'1 #f]
-  [Weak-Boxof (Weak-Boxof Integer) (make-weak-box 1) #f]
+  [Continuation-Mark-Keyof (Continuation-Mark-Keyof Any) (make-continuation-mark-key 'X) #f]
+  [Custodian-Boxof (Custodian-Boxof Integer) (make-custodian-box (current-custodian) 1) #f]
   [Ephemeronof (Ephemeronof Integer) (make-ephemeron 'key 4) #f]
+  [Evtof (Evtof String) never-evt choice-evt]
   [Futureof (Futureof Integer) (future (lambda () 4)) #f]
   [MPairof (MPairof Integer String) (mcons 4 "ad") #f]
+  [Prompt-Tagof (Prompt-Tagof Any Any) (make-continuation-prompt-tag) (lambda (t) (chaperone-prompt-tag t (lambda () #f) (lambda () #f)))]
+  [Syntaxof (Syntaxof Integer) #'1 #f]
   [Thread-Cellof (Thread-Cellof Integer) (make-thread-cell 1) #f]
-  [Custodian-Boxof (Custodian-Boxof Integer) (make-custodian-box (current-custodian) 1) #f]
+  [Weak-Boxof (Weak-Boxof Integer) (make-weak-box 1) #f]
 
   ;; -- Wrappable polymorphic types
-  [Listof (Listof Integer) (list 1) (lambda (xs) (add1 (car xs)))]
-  [Sexpof (Sexpof Integer) (syntax->datum #'(1 2 3)) (lambda (xs) (add1 (car xs)))]
-  [Vectorof (Vectorof Integer) (vector 1) (lambda (v) (add1 (vector-ref v 0)))]
-  [Option (Option Integer) 1 add1]
-  [HashTable (HashTable Symbol String) (hash) (lambda (h) (hash-ref h 'a #f))]
-  [Promise (Promise Integer) (delay 3) force]
-  [Pair (Pair Integer Boolean) (cons 1 #t) (lambda (v) (add1 (car v)))]
   [Boxof (Boxof Integer) (box 3) (lambda (v) (add1 (unbox v)))]
   [Channelof (Channelof Integer) (make-channel) channel-try-get]
-  [Setof (Setof Integer) (set) set-empty?]
+  [HashTable (HashTable Symbol String) (hash) (lambda (h) (hash-ref h 'a #f))]
+  [Listof (Listof Integer) (list 1) (lambda (xs) (add1 (car xs)))]
+  [Option (Option Integer) 1 add1]
+  [Pair (Pair Integer Boolean) (cons 1 #t) (lambda (v) (add1 (car v)))]
   [Pairof (Pairof Integer Boolean) (cons 1 #f) (lambda (v) (add1 (car v)))]
+  [Promise (Promise Integer) (delay 3) force]
   [Sequenceof (Sequenceof Natural) '(1 2 3) sequence->list]
-  [Continuation-Mark-Keyof (Continuation-Mark-Keyof Any) (make-continuation-mark-key 'X) boolean?]
+  [Setof (Setof Integer) (set) set-empty?]
+  [Sexpof (Sexpof Integer) (syntax->datum #'(1 2 3)) (lambda (xs) (add1 (car xs)))]
+  [Vectorof (Vectorof Integer) (vector 1) (lambda (v) (add1 (vector-ref v 0)))]
+))
+
+;; We don't have values to test these types with, but trust they're wrapped correctly
+(define-for-syntax whitelist '(
+ (Undefined . #f)
+ (Nothing . #f)
+ (Struct-TypeTop . #f)
+ (Module-Path-Index . #f)
+ (Compiled-Module-Expression . #f)
+ (Namespace-Anchor . "See `variation-6` for this pull request")
 ))
 
 (define-values-for-syntax (poly-untyped* poly-typed*)
@@ -317,11 +321,12 @@
 
 (define-for-syntax (known-string? str)
   (define s (string->symbol str))
-  (or
-    (for/or ([x (in-list known-poly-types)])
-      (eq? s (car x)))
-    (for/or ([x (in-list known-base-types)])
-      (eq? s (car x)))))
+  (member* s known-base-types known-poly-types whitelist))
+
+(define-for-syntax (member* s . x**)
+  (for*/or ([x* (in-list x**)]
+            [x (in-list x*)])
+    (eq? s (car x))))
 
 (require
   (filtered-in
