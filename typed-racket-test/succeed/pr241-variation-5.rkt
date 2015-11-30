@@ -26,14 +26,8 @@
 ;;  and not be dummy functions like (lambda (x) x).
 (define-for-syntax known-base-types '(
  ;; --- TODO missing value for these types
- ;[ExtFlonum-Zero (->extfl 0) extflround]
- ;[ExtFlonum-Negative-Zero (->extfl -0) extflround]
- ;[ExtFlonum-Positive-Zero (->extfl 0) extflround]
- ;[Single-Flonum-Complex 1f0+1i add1]
- ;[Read-Table (or (current-readtable) (error 'pr241 "Failed to make a readtable")) #f]
+ ;[Read-Table (or (current-readtable) (error 'noo)) #f]
  ;[Internal-Definition-Context (syntax-local-make-definition-context) #f]
- ;;bg; subprocess prints to console
- ;[Subprocess (let-values ([(sp _out _in _err) (subprocess (current-output-port) (current-input-port) (current-output-port) ":")]) sp) choice-evt]
  ;[Place (place hi (void)) place-kill]
 
  ;; --- Types that should NOT be passes as 'Any' are marked with #f
@@ -56,6 +50,17 @@
  [Weak-BoxTop (make-weak-box 3) #f]
 
  ;; -- Normal base types
+ [Subprocess
+  (let*-values ([(sp _out _in _err) (subprocess #f #f #f ".")])
+    (close-output-port _in)
+    (close-input-port _out)
+    (close-input-port _err)
+    sp)
+  choice-evt]
+ [Single-Flonum-Complex 1f0+1f0i add1]
+ [ExtFlonum-Zero 0.0t0 extflround]
+ [ExtFlonum-Negative-Zero -0.0t0 extflround]
+ [ExtFlonum-Positive-Zero +0.0t0 extflround]
  [Complex 0 add1]
  [Number 0 add1]
  [Inexact-Complex (let ([n (exact->inexact 1/3+1/3i)]) (if (not (real? n)) n (error 'pr241 "Failed to make Inexact-Complex"))) zero?]
@@ -73,6 +78,7 @@
  [Nonpositive-Single-Flonum -1.0f0 add1]
  [Negative-Inexact-Real -1.0f0 add1]
  [Negative-Single-Flonum -1.0f0 add1]
+ [Positive-Single-Flonum +1.0f0 add1]
  [Nonnegative-Inexact-Real (exact->inexact 1/3) add1]
  [Nonnegative-Single-Flonum 1.0f0 add1]
  [Positive-Inexact-Real 1.0f0 add1]
@@ -232,6 +238,7 @@
   [Evtof (Evtof String) never-evt choice-evt]
   [Futureof (Futureof Integer) (future (lambda () 4)) #f]
   [MPairof (MPairof Integer String) (mcons 4 "ad") #f]
+  [MListof (MListof Integer) (mcons 4 '()) #f]
   [Prompt-Tagof (Prompt-Tagof Any Any) (make-continuation-prompt-tag) (lambda (t) (chaperone-prompt-tag t (lambda () #f) (lambda () #f)))]
   [Syntaxof (Syntaxof Integer) #'1 #f]
   [Thread-Cellof (Thread-Cellof Integer) (make-thread-cell 1) #f]
