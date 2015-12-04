@@ -31,7 +31,9 @@
  ;[Place (place hi (void)) place-kill]
 
  ;; --- Types that should NOT be passes as 'Any' are marked with #f
+ [Async-ChannelTop (make-async-channel) #f]
  [ClassTop object% #f]
+ [Compiled-Expression (compile-syntax #'#t) #f]
  [Continuation-Mark-KeyTop (make-continuation-mark-key) #f]
  [Continuation-Mark-Set (current-continuation-marks) #f]
  [Custodian (current-custodian) #f]
@@ -39,6 +41,7 @@
  [MPairTop (mcons 1 1) #f]
  [Namespace (make-empty-namespace) #f]
  [Parameterization (current-parameterization) #f]
+ [Prompt-TagTop (make-continuation-prompt-tag) #f]
  [Security-Guard (current-security-guard) #f]
  [Special-Comment (make-special-comment 'hi) #f]
  [Struct-Type-Property (let-values ([(n g s) (make-struct-type-property 'foo)]) n) #f]
@@ -140,7 +143,6 @@
  [ExtFlonum-Nan +nan.t (lambda (n) (extfl= n n))]
 
  [Any 'a boolean?]
- [Async-ChannelTop (make-async-channel) async-channel-try-get]
  [Boolean #f not]
  [BoxTop (box 5) boolean?]
  [Byte-PRegexp (byte-pregexp #"\\d\\d") (lambda (p) (regexp-match? p "013a"))]
@@ -149,7 +151,6 @@
  [Bytes-Converter (or (bytes-open-converter "UTF-8" "UTF-8") (error 'pr241 "Failed to make bytes converter")) bytes-close-converter]
  [ChannelTop (make-channel) channel-try-get]
  [Char #\space char->integer]
- [Compiled-Expression (compile-syntax #'#t) compiled-expression?]
  [Datum 'A (lambda (x) (datum->syntax #f x))]
  [EOF eof eof-object?]
  [ExtFlVector (extflvector pi.t) extflvector-length]
@@ -176,7 +177,6 @@
  [Port (current-input-port) port?]
  [Pretty-Print-Style-Table (pretty-print-current-style-table) (lambda (x) (pretty-print-extend-style-table x '() '()))]
  [Procedure (lambda (x) x) (lambda (f) (procedure-arity-includes? f 1))]
- [Prompt-TagTop (make-continuation-prompt-tag) continuation-prompt-available?]
  [Pseudo-Random-Generator (current-pseudo-random-generator) pseudo-random-generator->vector]
  [Regexp #rx"hi$" (lambda (p) (regexp-match? p "hi"))]
  [Resolved-Module-Path (make-resolved-module-path (current-directory)) resolved-module-path-name]
@@ -228,10 +228,8 @@
 ;; VALUE is an expression with type TYPE
 ;; USE is the same as for `known-base-types`
 (define-for-syntax known-poly-types '(
-  ;; --- TODO need value for these types
-  ;[Async-Channelof (Async-Channelof Any) (make-async-channel) async-channel-try-get]
-
   ;; --- Higher-Order polymorphic types
+  [Async-Channelof (Async-Channelof Any) (make-async-channel) #f]
   [Continuation-Mark-Keyof (Continuation-Mark-Keyof Any) (make-continuation-mark-key 'X) #f]
   [Custodian-Boxof (Custodian-Boxof Integer) (make-custodian-box (current-custodian) 1) #f]
   [Ephemeronof (Ephemeronof Integer) (make-ephemeron 'key 4) #f]
@@ -239,7 +237,7 @@
   [Futureof (Futureof Integer) (future (lambda () 4)) #f]
   [MPairof (MPairof Integer String) (mcons 4 "ad") #f]
   [MListof (MListof Integer) (mcons 4 '()) #f]
-  [Prompt-Tagof (Prompt-Tagof Any Any) (make-continuation-prompt-tag) (lambda (t) (chaperone-prompt-tag t (lambda () #f) (lambda () #f)))]
+  [Prompt-Tagof (Prompt-Tagof Any Any) (make-continuation-prompt-tag) #f]
   [Syntaxof (Syntaxof Integer) #'1 #f]
   [Thread-Cellof (Thread-Cellof Integer) (make-thread-cell 1) #f]
   [Weak-Boxof (Weak-Boxof Integer) (make-weak-box 1) #f]
@@ -320,7 +318,7 @@
         (require/typed racket/base
           [variable-reference->module-path-index (-> Any Module-Path-Index)])
         (require/typed racket/async-channel
-          [make-async-channel (-> Async-ChannelTop)])
+          [make-async-channel (-> (Async-Channelof Any))])
         #,@base-typed*
         #,@poly-typed*
         (printf "Successfully typechecked ~a identifiers\n"

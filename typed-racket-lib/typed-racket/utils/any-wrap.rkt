@@ -5,9 +5,10 @@
          racket/fixnum racket/flonum racket/extflonum
          racket/set
          racket/undefined
-         (only-in racket/udp udp?)
+         (only-in racket/async-channel async-channel?)
          (only-in racket/future future? fsemaphore?)
          (only-in racket/pretty pretty-print-style-table?)
+         (only-in racket/udp udp?)
          (only-in (combine-in racket/private/promise)
                   promise?
                   prop:force promise-forcer))
@@ -33,7 +34,10 @@
       (flvector? e) (fxvector? e) (extflvector? e) (extflonum? e)))
 
 (define (unsafe-val? e)
-  (or
+  (or ;; TODO: async-channel and special-comment should be safe
+      (async-channel? e)
+      (special-comment? e)
+      ;; --
       (class? e)
       (compiled-expression? e)
       (compiled-module-expression? e)
@@ -50,14 +54,12 @@
       (namespace? e)
       (parameterization? e)
       (security-guard? e)
-      (special-comment? e) ;;TODO make safe
       (struct-type-property? e)
       (syntax? e)
       (thread-cell? e)
       (unit? e)
       (variable-reference? e)
-      (weak-box? e)
-  ))
+      (weak-box? e)))
 
 (define (val-first-projection b)
   (define (fail neg-party v)
