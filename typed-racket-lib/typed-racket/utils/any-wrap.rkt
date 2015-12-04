@@ -18,9 +18,7 @@
       (regexp? e) (pregexp? e) (byte-regexp? e) (byte-pregexp? e)
       (keyword? e) (bytes? e) (boolean? e) (void? e)
       (bytes-converter? e)
-      (compiled-expression? e)
-      (compiled-module-expression? e)
-      (continuation-prompt-tag? e) ;;bg; apply a chaperone?
+      (continuation-prompt-tag? e) ;;bg; TODO unsafe
       (impersonator-property? e)
       (inspector? e)
       (logger? e)
@@ -38,6 +36,8 @@
 (define (unsafe-val? e)
   (or
       (class? e)
+      (compiled-expression? e)
+      (compiled-module-expression? e)
       (continuation-mark-key? e) ;; Stricter than necessary if key holds a base value
       (continuation-mark-set? e)
       (custodian-box? e)
@@ -50,7 +50,7 @@
       (namespace? e)
       (parameterization? e)
       (security-guard? e)
-      (special-comment? e)
+      (special-comment? e) ;;TODO make safe
       (struct-type-property? e)
       (syntax? e)
       (thread-cell? e)
