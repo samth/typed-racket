@@ -18,7 +18,6 @@
       (regexp? e) (pregexp? e) (byte-regexp? e) (byte-pregexp? e)
       (keyword? e) (bytes? e) (boolean? e) (void? e)
       (bytes-converter? e)
-      (continuation-prompt-tag? e) ;;bg; TODO unsafe
       (impersonator-property? e)
       (inspector? e)
       (logger? e)
@@ -40,6 +39,7 @@
       (compiled-module-expression? e)
       (continuation-mark-key? e) ;; Stricter than necessary if key holds a base value
       (continuation-mark-set? e)
+      (continuation-prompt-tag? e)
       (custodian-box? e)
       (custodian? e)
       (ephemeron? e)
