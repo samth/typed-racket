@@ -51,6 +51,7 @@
   (ignore-some typechecker:ignore-some #:mark)
   (ignore-some-expr typechecker:ignore-some)
   (contract-def typechecker:contract-def)
+  (contracted-def typechecker:contracted-def)
   (contract-def/provide typechecker:contract-def/provide)
   (external-check typechecker:external-check)
   (with-type typechecker:with-type #:mark)

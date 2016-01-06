@@ -20,7 +20,7 @@
 
 ; equations: (hash/c var? (-> value?))
 ; initial-values: (hash/c var? (-> value?))
-(struct equation-set (equations initial-values))
+(struct equation-set (equations initial-values) #:transparent)
 
 (define (make-equation-set)
   (equation-set (make-hash) (make-hash)))
@@ -48,6 +48,7 @@
         (define new-value (thunk))
         (define old-value (hash-ref values v))
         (unless (equal? new-value old-value)
+          (printf "changing ~s -> ~s\n" old-value new-value)
           (set! change #t)
           (hash-set! values v new-value)))
       (when change

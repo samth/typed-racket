@@ -105,6 +105,7 @@
 
 
 (define (compute-recursive-kinds recursives)
+  (printf "recursives ~s\n" (dict-map recursives list ))
   (define eqs (make-equation-set))
   (define vars
     (for/hash ([(name _) (in-dict recursives)])
@@ -119,7 +120,10 @@
        (add-equation! eqs
           (hash-ref vars name)
           (lambda ()
+            (printf "f: ~s ~s ~s\n" max (dict-keys others) (map lookup (dict-keys others)))
             (apply combine-kinds max (map lookup (dict-keys others)))))]))
+  (printf ">> eqs: ~s\n" eqs)
+  (printf ">> resolved eqs: ~s\n" (resolve-equations eqs))
   (define var-values (resolve-equations eqs))
   (for/hash (((name var) (in-hash vars)))
     (values name (hash-ref var-values var))))

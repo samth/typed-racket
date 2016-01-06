@@ -40,6 +40,7 @@
 (module* test-exports #f (provide type->contract))
 
 (struct contract-def (type flat? maker? typed-side) #:prefab)
+(struct contracted-def (type maker? lib orig-id typed-side) #:prefab)
 
 ;; Checks if the given syntax needs to be fixed up for contract generation
 ;; and if yes it returns the information stored in the property
@@ -47,6 +48,15 @@
   (syntax-parse stx
     #:literal-sets (kernel-literals)
     [(define-values (_) e) (contract-def-property #'e)]
+    [_ #f]))
+
+
+;; Checks if the given syntax needs to be fixed up for contract generation
+;; and if yes it returns the information stored in the property
+(define (get-contracted-def-property stx)
+  (syntax-parse stx
+    #:literal-sets (kernel-literals)
+    [(define-values (_) e) (contracted-def-property stx)]
     [_ #f]))
 
 ;; type->contract-fail : Syntax Type #:ctc-str String
@@ -93,6 +103,47 @@
      (ignore ; should be ignored by the optimizer
       (quasisyntax/loc stx
         (begin #,@defs (define-values (n) #,ctc))))]
+    [_ (int-err "should never happen - not a define-values: ~a"
+                (syntax->datum stx))]))
+
+;; generate a call to `require/contract` to define this identifier
+(define (generate-contracted-def stx cache sc-cache)
+  (define prop (get-contracted-def-property stx))
+  (match-define (contracted-def type-stx maker? lib orig-id typed-side) prop)
+  (define *typ (parse-type type-stx))
+  (define kind 'impersonator)
+  (syntax-parse stx #:literals (define-values)
+    [(define-values (n) _)
+     (define typ
+       (if maker?
+           ((map fld-t (Struct-flds (lookup-type-name (Name-id *typ)))) #f . t:->* . *typ)
+           *typ))
+     (match-define (list defs ctc)
+       (type->contract
+        typ
+        ;; this value is from the typed side (require/typed, make-predicate, etc)
+        ;; unless it's used for with-type
+        #:typed-side (from-typed? typed-side)
+        #:kind kind
+        #:cache cache
+        #:sc-cache sc-cache
+        (type->contract-fail typ type-stx #:ctc-str "contract")))
+     (define maybe-inline-val
+       (should-inline-contract? ctc cache))
+     (ignore #`(begin #,@defs
+                      (require (only-in #,lib #,orig-id))
+              #,@(if maybe-inline-val
+                     null
+                     (list #`(define-values (ctc-id) #,ctc)))
+              (define-module-boundary-contract n
+                #,orig-id
+                #,(or maybe-inline-val #'ctc-id)
+                #:pos-source `(interface for #,(syntax-e orig-id))
+                #:srcloc (vector (quote #,(syntax-source orig-id))
+                                 #,(syntax-line orig-id)
+                                 #,(syntax-column orig-id)
+                                 #,(syntax-position orig-id)
+                                 #,(syntax-span orig-id)))))]
     [_ (int-err "should never happen - not a define-values: ~a"
                 (syntax->datum stx))]))
 
@@ -184,10 +235,14 @@
   (define sc-cache (make-hash))
   (with-new-name-tables
    (for/list ((e (in-list forms)))
-     (if (not (get-contract-def-property e))
-         e
-         (begin (set-box! include-extra-requires? #t)
-                (generate-contract-def e ctc-cache sc-cache))))))
+     (cond 
+      [(get-contracted-def-property e)
+       (set-box! include-extra-requires? #t)
+       (generate-contracted-def e ctc-cache sc-cache)]
+      [(get-contract-def-property e)
+       (set-box! include-extra-requires? #t)
+       (generate-contract-def e ctc-cache sc-cache)]
+      [else e]))))
 
 ;; TODO: These are probably all in a specific place, which could avoid
 ;;       the big traversal
@@ -577,9 +632,10 @@
                 (t->sc fty #:recursive-values (hash-set
                                                 recursive-values
                                                 nm (recursive-sc-use nm*)))))
-            (recursive-sc (list nm*) (list (struct/sc nm (ormap values mut?) fields))
-                                (recursive-sc-use nm*))]
-           [else (flat/sc #`(flat-named-contract '#,(syntax-e pred?) (lambda (x) (#,pred? x))))])]
+            (recursive-sc (list nm*)
+                          (list (struct/sc nm (ormap values mut?) fields))
+                          (recursive-sc-use nm*))]
+           [else (flat/sc pred?)])]
         [(StructType: s)
          (if (from-untyped? typed-side)
              (fail #:reason (~a "cannot import structure types from"

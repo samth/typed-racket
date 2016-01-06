@@ -3,11 +3,13 @@
 ;; This module provides helper macros for `require/typed`
 
 (require racket/contract/region racket/contract/base
-         syntax/location
-         (for-syntax racket/base
+         syntax/location 
+         (for-syntax racket/base racket/syntax
+                     "../private/syntax-properties.rkt"
                      syntax/parse))
 
 (provide require/contract define-ignored rename-without-provide)
+
 
 (define-syntax (define-ignored stx)
   (syntax-case stx ()
@@ -25,6 +27,14 @@
         #`(define name #,(syntax-property #'e
                                           'inferred-name
                                           (syntax-e #'name)))])]))
+(require (for-syntax racket/pretty))
+(define-syntax (really-ignore stx)
+  (syntax-case stx ()
+    [(_ e)
+     (syntax-case (local-expand #'e (syntax-local-context) null) ()
+       [(begin e ...)
+        (pretty-print (syntax-e #'(e ...)))
+         #`(begin #,@(map ignore (syntax-e #'(e ...))))])]))
 
 ;; Define a rename-transformer that's set up to avoid being provided
 ;; by all-defined-out or related forms.
@@ -51,17 +61,43 @@
              #:with orig-nm-r ((make-syntax-introducer) #'nm)))
 
   (syntax-parse stx
-    [(require/contract nm:renameable hidden:id cnt lib)
-     #`(begin (require (only-in lib [nm.orig-nm nm.orig-nm-r]))
-              (rename-without-provide nm.nm hidden)
+    [(require/contract nm:renameable cnt lib)
+     (define/with-syntax fresh (generate-temporary))
+      #`(begin
+         #;
+         (module submodule-name racket/base
+           (require
+             (submod typed-racket/private/type-contract predicates)
+             typed-racket/utils/utils
+             (for-syntax typed-racket/utils/utils)
+             typed-racket/utils/any-wrap typed-racket/utils/struct-type-c
+             typed-racket/utils/opaque-object
+             typed-racket/utils/evt-contract
+             typed-racket/utils/sealing-contract
+             typed-racket/utils/promise-not-name-contract
+             racket/sequence
+             racket/contract/parametric)
+           (require (only-in lib [nm.orig-nm nm.orig-nm-r]))
+           (provide (contract-out [rename #,(get-alternate #'nm.orig-nm-r) hidden cnt])))
+         ;(require (only-in 'submodule-name hidden))
+         
+         (require (only-in lib [nm.orig-nm nm.orig-nm-r]))
+         (rename-without-provide nm.nm hidden)
 
-              (define-ignored hidden
-                (contract cnt
-                          #,(get-alternate #'nm.orig-nm-r)
-                          '(interface for #,(syntax->datum #'nm.nm))
-                          (current-contract-region)
-                          (quote nm.nm)
-                          (quote-srcloc nm.nm))))]))
+         (define-module-boundary-contract fresh
+           #,(get-alternate #'nm.orig-nm-r)
+           cnt
+           #:pos-source '(interface for #,(syntax->datum #'nm.nm))
+           #:srcloc (quote-srcloc nm.nm)
+           #:hidden-id #,(ignore #'hidden) #,(ignore #'hidden-extra))
+         #;
+         (define-ignored hidden
+           (contract cnt
+                     #,(get-alternate #'nm.orig-nm-r)
+                     '(interface for #,(syntax->datum #'nm.nm))
+                     (current-contract-region)
+                     (quote nm.nm)
+                     (quote-srcloc nm.nm))))]))
 
 ;; identifier -> identifier
 ;; get the alternate field of the renaming, if it exists

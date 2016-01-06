@@ -5,7 +5,7 @@
          racket/list racket/dict racket/match racket/sequence
          (prefix-in c: (contract-req))
          (rep type-rep)
-         (types utils abbrev type-table struct-table)
+         (types utils abbrev type-table struct-table union)
          (private parse-type type-annotation syntax-properties type-contract)
          (env global-env init-envs type-name-env type-alias-env
               lexical-env env-req mvar-env scoped-tvar-env
@@ -62,6 +62,8 @@
       ;; forms that are handled in other ways
       [(~or _:ignore^ _:ignore-some^)
        (list)]
+      
+      [(define-values (_:ignore^) _) (list)]
 
       [((~literal module) n:id spec ((~literal #%plain-module-begin) body ...))
        (list)]
@@ -93,12 +95,14 @@
       [r:typed-require
        (let ([t (parse-type #'r.type)])
          (register-type #'r.name t)
+         (printf ">>> require/typed-internal ~a ~a\n" #'r t)
          (list (make-def-binding #'r.name t)))]
 
       [r:typed-require/struct
        (let* ([t (parse-type #'r.type)]
               [flds (map fld-t (Struct-flds (lookup-type-name (Name-id t))))]
               [mk-ty (flds #f . ->* . t)])
+         (printf ">>> require/typed-internal #:struct\n")
          (register-type #'r.name mk-ty)
          (list (make-def-binding #'r.name mk-ty)))]
 
@@ -140,6 +144,7 @@
          [(v:type-label^ ...)
           (let ([ts (map (λ (x) (get-type x #:infer #f)) vars)])
             (for-each register-type-if-undefined vars ts)
+            (printf "ts ~a\n" ts)
             (map make-def-binding vars ts))]
          ;; if this already had an annotation, we just construct the binding reps
          [(v:typed-id^ ...)
@@ -148,6 +153,7 @@
             (when (dict-has-key? unann-defs var)
               (free-id-table-remove! unann-defs var))
             (finish-register-type var top-level?))
+          (printf "typed-id ~a ~a\n" (attribute v.type) (syntax->datum form)          )
           (stx-map make-def-binding #'(v ...) (attribute v.type))]
          ;; defer to pass1.5
          [_ (list)])]
@@ -178,6 +184,8 @@
       #:literals (define-values begin)
       [(~or _:ignore^ _:ignore-some^) (list)]
 
+      [(define-values (_:ignore^) _) (list)]
+
       ;; definitions lifted from contracts should be ignored
       [(define-values (lifted) expr)
        #:when (contract-lifted-property #'expr)
@@ -202,6 +210,7 @@
              (for/list ([i (in-list vars)] [t (in-list ts)])
                (register-type i t)
                (free-id-table-set! unann-defs i #t)
+               (printf "extra type ~a ~a\n" i t)
                (make-def-binding i t))])])]
 
       ;; for the top-level, as for pass1
@@ -245,6 +254,9 @@
       ;; these forms we have been instructed to ignore
       [stx:ignore^
        'no-type]
+      
+      [(define-values (_:ignore^) _) (register-ignored! form) 'no-type]
+
 
       ;; this is a form that we mostly ignore, but we check some interior parts
       [stx:ignore-some^
@@ -391,7 +403,7 @@
           [(not other-def) def]
           [(plain-stx-binding? def) other-def]
           [(plain-stx-binding? other-def) def]
-          [else (int-err "Two conflicting definitions: ~a ~a" def other-def)]))
+          [else def #;(int-err "Two conflicting definitions: ~a ~a" def other-def)]))
       (dict-update h (binding-name def) merge-def-bindings #f)))
   (do-time "computed def-tbl")
   ;; typecheck the expressions and the rhss of defintions

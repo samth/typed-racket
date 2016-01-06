@@ -43,6 +43,12 @@
         [(struct-combinator args _ mut?)
          (merge-restricts*
            (if mut? 'chaperone 'flat)
+           (for/list ([a (in-list args)])
+                     (printf ">>> a ~s\n (f a) ~s\n add ~s\n" a (f a) (add-constraint (f a) 'chaperone))
+                     (if mut?
+                         (f a)
+                         (add-constraint (f a) 'chaperone)))
+           #;
            (map (lambda (a) (if (not mut?) (add-constraint (f a) 'chaperone) (f a))) args))]))])
 
 (define (struct/sc name mut? fields)

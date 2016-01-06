@@ -182,7 +182,7 @@
                                   #'()))
        (cond [(not (attribute unsafe?))
               ;; define `cnt*` to be fixed up later by the module type-checking
-              (define cnt*
+              #;(define cnt*
                 (syntax-local-lift-expression
                  (make-contract-def-rhs #'ty #f (attribute parent))))
               (quasisyntax/loc stx
@@ -191,8 +191,14 @@
                   #,@(if (eq? (syntax-local-context) 'top-level)
                          (list #'(define-syntaxes (hidden) (values)))
                          null)
+                  (define-syntax (nm.nm stx)
+                    (syntax-case stx ()
+                      [(_ . args) #'(hidden . args)]
+                      [_ #'hidden]))
                   #,(internal #'(require/typed-internal hidden ty . sm))
-                  #,(ignore #`(require/contract nm.spec hidden #,cnt* lib))))]
+                  #,(make-contracted-def #'ty #f #'hidden #'nm.spec #'lib)
+
+                  #;#,(ignore #`(require/contract nm.spec hidden #,cnt* lib))))]
              [else
               (define/with-syntax hidden2 (generate-temporary #'nm.nm))
               (quasisyntax/loc stx
@@ -253,6 +259,11 @@
 ;; Helper to construct syntax for contract definitions
 (define (make-contract-def-rhs type flat? maker?)
   (contract-def-property #'#f `#s(contract-def ,type ,flat? ,maker? untyped)))
+;; orig-id is the name from `lib` to be imported
+;; id is the name to be defined
+(define (make-contracted-def type maker? id orig-id lib)
+  (contracted-def-property (ignore #`(define #,id (error "contracted def not fixed up")))
+                           `#s(contracted-def ,type ,maker? ,lib ,orig-id untyped)))
 
 
 (define (define-predicate stx)
@@ -345,6 +356,8 @@
            #,(if (attribute ne)
                  (internal (syntax/loc stx (define-type-alias-internal ty (Opaque pred))))
                  (syntax/loc stx (define-type-alias ty (Opaque pred))))
+           #,(make-contracted-def #'(-> Any Boolean) #f #'hidden #'pred #'lib)
+           #;
            #,(ignore #`(require/contract pred hidden #,pred-cnt lib)))))]))
 
 
@@ -405,6 +418,7 @@
        (with-syntax* ([nm #'name.nm]
                       [parent #'name.parent]
                       [hidden (generate-temporary #'name.nm)]
+                      [hidden-extra (generate-temporary #'name.nm)]
                       [orig-struct-info (generate-temporary #'nm)]
                       [spec (if (syntax-e #'name.parent) #'(nm parent) #'nm)]
                       [num-fields (syntax-length #'(fld ...))]
@@ -478,7 +492,9 @@
                                   si))
 
                          (dtsi* () spec type ([fld : ty] ...) #:maker maker-name #:type-only)
-                         #,(ignore #'(require/contract pred hidden (or/c struct-predicate-procedure?/c (c-> any-wrap/c boolean?)) lib))
+                         #,(make-contracted-def #'(-> Any Boolean) #f #'hidden #'pred #'lib)
+
+                         #;#,(ignore #'(require/contract pred hidden (or/c struct-predicate-procedure?/c (c-> any-wrap/c boolean?)) lib))
                          #,(internal #'(require/typed-internal hidden (Any -> Boolean : type)))
                          (require/typed #:internal (maker-name real-maker) type lib
                                         #:struct-maker parent
