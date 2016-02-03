@@ -341,8 +341,8 @@
           (LOG "<<subtype>> ref below\n A: ~a\n rt: ~a\n rp: ~a\n t: ~a\n obj: ~a\n env: ~a\n\n"
                A t p super-t obj (or env (lexical-env)))
           (cond
-            ;; quick check, is it a refinement of the parent type?
-            [(eq? (unsafe-Rep-seq t) st) A0]
+            ;; Weakening -- is the refined lhs type a subtype of the rhs type?
+            [(subtype* A0 t super-t env obj)]
             ;; else methodically reason about what's going on
             [else
              (when (not env) (set! env (lexical-env)))

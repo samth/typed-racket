@@ -93,7 +93,7 @@
     ;; length ops
     [vt #:when (and (LengthPE? path-elem)
                     (overlap vt -VectorTop))
-        -Nat]
+        -Index]
 
     ;; go into refined type
     [(Refine-type: t)
