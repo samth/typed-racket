@@ -20,7 +20,7 @@
          racket/extflonum
          ;; Needed for current implementation of typechecking letrec-syntax+values
          ;; and for *'s special case
-         (for-template (only-in racket/base letrec-values * vector-ref vector-set!)
+         (for-template (only-in racket/base letrec-values * vector-ref vector-set! #%plain-app)
                        (only-in racket/unsafe/ops unsafe-vector-ref unsafe-vector-set!)
                        ;; see tc-app-contracts.rkt
                        racket/contract/private/provide)
@@ -114,20 +114,60 @@
                           t))]
          [else (tc-error/expr #:stx stx (syntax-e msg))]))
 
-
-(define safe-counter 0)
-(define (safe-counter++!)
-  (set! safe-counter (add1 safe-counter)))
-
 (define safe-check-box (box 'uninit))
 (define (safe-checking?)
   (define val (unbox safe-check-box))
   (cond
     [(eq? val 'uninit)
-     (let ([env-val (getenv "PLT_DTR_SAFECHECK")])
+     (let ([env-val (getenv "RTR_CASE_STUDY")])
        (set-box! safe-check-box env-val)
        env-val)]
     [else val]))
+
+(define (maybe-safe-vector-check form expected)
+  (when (safe-checking?)
+    (syntax-parse form
+      #:literal-sets (kernel-literals tc-expr-literals)
+      [(#%plain-app (~and vec-ref:id (~or (~literal vector-ref)
+                                          (~literal unsafe-vector-ref)))
+                    v-exp
+                    i-exp)
+       (define stx-w/loc (locate-stx form))
+       (define loc (~a (syntax-source stx-w/loc) ":"
+                       (syntax-line stx-w/loc) ":"
+                       (syntax-column stx-w/loc)))
+       ;; try safe-vector-ref
+       (define safe-result?
+         (tc-expr/check? #'(#%plain-app safe-vector-ref v-exp i-exp)
+                         expected))
+       (eprintf "~a , ~a , ~a, ~a \n"
+                "ref"
+                (if safe-result? "YES" "NO")
+                (syntax->datum form)
+                loc)
+       (void)]
+      ;; SAFE-VECTOR-SET!-TEST!
+      [(#%plain-app (~and vec-set:id (~or (~literal vector-set!)
+                                          (~literal unsafe-vector-set!)))
+                    v-exp
+                    i-exp
+                    val-exp)
+       ;; try safe-vector-ref
+       (define stx-w/loc (locate-stx form))
+       (define loc (~a (syntax-source stx-w/loc) ":"
+                       (syntax-line stx-w/loc) ":"
+                       (syntax-column stx-w/loc)))
+       (define safe-result?
+         (tc-expr/check? #'(#%plain-app safe-vector-set! v-exp i-exp val-exp)
+                         expected))
+       (eprintf "~a , ~a , ~a, ~a, \n"
+                "set!"
+                (if safe-result? "YES" "NO")
+                (syntax->datum form)
+                loc)
+       (void)]
+      [_ (void)]))
+  (void))
 
 ;; tc-expr/check/internal : syntax maybe[tc-results] -> tc-results
 (define/cond-contract (tc-expr/check/internal form expected)
@@ -223,66 +263,9 @@
                  fs
                  obj)]
            [else res]))]
-
-      ;; 'SAFE-VECTOR-REF?' TEST!
-      [(#%plain-app (~and vec-ref:id (~or (~literal vector-ref)
-                                          (~literal unsafe-vector-ref)))
-                    v-exp
-                    i-exp)
-       #:when (safe-checking?)
-       (define stx-w/loc (locate-stx form))
-       (define loc (~a (syntax-source stx-w/loc) ":"
-                       (syntax-line stx-w/loc) ":"
-                       (syntax-column stx-w/loc)))
-       ;; try safe-vector-ref
-       (define safe-result?
-         (parameterize ([current-type-error? #f])
-           (with-handlers ([exn:fail:syntax? (λ (_) #f)])
-             (dynamic-wind
-              (λ () (save-errors!))
-              (λ ()
-                (let ([result (tc/app (syntax/loc form (#%plain-app safe-vector-ref v-exp i-exp))
-                                      expected)])
-                  (and (not (current-type-error?)) result)))
-              (λ () (restore-errors!))))))
-       (eprintf "~a , ~a , ~a, ~a \n"
-                "ref"
-                (if safe-result? "YES" "NO")
-                (syntax->datum form)
-                loc)
-       (or safe-result?
-           (tc/app form expected))]
-      ;; SAFE-VECTOR-SET!-TEST!
-      [(#%plain-app (~and vec-set:id (~or (~literal vector-set!)
-                                          (~literal unsafe-vector-set!)))
-                    v-exp
-                    i-exp
-                    val-exp)
-       #:when (safe-checking?)
-       ;; try safe-vector-ref
-       (define stx-w/loc (locate-stx form))
-       (define loc (~a (syntax-source stx-w/loc) ":"
-                       (syntax-line stx-w/loc) ":"
-                       (syntax-column stx-w/loc)))
-       (define safe-result?
-         (parameterize ([current-type-error? #f])
-           (with-handlers ([exn:fail:syntax? (λ (_) #f)])
-             (dynamic-wind
-               (λ () (save-errors!))
-               (λ ()
-                 (let ([result (tc/app (syntax/loc form (#%plain-app safe-vector-set! v-exp i-exp val-exp))
-                                       expected)])
-                   (and (not (current-type-error?)) result)))
-               (λ () (restore-errors!))))))
-       (eprintf "~a , ~a , ~a, ~a, \n"
-                "set!"
-                (if safe-result? "YES" "NO")
-                (syntax->datum form)
-                loc)
-       (or safe-result?
-           (tc/app form expected))]
       ;; application
       [(#%plain-app . _)
+       (maybe-safe-vector-check form expected)
        (tc/app form expected)]
       ;; #%expression
       [(#%expression e) 
@@ -378,6 +361,13 @@
       [(letrec-values ([(name ...) expr] ...) . body)
        (tc/letrec-values #'((name ...) ...) #'(expr ...) #'body expected)]
       ;; other
+      [(a b c d)
+       (printf "info: \n~a \n ~a\n ~a\n ~a\n\n"
+               (and (identifier? #'a) (identifier-binding #'a))
+               (and (identifier? #'b) (identifier-binding #'b))
+               (and (identifier? #'c) (identifier-binding #'c))
+               (and (identifier? #'d) (identifier-binding #'d)))
+       (int-err "cannot typecheck unknown form : ~s" (syntax->datum form))]
       [_ (int-err "cannot typecheck unknown form : ~s" (syntax->datum form))])))
 
 ;; type check form in the current type environment
