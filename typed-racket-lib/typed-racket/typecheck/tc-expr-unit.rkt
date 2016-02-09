@@ -3,6 +3,7 @@
 
 (require (rename-in "../utils/utils.rkt" [private private-in])
          racket/match racket/format (prefix-in - (contract-req))
+         (only-in racket/unsafe/ops unsafe-vector-ref unsafe-vector-set!)
          "signatures.rkt"
          "check-below.rkt" "../types/kw-types.rkt"
          (types utils abbrev union subtype type-table
