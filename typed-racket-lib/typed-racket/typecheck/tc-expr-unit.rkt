@@ -125,6 +125,12 @@
        env-val)]
     [else val]))
 
+(define (short-str str)
+  (define len (string-length str))
+  (if (> len 18)
+      (string-append "..." (substring str (- len 18)))
+      str))
+
 (define (maybe-safe-vector-check form expected)
   (when (safe-checking?)
     (syntax-parse form
