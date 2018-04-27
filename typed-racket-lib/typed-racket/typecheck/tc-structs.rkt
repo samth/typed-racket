@@ -80,8 +80,8 @@
                                       (if prefab? (Prefab? parent) (Struct? parent)))
                                   parent)
                                  (else
-                                  (tc-error/stx #'v.par "parent type not a valid structure name: ~a"
-                                                (syntax->datum #'v.par)))))])
+                                  (tc-error/stx #'v.par "parent type not a valid structure name: ~a ~a"
+                                                (syntax->datum #'v.par) parent))))])
                 (values #'v.name parent0 parent))
           (values #'v.name #f #f))]))
 

@@ -4,7 +4,7 @@
          (rep type-rep values-rep rep-utils)
          racket/match
          syntax/parse/define
-         racket/set
+         racket/set racket/unsafe/undefined
          (types resolve base-abbrev)
          (for-syntax racket/base syntax/parse))
 
@@ -44,6 +44,7 @@
     [(== -False) (box-immutable #f)]
     [(== -Zero) (box-immutable 0)]
     [(== -One) (box-immutable 1)]
+    [(== -Unsafe-Undefined) (box-immutable unsafe-undefined)]
     [_ #f]))
 
 ;; matches types that correspond to singleton values

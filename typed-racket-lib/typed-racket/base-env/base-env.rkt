@@ -20,9 +20,11 @@
   (only-in racket/match/runtime match:error matchable? match-equality-test syntax-srclocs))
  "base-structs.rkt"
  racket/file
+ racket/unsafe/undefined
  (only-in racket/private/pre-base new-apply-proc)
  (only-in (types abbrev) [-Boolean B] [-Symbol Sym] -Flat)
  (only-in (types numeric-tower) [-Number N])
+ (only-in (rep base-types) -Unsafe-Undefined)
  (only-in (rep type-rep values-rep object-rep)
           -car
           -cdr
@@ -3458,3 +3460,6 @@
         (output (-opt (-pair ind-pair (-lst (-opt ind-pair)))))
         (-Input (Un -String -Input-Port -Bytes -Path)))
    (->optkey -Pattern -Input (N ?N -Bytes) #:match-select sel #f output)))
+
+[unsafe-undefined -Unsafe-Undefined]
+

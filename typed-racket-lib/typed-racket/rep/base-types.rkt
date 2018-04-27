@@ -7,13 +7,14 @@
          (rep rep-utils base-type-rep type-mask core-rep)
          racket/undefined
          (types numeric-predicates)
-         racket/extflonum
+         racket/extflonum racket/unsafe/undefined
          ;; for base type contracts and predicates
          ;; use '#%place to avoid the other dependencies of `racket/place`
          (for-template
            racket/base
            racket/contract/base
            racket/undefined
+           racket/unsafe/undefined
            racket/extflonum
            (only-in racket/pretty pretty-print-style-table?)
            (only-in racket/udp udp?)
@@ -217,4 +218,7 @@
    Positive-ExtFlonum-No-NaN
    #'(and/c extflonum? (λ (x) (extfl>= x 0.0t0)))
    (λ (x) (and (extflonum? x) (extfl>= x 0.0t0)))]
-  [-Dead-Code Dead-Code #'(make-none/c 'dead-code/c) (λ (v) #f)])
+  [-Dead-Code Dead-Code #'(make-none/c 'dead-code/c) (λ (v) #f)]
+  [-Unsafe-Undefined Unsafe-Undefined
+                     #'(λ (v) (eq? v unsafe-undefined))
+                     (λ (v) (eq? v unsafe-undefined))])
