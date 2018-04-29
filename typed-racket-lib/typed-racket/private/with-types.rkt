@@ -44,25 +44,27 @@
 (define-literal-syntax-class #:for-label Values)
 (define-literal-syntax-class #:for-label values)
 
-(provide wt-core)
+(provide wt-core wt-core-shallow wt-core-optional)
 
-(define (with-type-helper stx body fvids fvtys exids extys resty expr? ctx)
+(define (with-type-helper stx body fvids fvtys exids extys resty expr? ctx te-mode)
   (define old-context (unbox typed-context?))
+  (define old-te-mode (unbox type-enforcement-mode))
   (unless (not old-context)
-    (tc-error/stx stx "with-type cannot be used in a typed module."))
+    (tc-error/stx stx (format "with-type cannot be used in a typed module. ~a " old-context)))
   (set-box! typed-context? #t)
+  (set-box! type-enforcement-mode te-mode)
   (do-standard-inits)
   (define fv-types (for/list ([t (in-syntax fvtys)])
                      (parse-type t)))
   (define ex-types (for/list ([t (in-syntax extys)])
                      (parse-type t)))
   (define-values (fv-ctc-ids fv-ctc-defs)
-    (type-stxs->ids+defs (syntax->list fvtys) 'untyped))
+    (type-stxs->ids+defs (syntax->list fvtys) 'untyped te-mode))
   (define-values (ex-ctc-ids ex-ctc-defs)
-    (type-stxs->ids+defs (syntax->list extys) 'typed))
+    (type-stxs->ids+defs (syntax->list extys) 'typed te-mode))
   (define-values (region-ctc-ids region-ctc-defs)
     (if expr?
-        (type-stxs->ids+defs (values-stx->type-stxs resty) 'typed)
+        (type-stxs->ids+defs (values-stx->type-stxs resty) 'typed te-mode)
         (values null null)))
   (define region-tc-result
     (and expr? (parse-tc-results resty)))
@@ -100,18 +102,20 @@
     (tc-toplevel-form lifted-definitions)
     (tc-expr/check expanded-body (if expr? region-tc-result (ret ex-types))))
   (set-box! typed-context? old-context)
+  (set-box! type-enforcement-mode old-te-mode)
   ;; then clear the new entries from the env ht
   (for ([i (in-syntax fvids)])
     (unregister-type i))
   ;; report errors after setting the typed-context? flag and unregistering
   ;; types to ensure that the state is cleaned up properly in the REPL
   (report-all-errors)
+  (set-box! type-enforcement-mode te-mode) ;; begin optimizer + contracts
   (with-syntax ([(fv.id ...) fvids]
                 [(cnt ...) fv-ctc-ids]
                 [(ex-id ...) exids]
                 [(ex-cnt ...) ex-ctc-ids]
                 [(region-cnt ...) region-ctc-ids]
-                [(body) (maybe-optimize #`(#,expanded-body))]
+                [(body) (parameterize ([optimize? (memq te-mode (list guarded transient))]) (maybe-optimize #`(#,expanded-body)))]
                 [check-syntax-help (syntax-property
                                     (syntax-property
                                      #'(void)
@@ -123,12 +127,13 @@
         #`(begin #,lifted-definitions
                  #,@(if expr? (append region-ctc-defs fv-ctc-defs) null)
                  #,@(if (not expr?) ex-ctc-defs null)))))
+    (set-box! type-enforcement-mode old-te-mode) ;; end optimizer + contracts 
     (arm
       (if expr?
           (quasisyntax/loc stx
             (let ()
               check-syntax-help
-              (local-require #,@(cdr (syntax-e extra-requires)))
+              (local-require #,@(cdr (syntax-e (extra-requires #:enforcement-mode te-mode))))
               #,@fixed-up-definitions
               (c:with-contract typed-region
                                #:results (region-cnt ...)
@@ -136,7 +141,7 @@
                                body)))
           (quasisyntax/loc stx
             (begin
-              (local-require #,@(cdr (syntax-e extra-requires)))
+              (local-require #,@(cdr (syntax-e (extra-requires #:enforcement-mode te-mode))))
               (define-values () (begin check-syntax-help (values)))
               #,@fixed-up-definitions
               (c:with-contract typed-region
@@ -159,18 +164,19 @@
      (syntax->list #'(t ...))]
     [t (list #'t)]))
 
-;; type-stxs->ids+defs : (Listof Syntax) Symbol -> (Listof Id Syntax)
+;; type-stxs->ids+defs : (Listof Syntax) Symbol type-enforcement-mode? -> (Listof Id Syntax)
 ;; Create identifiers and definition syntaxes for contract generation
-(define (type-stxs->ids+defs type-stxs typed-side)
+(define (type-stxs->ids+defs type-stxs typed-side te-mode)
   (for/lists (_1 _2) ([t (in-list type-stxs)])
     (define ctc-id (generate-temporary))
-    (define contract-def `#s(contract-def ,t #f #f ,typed-side))
+    (define contract-def `#s(contract-def ,t #f #f ,typed-side ,te-mode))
     (values ctc-id
             #`(define-values (#,ctc-id)
                 #,(contract-def-property
                    #'#f (λ () contract-def))))))
 
-(define (wt-core stx)
+(define-values [wt-core wt-core-shallow wt-core-optional]
+ (let ()
   (define-syntax-class typed-id
     #:description "[id type]"
     [pattern (id ty)])
@@ -190,8 +196,11 @@
   (define-splicing-syntax-class result-ty
     #:description "result specification"
     [pattern (~seq #:result ty:expr)])
-  (syntax-parse stx
-    [(_ :typed-ids fv:free-vars . body)
-     (with-type-helper stx #'body #'(fv.id ...) #'(fv.ty ...) #'(id ...) #'(ty ...) #f #f (syntax-local-context))]
-    [(_ :result-ty fv:free-vars . body)
-     (with-type-helper stx #'body #'(fv.id ...) #'(fv.ty ...) #'() #'() #'ty #t (syntax-local-context))]))
+  (apply
+    values
+    (for/list ((te-mode (in-list (list guarded transient erasure))))
+      (syntax-parser
+        [(_ :typed-ids fv:free-vars . body)
+         (with-type-helper this-syntax #'body #'(fv.id ...) #'(fv.ty ...) #'(id ...) #'(ty ...) #f #f (syntax-local-context) te-mode)]
+        [(_ :result-ty fv:free-vars . body)
+         (with-type-helper this-syntax #'body #'(fv.id ...) #'(fv.ty ...) #'() #'() #'ty #t (syntax-local-context) te-mode)])))))

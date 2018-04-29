@@ -38,6 +38,7 @@
                        syntax/stx
                        "../rep/values-rep.rkt"
                        "../optimizer/optimizer.rkt"
+                       "../private/transient-rewrite.rkt"
                        "../types/utils.rkt"
                        "../types/abbrev.rkt"
                        "../types/printer.rkt"
@@ -60,12 +61,24 @@
 
   (define-for-syntax (maybe-optimize body)
     ;; do we optimize?
-    (if (optimize?)
+    (if (and (optimize?)
+             (memq (current-type-enforcement-mode) (list guarded transient))
+             (not (getenv "PLT_TR_NO_OPTIMIZE")))
         (begin
           (do-time "Starting optimizer")
           (begin0 (stx-map optimize-top body)
             (do-time "Optimized")))
         body))
+
+  (define-for-syntax (maybe-transient-rewrite body-stx ctc-cache)
+    (case (current-type-enforcement-mode)
+      [(transient)
+       (do-time "Starting transient rewrite")
+       (define-values [extra-def* body+] (transient-rewrite-top body-stx ctc-cache))
+       (do-time "End transient rewrite")
+       (values extra-def* body+)]
+      [else
+       (values '() body-stx)]))
 
   (define-for-syntax (trampoline-core stx report? kont)
     (syntax-parse stx
@@ -113,9 +126,13 @@
                ;; will change syntax object identity (via syntax-track-origin) which
                ;; doesn't work for looking up types in the optimizer.
                (define new-stx
-                 (apply append
-                        (for/list ([form (in-list forms)])
-                          (change-contract-fixups (maybe-optimize (list form))))))
+                 (let ((ctc-cache (make-hash)))
+                   (apply append
+                          (for/list ([form (in-list forms)])
+                            (define-values [extra-def* form+]
+                              (maybe-transient-rewrite form ctc-cache))
+                            (append extra-def*
+                                    (change-contract-fixups (maybe-optimize (list form+))))))))
                (kont new-stx result)]))])]))
 
   ;; Trampoline that continues the typechecking process.
@@ -125,7 +142,7 @@
      (λ (new-stx result)
        (arm
         (if (unbox include-extra-requires?)
-            #`(begin #,extra-requires #,@new-stx)
+            #`(begin #,(extra-requires) #,@new-stx)
             #`(begin #,@new-stx))))))
 
   ;; Trampoline that continues the typechecking process and reports the type
@@ -149,7 +166,7 @@
               #'(begin e ... e-last))))
        (arm
         (if (unbox include-extra-requires?)
-            #`(begin #,extra-requires #,with-printing)
+            #`(begin #,(extra-requires) #,with-printing)
             with-printing))))))
 
 (require (for-template (submod "." trampolines)))

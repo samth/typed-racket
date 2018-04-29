@@ -46,4 +46,5 @@
   "tooltip-tests.rkt"
   "prefab-tests.rkt"
   "json-tests.rkt"
-  "typed-units-tests.rkt")
+  "typed-units-tests.rkt"
+  #;"transient-rewrite-expansion/main.rkt")

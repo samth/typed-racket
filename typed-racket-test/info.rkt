@@ -46,6 +46,7 @@
 (define compile-omit-paths
   '("succeed"
     "fail"
+    "transient" "t-succeed" "t-fail"
     "xfail"
     "optimizer" ;; FIXME: should be improved by stamourv
     "tr-random-testing.rkt" ;; Requires recompiling all of redex when rebuilding TR tests

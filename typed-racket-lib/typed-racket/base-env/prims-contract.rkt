@@ -17,9 +17,16 @@
 ;;   implementations of the forms
 
 
-(provide require/opaque-type require-typed-struct-legacy require-typed-struct
-         require/typed-legacy require/typed require/typed/provide
-         require-typed-struct/provide core-cast make-predicate define-predicate
+(provide require/opaque-type require/opaque-type-transient require/opaque-type-erasure
+         require-typed-struct-legacy require-typed-struct-legacy-transient require-typed-struct-legacy-erasure
+         require-typed-struct require-typed-struct-transient require-typed-struct-erasure
+         require/typed-legacy require/typed-legacy-transient require/typed-legacy-erasure
+         require/typed require/typed-transient require/typed-erasure
+         require/typed/provide require/typed/provide-transient require/typed/provide-erasure
+         require-typed-struct/provide require-typed-struct/provide-transient require-typed-struct/provide-erasure
+         core-cast core-cast-transient core-cast-erasure
+         make-predicate make-predicate-transient make-predicate-erasure
+         define-predicate define-predicate-transient define-predicate-erasure
          require-typed-signature)
 
 (module forms racket/base
@@ -54,6 +61,75 @@
       [(_ e ty) (quasisyntax/loc stx (#%expression #,(syntax/loc stx (-core-cast e ty))))]))
   (provide cast))
 
+;; copied from `forms`
+(module forms-shallow racket/base
+  (require (for-syntax racket/lazy-require racket/base))
+  (begin-for-syntax
+    (lazy-require [(submod "..")
+                   (require/opaque-type-transient
+                    (require-typed-signature require-typed-signature-transient)
+                    require-typed-struct-legacy-transient
+                    require-typed-struct-transient
+                    require/typed-legacy-transient
+                    require/typed-transient
+                    require/typed/provide-transient
+                    require-typed-struct/provide-transient
+                    core-cast-transient
+                    make-predicate-transient
+                    define-predicate-transient)]))
+  (define-syntax (def stx)
+    (syntax-case stx ()
+      [(_ id ...)
+       (with-syntax ([(names ...) (generate-temporaries #'(id ...))])
+         #'(begin (provide (rename-out [names id] ...))
+                  (define-syntax (names stx) (id stx)) ...))]))
+  (def require/opaque-type-transient
+       require-typed-signature-transient
+       require-typed-struct-legacy-transient
+       require-typed-struct-transient
+       require/typed-legacy-transient require/typed-transient require/typed/provide-transient
+       require-typed-struct/provide-transient make-predicate-transient define-predicate-transient)
+  (define-syntax (-core-cast-transient stx) (core-cast-transient stx))
+  (define-syntax (cast-transient stx)
+    (syntax-case stx ()
+      [(_ e ty) (quasisyntax/loc stx (#%expression #,(syntax/loc stx (-core-cast-transient e ty))))]))
+  (provide cast-transient))
+
+;; copied from `forms`
+(module forms-optional racket/base
+  (require (for-syntax racket/lazy-require racket/base))
+  (begin-for-syntax
+    (lazy-require [(submod "..")
+                   (require/opaque-type-erasure
+                    (require-typed-signature require-typed-signature-erasure)
+                    require-typed-struct-legacy-erasure
+                    require-typed-struct-erasure
+                    require/typed-legacy-erasure
+                    require/typed-erasure
+                    require/typed/provide-erasure
+                    require-typed-struct/provide-erasure
+                    core-cast-erasure
+                    make-predicate-erasure
+                    define-predicate-erasure)]))
+  (define-syntax (def stx)
+    (syntax-case stx ()
+      [(_ id ...)
+       (with-syntax ([(names ...) (generate-temporaries #'(id ...))])
+         #'(begin (provide (rename-out [names id] ...))
+                  (define-syntax (names stx) (id stx)) ...))]))
+  (def require/opaque-type-erasure
+       require-typed-signature-erasure
+       require-typed-struct-legacy-erasure
+       require-typed-struct-erasure
+       require/typed-legacy-erasure require/typed-erasure require/typed/provide-erasure
+       require-typed-struct/provide-erasure make-predicate-erasure define-predicate-erasure)
+  (define-syntax (-core-cast-erasure stx) (core-cast-erasure stx))
+  (define-syntax (cast-erasure stx)
+    (syntax-case stx ()
+      [(_ e ty) (quasisyntax/loc stx (#%expression #,(syntax/loc stx (-core-cast-erasure e ty))))]))
+  (provide cast-erasure))
+
+
 ;; unsafe operations go in this submodule
 (module* unsafe #f
   ;; turned into a macro on the requiring side
@@ -63,8 +139,12 @@
 ;; *do not export*
 (define-syntax unsafe-kw (syntax-rules ()))
 
-(require (for-template (submod "." forms) "../utils/require-contract.rkt"
+(require (for-template (submod "." forms)
+                       (submod "." forms-shallow)
+                       (submod "." forms-optional)
+                       "../utils/require-contract.rkt"
                        (submod "../typecheck/internal-forms.rkt" forms)
+                       (only-in "../utils/tc-utils.rkt" current-type-enforcement-mode)
                        "colon.rkt"
                        "top-interaction.rkt"
                        "base-types.rkt"
@@ -82,7 +162,7 @@
          syntax/struct
          syntax/location
          "../utils/require-contract.rkt"
-         (for-template "../utils/any-wrap.rkt")
+         (for-template "../utils/any-wrap.rkt" "../utils/transient-contract.rkt")
          "../utils/tc-utils.rkt"
          "../private/syntax-properties.rkt"
          "../private/cast-table.rkt"
@@ -119,7 +199,9 @@
   #:datum-literals (:)
   (pattern [field:id : type]))
 
-(define-values (require/typed-legacy require/typed unsafe-require/typed)
+(define-values (require/typed-legacy require/typed-legacy-transient require/typed-legacy-erasure
+                require/typed require/typed-transient require/typed-erasure
+                unsafe-require/typed)
  (let ()
   (define-syntax-class opt-rename
     #:attributes (nm orig-nm spec)
@@ -169,28 +251,34 @@
     (pattern [(~or (~datum opaque) #:opaque) opaque ty:id pred:id #:name-exists]
              #:with opt #'(#:name-exists)))
 
-  (define-syntax-class (clause legacy unsafe? lib)
+  (define-syntax-class (clause legacy unsafe? te-mode lib)
    #:attributes (spec)
-   (pattern oc:opaque-clause #:attr spec
-     #`(require/opaque-type oc.ty oc.pred #,lib #,@(if unsafe? #'(unsafe-kw) #'()) . oc.opt))
-   (pattern (~var strc (struct-clause legacy)) #:attr spec
-     #`(require-typed-struct strc.nm (strc.tvar ...)
-                             (strc.body ...) strc.constructor-parts ...
-                             #:type-name strc.type
-                             #,@(if unsafe? #'(unsafe-kw) #'())
-                             #,lib))
+   (pattern oc:opaque-clause
+     #:with r/ot/te-mode (case te-mode ((guarded) #'require/opaque-type) ((transient) #'require/opaque-type-transient) ((erasure) #'require/opaque-type-erasure))
+     #:attr spec
+     #`(r/ot/te-mode oc.ty oc.pred #,lib #,@(if unsafe? #'(unsafe-kw) #'()) . oc.opt))
+   (pattern (~var strc (struct-clause legacy))
+     #:with rts/te-mode (case te-mode ((guarded) #'require-typed-struct) ((transient) #'require-typed-struct-transient) ((erasure) #'require-typed-struct-erasure))
+     #:attr spec
+     #`(rts/te-mode strc.nm (strc.tvar ...)
+                    (strc.body ...) strc.constructor-parts ...
+                    #:type-name strc.type
+                    #,@(if unsafe? #'(unsafe-kw) #'())
+                    #,lib))
    (pattern sig:signature-clause #:attr spec
      (quasisyntax/loc #'sig (require-typed-signature sig.sig-name (sig.var ...) (sig.type ...) #,lib)))
-   (pattern sc:simple-clause #:attr spec
-     #`(require/typed #:internal sc.nm sc.ty #,lib
-                      #,@(if unsafe? #'(unsafe-kw) #'()))))
+   (pattern sc:simple-clause
+     #:with r/t/te-mode (case te-mode ((guarded) #'require/typed) ((transient) #'require/typed-transient) ((erasure) #'require/typed-erasure))
+     #:attr spec
+     #`(r/t/te-mode #:internal sc.nm sc.ty #,lib
+                    #,@(if unsafe? #'(unsafe-kw) #'()))))
 
 
-  (define ((r/t-maker legacy unsafe?) stx)
+  (define ((r/t-maker legacy unsafe? te-mode) stx)
     (unless (or (unbox typed-context?) (eq? (syntax-local-context) 'module-begin))
       (raise-syntax-error #f "only allowed in a typed module" stx))
     (syntax-parse stx
-      [(_ lib:expr (~var c (clause legacy unsafe? #'lib)) ...)
+      [(_ lib:expr (~var c (clause legacy unsafe? te-mode #'lib)) ...)
        (when (zero? (syntax-length #'(c ...)))
          (raise-syntax-error #f "at least one specification is required" stx))
        #`(begin c.spec ...)]
@@ -203,11 +291,12 @@
        (define/with-syntax sm (if (attribute parent)
                                   #'(#:struct-maker parent)
                                   #'()))
+       (define/with-syntax r/c/te-mode (case te-mode ((guarded) #'require/contract) ((transient) #'require/contract-transient) ((erasure) #'require/contract-erasure)))
        (cond [(not (attribute unsafe?))
               ;; define `cnt*` to be fixed up later by the module type-checking
               (define cnt*
                 (syntax-local-lift-expression
-                 (make-contract-def-rhs #'ty #f (attribute parent))))
+                 (make-contract-def-rhs #'ty #f (attribute parent) te-mode)))
               (quasisyntax/loc stx
                 (begin
                   ;; register the identifier so that it has a binding (for top-level)
@@ -215,7 +304,7 @@
                          (list #'(define-syntaxes (hidden) (values)))
                          null)
                   #,(internal #'(require/typed-internal hidden ty . sm))
-                  #,(ignore #`(require/contract nm.spec hidden #,cnt* lib))))]
+                  #,(ignore #`(r/c/te-mode nm.spec hidden #,cnt* lib #,(format "~a" (syntax->datum #'ty))))))]
              [else
               (define/with-syntax hidden2 (generate-temporary #'nm.nm))
               (quasisyntax/loc stx
@@ -226,8 +315,9 @@
                   #,(ignore #'(define hidden2 hidden))
                   (rename-without-provide nm.nm hidden2 hidden)
                   #,(internal #'(require/typed-internal hidden2 ty . sm))))])]))
-  (values (r/t-maker #t #f) (r/t-maker #f #f) (r/t-maker #f #t))))
-
+  (values (r/t-maker #t #f guarded) (r/t-maker #t #f transient) (r/t-maker #t #f erasure)
+          (r/t-maker #f #f guarded) (r/t-maker #f #f transient) (r/t-maker #f #f erasure)
+          (r/t-maker #f #t guarded))))
 
 (define (require/typed/provide stx)
   (unless (memq (syntax-local-context) '(module module-begin))
@@ -252,6 +342,54 @@
               (provide t pred)
               (require/typed/provide lib other-clause ...))]))
 
+;; TODO combine ^
+(define (require/typed/provide-transient stx)
+  (unless (memq (syntax-local-context) '(module module-begin))
+    (raise-syntax-error 'require/typed/provide
+                        "can only be used at module top-level"))
+  (syntax-parse stx
+    [(_ lib) #'(begin)]
+    [(_ lib [r:id t] other-clause ...)
+     #'(begin (require/typed-transient lib [r t])
+              (provide r)
+              (require/typed/provide-transient lib other-clause ...))]
+    [(_ lib (~and clause [#:struct nm:opt-parent
+                                   (body:typed-field ...)
+                                   option ...])
+        other-clause ...)
+     #'(begin (require/typed-transient lib clause)
+              (provide (struct-out nm.nm))
+              (require/typed/provide-transient lib other-clause ...))]
+    [(_ lib (~and clause [#:opaque t:id pred:id])
+        other-clause ...)
+     #'(begin (require/typed-transient lib clause)
+              (provide t pred)
+              (require/typed/provide-transient lib other-clause ...))]))
+
+;; TODO combine ^^
+(define (require/typed/provide-erasure stx)
+  (unless (memq (syntax-local-context) '(module module-begin))
+    (raise-syntax-error 'require/typed/provide
+                        "can only be used at module top-level"))
+  (syntax-parse stx
+    [(_ lib) #'(begin)]
+    [(_ lib [r:id t] other-clause ...)
+     #'(begin (require/typed-erasure lib [r t])
+              (provide r)
+              (require/typed/provide-erasure lib other-clause ...))]
+    [(_ lib (~and clause [#:struct nm:opt-parent
+                                   (body:typed-field ...)
+                                   option ...])
+        other-clause ...)
+     #'(begin (require/typed-erasure lib clause)
+              (provide (struct-out nm.nm))
+              (require/typed/provide-erasure lib other-clause ...))]
+    [(_ lib (~and clause [#:opaque t:id pred:id])
+        other-clause ...)
+     #'(begin (require/typed-erasure lib clause)
+              (provide t pred)
+              (require/typed/provide-erasure lib other-clause ...))]))
+
 
 
 (define require-typed-struct/provide
@@ -263,6 +401,26 @@
      (begin (require-typed-struct nm . rest)
             (provide (struct-out nm)))]))
 
+;; TODO combine ^
+(define require-typed-struct/provide-transient
+  (syntax-rules ()
+    [(_ (nm par) . rest)
+     (begin (require-typed-struct-transient (nm par) . rest)
+            (provide (struct-out nm)))]
+    [(_ nm . rest)
+     (begin (require-typed-struct-transient nm . rest)
+            (provide (struct-out nm)))]))
+
+;; TODO combine ^^
+(define require-typed-struct/provide-erasure
+  (syntax-rules ()
+    [(_ (nm par) . rest)
+     (begin (require-typed-struct-erasure (nm par) . rest)
+            (provide (struct-out nm)))]
+    [(_ nm . rest)
+     (begin (require-typed-struct-erasure nm . rest)
+            (provide (struct-out nm)))]))
+
 ;; Conversion of types to contracts
 ;;  define-predicate
 ;;  make-predicate
@@ -270,12 +428,12 @@
 
 ;; Helpers to construct syntax for contract definitions
 ;; make-contract-def-rhs : Type-Stx Boolean Boolean -> Syntax
-(define (make-contract-def-rhs type flat? maker?)
-  (define contract-def `#s(contract-def ,type ,flat? ,maker? untyped))
+(define (make-contract-def-rhs type flat? maker? te-mode)
+  (define contract-def `#s(contract-def ,type ,flat? ,maker? untyped ,te-mode))
   (contract-def-property #'#f (λ () contract-def)))
 
 ;; make-contract-def-rhs/from-typed : Id Boolean Boolean -> Syntax
-(define (make-contract-def-rhs/from-typed id flat? maker?)
+(define (make-contract-def-rhs/from-typed id flat? maker? te-mode)
   (contract-def-property
    #'#f
    ;; This function should only be called after the type-checking pass has finished.
@@ -288,7 +446,7 @@
          (cond [(not types) #f]
                [(null? (cdr types)) (car types)]
                [else (quasisyntax/loc (car types) (U #,@types))])))
-     `#s(contract-def ,type-stx ,flat? ,maker? typed))))
+     `#s(contract-def ,type-stx ,flat? ,maker? typed ,te-mode))))
 
 
 (define (define-predicate stx)
@@ -305,12 +463,76 @@
          ;; not a require, this is just the unchecked declaration syntax
          #,(internal (syntax/loc stx (require/typed-internal name (Any -> Boolean : ty)))))]))
 
+;; TODO combine ^
+(define (define-predicate-transient stx)
+  (syntax-parse stx
+    [(_ name:id ty:expr)
+     #`(begin
+         ;; We want the value bound to name to have a nice object name. Using the built in mechanism
+         ;; of define has better performance than procedure-rename.
+         #,(ignore
+            (syntax/loc stx
+              (define name
+                (let ([pred (make-predicate-transient ty)])
+                  (lambda (x) (pred x))))))
+         ;; not a require, this is just the unchecked declaration syntax
+         #,(internal (syntax/loc stx (require/typed-internal name (Any -> Boolean : ty)))))]))
+
+;; TODO combine ^^
+(define (define-predicate-erasure stx)
+  (syntax-parse stx
+    [(_ name:id ty:expr)
+     #`(begin
+         ;; We want the value bound to name to have a nice object name. Using the built in mechanism
+         ;; of define has better performance than procedure-rename.
+         #,(ignore
+            (syntax/loc stx
+              (define name
+                (let ([pred (make-predicate-erasure ty)])
+                  (lambda (x) (pred x))))))
+         ;; not a require, this is just the unchecked declaration syntax
+         #,(internal (syntax/loc stx (require/typed-internal name (Any -> Boolean : ty)))))]))
+
 
 (define (make-predicate stx)
   (syntax-parse stx
     [(_ ty:expr)
      (define name (syntax-local-lift-expression
-                   (make-contract-def-rhs #'ty #t #f)))
+                   (make-contract-def-rhs #'ty #t #f guarded)))
+     (define (check-valid-type _)
+       (define type (parse-type #'ty))
+       (define vars (fv type))
+       ;; If there was an error don't create another one
+       (unless (or (Error? type) (null? vars))
+         (tc-error/delayed
+          "Type ~a could not be converted to a predicate because it contains free variables."
+          type)))
+     #`(#,(external-check-property #'#%expression check-valid-type)
+        #,(ignore-some/expr #`(flat-contract-predicate #,name) #'(Any -> Boolean : ty)))]))
+
+;; TODO consolidate
+(define (make-predicate-transient stx)
+  (syntax-parse stx
+    [(_ ty:expr)
+     (define name (syntax-local-lift-expression
+                   (make-contract-def-rhs #'ty #t #f transient)))
+     (define (check-valid-type _)
+       (define type (parse-type #'ty))
+       (define vars (fv type))
+       ;; If there was an error don't create another one
+       (unless (or (Error? type) (null? vars))
+         (tc-error/delayed
+          "Type ~a could not be converted to a predicate because it contains free variables."
+          type)))
+     #`(#,(external-check-property #'#%expression check-valid-type)
+        #,(ignore-some/expr #`(flat-contract-predicate #,name) #'(Any -> Boolean : ty)))]))
+
+;; TODO consolidate
+(define (make-predicate-erasure stx)
+  (syntax-parse stx
+    [(_ ty:expr)
+     (define name (syntax-local-lift-expression
+                   (make-contract-def-rhs #'ty #t #f erasure)))
      (define (check-valid-type _)
        (define type (parse-type #'ty))
        (define vars (fv type))
@@ -326,30 +548,15 @@
 (define (core-cast stx)
   (syntax-parse stx
     [(_ v:expr ty:expr)
-     (define (apply-contract v ctc-expr pos neg)
-       #`(#%expression
-          #,(ignore-some/expr
-             #`(let-values (((val) #,(with-type* v #'Any)))
-                 #,(syntax-property
-                    (quasisyntax/loc stx
-                      (contract
-                       #,ctc-expr
-                       val
-                       '#,pos
-                       '#,neg
-                       #f
-                       (quote-srcloc #,stx)))
-                    'feature-profile:TR-dynamic-check #t))
-             #'ty)))
-
      (cond [(not (unbox typed-context?)) ; no-check, don't check
             #'v]
            [else
             (define new-ty-ctc (syntax-local-lift-expression
-                                (make-contract-def-rhs #'ty #f #f)))
+                                (make-contract-def-rhs #'ty #f #f guarded)))
             (define existing-ty-id new-ty-ctc)
-            (define existing-ty-ctc (syntax-local-lift-expression
-                                     (make-contract-def-rhs/from-typed existing-ty-id #f #f)))
+            (define existing-ty-ctc
+              (syntax-local-lift-expression
+                (make-contract-def-rhs/from-typed existing-ty-id #f #f guarded)))
             (define (store-existing-type existing-type)
               (check-no-free-vars existing-type #'v)
               (cast-table-add! existing-ty-id (datum->syntax #f existing-type #'v)))
@@ -364,6 +571,21 @@
                  #:stx stx
                  "Type ~a could not be converted to a contract because it contains free variables."
                  type)))
+            (define (apply-contract v ctc-expr pos neg)
+              #`(#%expression
+                 #,(ignore-some/expr
+                    #`(let-values (((val) #,(with-type* v #'Any)))
+                        #,(syntax-property
+                           (quasisyntax/loc stx
+                             (contract
+                              #,ctc-expr
+                              val
+                              '#,pos
+                              '#,neg
+                              #f
+                              (quote-srcloc #,stx)))
+                           'feature-profile:TR-dynamic-check #t))
+                    #'ty)))
             #`(#,(external-check-property #'#%expression check-valid-type)
                #,(apply-contract
                   (apply-contract
@@ -372,6 +594,64 @@
                    existing-ty-ctc 'typed-world 'cast)
                   new-ty-ctc 'cast 'typed-world))])]))
 
+;; 2021-09-15 very similar to core-cast
+(define (core-cast-transient stx)
+  (syntax-parse stx
+    [(_ v:expr ty:expr)
+     (define new-ty-ctc (syntax-local-lift-expression
+                         (make-contract-def-rhs #'ty #f #f transient)))
+     (define existing-ty-id new-ty-ctc)
+     (define existing-ty-ctc
+       (syntax-local-lift-expression
+         (make-contract-def-rhs/from-typed existing-ty-id #f #f transient)))
+     (define (store-existing-type existing-type)
+       (check-no-free-vars existing-type #'v)
+       (cast-table-add! existing-ty-id (datum->syntax #f existing-type #'v)))
+     (define (check-valid-type _)
+       (define type (parse-type #'ty))
+       (check-no-free-vars type #'ty))
+     (define (check-no-free-vars type stx)
+       (define vars (fv type))
+       ;; If there was an error don't create another one
+       (unless (or (Error? type) (null? vars))
+         (tc-error/delayed
+          #:stx stx
+          "Type ~a could not be converted to a contract because it contains free variables."
+          type)))
+     (define ty-str (format "~a" (syntax->datum #'ty))) ;;bg better to parse-type ?
+     (define ctx (quote-srcloc stx))
+     #`(#,(external-check-property #'#%expression check-valid-type)
+        #,(ignore-some/expr
+            #`(#%plain-app transient-assert
+                           (#,(casted-expr-property #'#%expression store-existing-type) v)
+                           #,new-ty-ctc '#,ty-str '#,ctx)
+            #'ty))]))
+
+;; 2021-09-15 similar to core-cast
+(define (core-cast-erasure stx)
+  (syntax-parse stx
+    [(_ v:expr ty:expr)
+     (define new-ty-ctc (syntax-local-lift-expression
+                         (make-contract-def-rhs #'ty #f #f erasure)))
+     (define existing-ty-id new-ty-ctc)
+     (define (store-existing-type existing-type)
+       (check-no-free-vars existing-type #'v)
+       (cast-table-add! existing-ty-id (datum->syntax #f existing-type #'v)))
+     (define (check-valid-type _)
+       (define type (parse-type #'ty))
+       (check-no-free-vars type #'ty))
+     (define (check-no-free-vars type stx)
+       (define vars (fv type))
+       ;; If there was an error don't create another one
+       (unless (or (Error? type) (null? vars))
+         (tc-error/delayed
+          #:stx stx
+          "Type ~a could not be converted to a contract because it contains free variables."
+          type)))
+     #`(#,(external-check-property #'#%expression check-valid-type)
+        #,(ignore-some/expr
+            #`(#,(casted-expr-property #'#%expression store-existing-type) v)
+            #'ty))]))
 
 (define (require/opaque-type stx)
   (define-syntax-class unsafe-id
@@ -397,15 +677,75 @@
            #,(if (attribute ne)
                  (internal (syntax/loc stx (define-type-alias-internal ty (Opaque pred))))
                  (syntax/loc stx (define-type-alias ty (Opaque pred))))
-           #,(if (attribute unsafe)
-                 (ignore #'(define pred-cnt any/c)) ; unsafe- shouldn't generate contracts
-                 (ignore #'(define pred-cnt
-                             (or/c struct-predicate-procedure?/c
-                                   (any-wrap-warning/c . c-> . boolean?)))))
-           #,(ignore #'(require/contract pred hidden pred-cnt lib)))))]))
+           #,(ignore
+               (with-syntax ((ctc (if (attribute unsafe) ; unsafe- shouldn't generate contracts
+                                    #'any/c
+                                    #'(or/c struct-predicate-procedure?/c
+                                            ((make-any-wrap-warning/c) . c-> . boolean?)))))
+                 #'(define pred-cnt ctc)))
+           #,(ignore #`(require/contract pred hidden pred-cnt lib "(-> Any Boolean)")))))]))
 
+(define (require/opaque-type-transient stx)
+  (define-syntax-class unsafe-id
+    (pattern (~literal unsafe-kw)))
+  (define-syntax-class name-exists-kw
+    (pattern #:name-exists))
+  (syntax-parse stx
+    [_ #:when (eq? 'module-begin (syntax-local-context))
+       ;; it would be inconvenient to find the correct #%module-begin here, so we rely on splicing
+       #`(begin #,stx (begin))]
+    [(_ ty:id pred:id lib (~optional unsafe:unsafe-id) (~optional ne:name-exists-kw) ...)
+     (with-syntax ([hidden (generate-temporary #'pred)])
+       ;; this is needed because this expands to the contract directly without
+       ;; going through the normal `make-contract-def-rhs` function.
+       (set-box! include-extra-requires? #t)
+       (quasisyntax/loc stx
+         (begin
+           ;; register the identifier for the top-level (see require/typed)
+           #,@(if (eq? (syntax-local-context) 'top-level)
+                  (list #'(define-syntaxes (hidden) (values)))
+                  null)
+           #,(internal #'(require/typed-internal hidden (Any -> Boolean : (Opaque pred))))
+           #,(if (attribute ne)
+                 (internal (syntax/loc stx (define-type-alias-internal ty (Opaque pred))))
+                 (syntax/loc stx (define-type-alias ty (Opaque pred))))
+           #,(ignore
+               (with-syntax ((ctc (if (attribute unsafe) ; unsafe- shouldn't generate contracts
+                                    #'any/c
+                                    #'(procedure-arity-includes/c 1))))
+                 #'(define pred-cnt ctc)))
+           #,(ignore #`(require/contract-transient pred hidden pred-cnt lib "(-> Any Boolean)")))))]))
 
-(define-values (require-typed-struct-legacy require-typed-struct)
+(define (require/opaque-type-erasure stx)
+  (define-syntax-class unsafe-id
+    (pattern (~literal unsafe-kw)))
+  (define-syntax-class name-exists-kw
+    (pattern #:name-exists))
+  (syntax-parse stx
+    [_ #:when (eq? 'module-begin (syntax-local-context))
+       ;; it would be inconvenient to find the correct #%module-begin here, so we rely on splicing
+       #`(begin #,stx (begin))]
+    [(_ ty:id pred:id lib (~optional unsafe:unsafe-id) (~optional ne:name-exists-kw) ...)
+     (with-syntax ([hidden (generate-temporary #'pred)])
+       ;; this is needed because this expands to the contract directly without
+       ;; going through the normal `make-contract-def-rhs` function.
+       (set-box! include-extra-requires? #t)
+       (quasisyntax/loc stx
+         (begin
+           ;; register the identifier for the top-level (see require/typed)
+           #,@(if (eq? (syntax-local-context) 'top-level)
+                  (list #'(define-syntaxes (hidden) (values)))
+                  null)
+           #,(internal #'(require/typed-internal hidden (Any -> Boolean : (Opaque pred))))
+           #,(if (attribute ne)
+                 (internal (syntax/loc stx (define-type-alias-internal ty (Opaque pred))))
+                 (syntax/loc stx (define-type-alias ty (Opaque pred))))
+           #,(ignore
+               #'(define pred-cnt any/c))
+           #,(ignore #`(require/contract-erasure pred hidden pred-cnt lib "(-> Any Boolean)")))))]))
+
+(define-values (require-typed-struct-legacy require-typed-struct-legacy-transient require-typed-struct-legacy-erasure
+                require-typed-struct require-typed-struct-transient require-typed-struct-erasure)
  (let ()
   (define-splicing-syntax-class (constructor-term legacy struct-name)
    (pattern (~seq) #:fail-when legacy #f #:attr name struct-name #:attr extra #f)
@@ -418,7 +758,7 @@
    (pattern (~seq) #:attr unsafe? #f)
    (pattern (~seq (~literal unsafe-kw)) #:attr unsafe? #t))
 
-  (define ((rts legacy) stx)
+  (define ((rts legacy te-mode) stx)
     (syntax-parse stx #:literals (:)
       [(_ name:opt-parent
           (~optional (~seq (tvar:id ...)) #:defaults ([(tvar 1) '()]))
@@ -454,7 +794,9 @@
                       ;; the struct type to use for the constructor/selectors
                       [self-type (if (null? (syntax->list #'(tvar ...)))
                                      #'type
-                                     #'poly-type)])
+                                     #'poly-type)]
+                      [r/t/te-mode (case te-mode ((guarded) #'require/typed) ((transient) #'require/typed-transient) ((erasure) #'require/typed-erasure))]
+                      [r/c/te-mode (case te-mode ((guarded) #'require/contract) ((transient) #'require/contract-transient) ((erasure) #'require/contract-erasure))])
                      (when (and (not (attribute unsafe.unsafe?))
                                 (pair? (syntax->list #'(tvar ...))))
                        (tc-error/stx stx "polymorphic structs are not supported"))
@@ -515,31 +857,46 @@
                                                        (id-drop orig-sels orig-muts num-fields)))
                                            (struct-info-list new-sels new-muts)))))))
 
-                         (define-syntax nm
-                              (if id-is-ctor?
-                                  (make-struct-info-wrapper* #'internal-maker si #'type)
-                                  si))
+                         #,(ignore
+                             ;; bg: provide the static struct info directly, unlike other define-syntax forms
+                             ;; this is similar to the struct quad code in `typecheck/provide-handling.rkt`
+                             ;; TODO need this? sound? leave it to #1078 close #926 ?
+                             #'(begin
+                                 (define-syntax nm
+                                   (if id-is-ctor?
+                                     (make-struct-info-wrapper* #'internal-maker si #'type)
+                                     si))
+                                 (provide nm)))
 
                          (dtsi* (tvar ...) spec type (body ...) #:maker maker-name #:type-only)
-                         #,(ignore #'(require/contract pred hidden (or/c struct-predicate-procedure?/c (c-> any-wrap/c boolean?)) lib))
+                         #,(ignore
+                             (with-syntax ((ctc (case te-mode
+                                                  ((guarded)
+                                                   #'(or/c struct-predicate-procedure?/c (c-> any-wrap/c boolean?)))
+                                                  ((transient)
+                                                   #'(procedure-arity-includes/c 1))
+                                                  (else
+                                                   #'any/c))))
+                               #'(r/c/te-mode pred hidden ctc lib "(-> Any Boolean)")))
                          #,(internal #'(require/typed-internal hidden (Any -> Boolean : type)))
-                         (require/typed #:internal (maker-name real-maker) type lib
+                         (r/t/te-mode #:internal (maker-name real-maker) type lib
                                         #:struct-maker parent
                                         #,@(if (attribute unsafe.unsafe?) #'(unsafe-kw) #'()))
 
                          ;This needs to be a different identifier to meet the specifications
                          ;of struct (the id constructor shouldn't expand to it)
                          #,(if (syntax-e #'extra-maker)
-                               #`(require/typed #:internal (maker-name extra-maker) type lib
+                               #`(r/t/te-mode #:internal (maker-name extra-maker) type lib
                                                 #:struct-maker parent
                                                 #,@(if (attribute unsafe.unsafe?) #'(unsafe-kw) #'()))
                                #'(begin))
 
                          #,@(if (attribute unsafe.unsafe?)
-                                #'((require/typed #:internal sel (All (tvar ...) (self-type -> ty)) lib unsafe-kw) ...)
-                                #'((require/typed lib [sel (All (tvar ...) (self-type -> ty))]) ...)))))]))
+                                #'((r/t/te-mode #:internal sel (All (tvar ...) (self-type -> ty)) lib unsafe-kw) ...)
+                                #'((r/t/te-mode lib [sel (All (tvar ...) (self-type -> ty))]) ...)))))]))
 
-  (values (rts #t) (rts #f))))
+  (values (rts #t guarded) (rts #t transient) (rts #t erasure)
+          (rts #f guarded) (rts #f transient) (rts #f erasure))))
 
 (define (require-typed-signature stx)
   (syntax-parse stx

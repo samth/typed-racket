@@ -20,6 +20,7 @@
          "../env/type-name-env.rkt"
          "../env/type-alias-env.rkt"
          "../env/tvar-env.rkt"
+         "../env/transient-env.rkt"
          "../env/lexical-env.rkt"
          "../env/struct-name-env.rkt"
          "../utils/tc-utils.rkt"
@@ -319,7 +320,8 @@
   (unless (free-identifier=? type-name struct-name)
     (register-struct-name! struct-name type-name))
   (register-type-name type-name
-                      (make-Poly (struct-desc-tvars desc) sty)))
+                      (make-Poly (struct-desc-tvars desc) sty))
+  (register-transient-trusted-positive! (struct-names-predicate names)))
 
 ;; Register the appropriate types, return a list of struct bindings
 (define/cond-contract (register-struct-bindings! sty names desc si)

@@ -32,8 +32,10 @@
   (module* #%type-decl #f
     (#%plain-module-begin
      (require typed-racket/env/global-env
+              typed-racket/env/transient-env
               typed-racket/types/abbrev
               typed-racket/rep/type-rep)
+     (register-transient-trusted-positive! (quote-syntax default-continuation-prompt-tag))
      (register-type
       (quote-syntax default-continuation-prompt-tag)
       ;; TODO: we actually want the type

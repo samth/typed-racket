@@ -51,14 +51,17 @@
  ;; TODO make this from contract-req
  (prefix-in c: racket/contract)
  (contract-req)
+ (only-in racket/unsafe/undefined unsafe-undefined)
  (for-syntax racket/base)
- (for-template racket/base racket/contract "../utils/any-wrap.rkt"))
+ (for-template racket/base racket/contract "../utils/any-wrap.rkt" "../utils/transient-contract.rkt"))
 
 (provide
   (c:contract-out
     [type->static-contract
       (c:parametric->/c (a) ((Type? (c:-> #:reason (c:or/c #f string?) a))
-                             (#:typed-side boolean?) . c:->* . (c:or/c a static-contract?)))]))
+                             (#:typed-side boolean?
+                              #:enforcement-mode type-enforcement-mode?)
+                             . c:->* . (c:or/c a static-contract?)))]))
 
 (provide change-contract-fixups
          change-provide-fixups
@@ -67,7 +70,7 @@
          include-extra-requires?)
 
 ;; submod for testing
-(module* test-exports #f (provide type->contract))
+(module* test-exports #f (provide type->contract has-contract-def-property? make-procedure-arity-flat/sc))
 
 
 (define num-existentials (make-parameter 0))
@@ -80,7 +83,12 @@
           #t)]
     [_ #f]))
 
-(struct contract-def (type flat? maker? typed-side) #:prefab)
+;; type : (syntaxof Type?)
+;; flat? : boolean?
+;; maker? : boolean?
+;; typed-side : (or/c 'untyped 'typed)
+;; te-mode : type-enforcement-mode?
+(struct contract-def (type flat? maker? typed-side te-mode) #:prefab)
 
 ;; get-contract-def-property : Syntax -> (U False Contract-Def)
 ;; Checks if the given syntax needs to be fixed up for contract generation
@@ -113,7 +121,7 @@
 ;; (such as mutually recursive class types).
 (define (generate-contract-def stx cache)
   (define prop (get-contract-def-property stx))
-  (match-define (contract-def type-stx flat? maker? typed-side) prop)
+  (match-define (contract-def type-stx flat? maker? typed-side te-mode) prop)
   (define *typ (if type-stx (parse-type type-stx) t:-Dead-Code))
   (define kind (if (and type-stx flat?) 'flat 'impersonator))
   (syntax-parse stx #:literals (define-values)
@@ -133,6 +141,7 @@
         ;; this value is from the typed side (require/typed, make-predicate, etc)
         ;; unless it's used for with-type
         #:typed-side (from-typed? typed-side)
+        #:enforcement-mode te-mode
         #:kind kind
         #:cache cache
         (type->contract-fail
@@ -151,9 +160,10 @@
   (define failure-reason #f)
   (define result
     (type->contract type
-                    #:typed-side #t
+                    #:typed-side (case (current-type-enforcement-mode) ((guarded) #t) (else #f))
                     #:kind 'impersonator
                     #:cache cache
+                    #:enforcement-mode 'guarded
                     ;; FIXME: get rid of this interface, make it functional
                     (λ (#:reason [reason #f]) (set! failure-reason reason))))
   (syntax-parse stx
@@ -200,23 +210,47 @@
 
 ;; TODO: It would be better to have individual contracts specify which
 ;; modules should be required, but for now this is just all of them.
-(define extra-requires
-  #'(require
-      (submod typed-racket/private/type-contract predicates)
-      typed-racket/utils/utils
-      (for-syntax typed-racket/utils/utils)
-      typed-racket/utils/any-wrap typed-racket/utils/struct-type-c
-      typed-racket/utils/prefab-c
-      typed-racket/utils/opaque-object
-      typed-racket/utils/evt-contract
-      typed-racket/utils/hash-contract
-      typed-racket/utils/vector-contract
-      typed-racket/utils/sealing-contract
-      typed-racket/utils/promise-not-name-contract
-      typed-racket/utils/simple-result-arrow
-      typed-racket/utils/eq-contract
-      racket/sequence
-      racket/contract/parametric))
+(define (extra-requires #:enforcement-mode [te-mode #f])
+  (case (or te-mode (current-type-enforcement-mode))
+    ((guarded erasure)
+     ;; erasure needs the guarded requires to protect guarded
+     #'(require
+         (submod typed-racket/private/type-contract predicates)
+         typed-racket/utils/utils
+         (for-syntax typed-racket/utils/utils)
+         typed-racket/utils/any-wrap typed-racket/utils/struct-type-c
+         typed-racket/utils/prefab-c
+         typed-racket/utils/opaque-object
+         typed-racket/utils/evt-contract
+         typed-racket/utils/hash-contract
+         typed-racket/utils/vector-contract
+         typed-racket/utils/sealing-contract
+         typed-racket/utils/promise-not-name-contract
+         typed-racket/utils/simple-result-arrow
+         typed-racket/utils/eq-contract
+         racket/sequence
+         racket/contract/parametric))
+    ((transient)
+     ;; need all the guarded requires, unfortunately, to make boundary contracts that protect guarded
+     #'(require
+         (submod typed-racket/private/type-contract predicates)
+         typed-racket/utils/utils
+         (for-syntax typed-racket/utils/utils)
+         typed-racket/utils/any-wrap typed-racket/utils/struct-type-c
+         typed-racket/utils/prefab-c
+         typed-racket/utils/opaque-object
+         typed-racket/utils/evt-contract
+         typed-racket/utils/hash-contract
+         typed-racket/utils/vector-contract
+         typed-racket/utils/sealing-contract
+         typed-racket/utils/promise-not-name-contract
+         typed-racket/utils/simple-result-arrow
+         typed-racket/utils/eq-contract
+         racket/sequence
+         racket/contract/parametric
+         typed-racket/utils/transient-contract))
+    (else
+     #'(begin))))
 
 ;; Should the above requires be included in the output?
 ;;   This box is only used for contracts generated for `require/typed`
@@ -224,8 +258,7 @@
 ;;   submodule, which always has the above `require`s.
 (define include-extra-requires? (box #f))
 
-(define (change-contract-fixups forms)
-  (define ctc-cache (make-hash))
+(define (change-contract-fixups forms [ctc-cache (make-hash)])
   (with-new-name-tables
    (for/list ((e (in-list forms)))
      (if (not (has-contract-def-property? e))
@@ -235,7 +268,7 @@
 
 ;; TODO: These are probably all in a specific place, which could avoid
 ;;       the big traversal
-(define (change-provide-fixups forms  [ctc-cache (make-hash)])
+(define (change-provide-fixups forms [ctc-cache (make-hash)])
   (with-new-name-tables
    (for/list ([form (in-list forms)])
      (syntax-parse form #:literal-sets (kernel-literals)
@@ -292,38 +325,50 @@
 (define (contract-kind->keyword sym)
   (string->keyword (symbol->string sym)))
 
+(define typed-side?-str "(or/c 'typed 'untyped 'both)")
+
 (define (from-typed? side)
   (case side
    [(typed both) #t]
-   [(untyped) #f]))
+   [(untyped) #f]
+   [else (raise-argument-error 'from-typed? typed-side?-str side)]))
 
 (define (from-untyped? side)
   (case side
    [(untyped both) #t]
-   [(typed) #f]))
+   [(typed) #f]
+   [else (raise-argument-error 'from-untyped? typed-side?-str side)]))
 
 (define (flip-side side)
   (case side
    [(typed) 'untyped]
    [(untyped) 'typed]
-   [(both) 'both]))
+   [(both) 'both]
+   [else (raise-argument-error 'flip-side typed-side?-str side)]))
 
 ;; type->contract : Type Procedure
-;;                  #:typed-side Boolean #:kind Symbol #:cache Hash
+;;                  #:typed-side (U 'both Boolean) #:kind Symbol #:cache Hash
 ;;                  -> (U Any (List (Listof Syntax) Syntax))
 (define (type->contract ty init-fail
                         #:typed-side [typed-side #t]
-                        #:kind [kind 'impersonator]
-                        #:cache [cache (make-hash)])
+                        #:kind [pre-kind 'impersonator]
+                        #:cache [cache (make-hash)]
+                        #:enforcement-mode [te-mode (current-type-enforcement-mode)])
   (let/ec escape
     (define (fail #:reason [reason #f]) (escape (init-fail #:reason reason)))
-    (instantiate/optimize
-     (type->static-contract ty #:typed-side typed-side fail)
-     fail
-     kind
-     #:cache cache
-     #:trusted-positive typed-side
-     #:trusted-negative (not typed-side))))
+    (define sc
+      (type->static-contract ty fail
+                             #:typed-side typed-side
+                             #:enforcement-mode te-mode))
+    (define kind (if (eq? guarded te-mode) pre-kind 'flat))
+    (define-values [trust-pos? trust-neg?]
+      (if (eq? typed-side 'both)
+        (values #f #f)
+        (values typed-side (not typed-side))))
+    (instantiate/optimize sc fail kind
+      #:cache cache
+      #:trusted-positive trust-pos?
+      #:trusted-negative trust-neg?)))
 
 (define any-wrap/sc (chaperone/sc #'any-wrap/c))
 
@@ -335,13 +380,25 @@
   (case side
     ((untyped) (triple-untyped trip))
     ((typed) (triple-typed trip))
-    ((both) (triple-both trip))))
+    ((both) (triple-both trip))
+    (else (raise-argument-error 'triple-lookup typed-side?-str 1 trip side))))
 (define (same sc)
   (triple sc sc sc))
 
 
 (define (type->static-contract type init-fail
-                               #:typed-side [typed-side #t])
+                               #:typed-side [typed-side #t]
+                               #:enforcement-mode [te-mode (current-type-enforcement-mode)])
+  (case te-mode
+    [(guarded)
+     (type->static-contract/guarded type init-fail #:typed-side typed-side)]
+    [(transient)
+     (type->static-contract/transient type #:typed-side typed-side)]
+    [else
+     any/sc]))
+
+(define (type->static-contract/guarded type init-fail
+                                       #:typed-side [typed-side #t])
   (let/ec return
     (define (fail #:reason reason) (return (init-fail #:reason reason)))
     (let loop ([type type] [typed-side (if typed-side 'typed 'untyped)] [recursive-values (hash)])
@@ -384,20 +441,6 @@
            (and-prop/sc (map prop->sc ps))]
           [(OrProp: ps)
            (or-prop/sc (map prop->sc ps))]))
-
-      (define (obj->sc o)
-        (match o
-          [(Path: pes (? identifier? x))
-           (for/fold ([obj (id/sc x)])
-                     ([pe (in-list (reverse pes))])
-             (match pe
-               [(CarPE:) (acc-obj/sc #'car obj)]
-               [(CdrPE:) (acc-obj/sc #'cdr obj)]
-               [(VecLenPE:) (acc-obj/sc #'vector-length obj)]))]
-          [(LExp: const terms)
-           (linear-exp/sc const
-                          (for/hash ([(obj coeff) (in-terms terms)])
-                            (values (obj->sc obj) coeff)))]))
       (define (only-untyped sc)
         (if (from-typed? typed-side)
             (and/sc sc any-wrap/sc)
@@ -438,20 +481,26 @@
                (lookup-name-sc type typed-side)])]
        ;; Ordinary type applications or struct type names, just resolve
        [(or (App: _ _) (Name/struct:)) (t->sc (resolve-once type))]
-       [(Univ:) (if (from-typed? typed-side) any-wrap/sc any/sc)]
+       [(Univ:) (only-untyped any/sc)]
        [(Bottom:) (or/sc)]
        [(Listof: elem-ty) (listof/sc (t->sc elem-ty))]
        ;; This comes before Base-ctc to use the Value-style logic
        ;; for the singleton base types (e.g. -Null, 1, etc)
        [(Val-able: v)
-        (if (and (c:flat-contract? v)
-                 ;; numbers used as contracts compare with =, but TR
-                 ;; requires an equal? check
-                 (not (number? v))
-                 ;; regexps don't match themselves when used as contracts
-                 (not (or (regexp? v) (byte-regexp? v))))
-            (flat/sc #`(quote #,v))
-            (flat/sc #`(flat-named-contract '#,v (lambda (x) (equal? x '#,v))) v))]
+        (cond
+          [(eof-object? v)
+           (flat/sc #'eof-object?)]
+          [(void? v)
+           (flat/sc #'void?)]
+          [(and (c:flat-contract? v)
+                ;; numbers used as contracts compare with =, but TR
+                ;; requires an equal? check
+                (not (number? v))
+                ;; regexps don't match themselves when used as contracts
+                (not (or (regexp? v) (byte-regexp? v))))
+            (flat/sc #`(quote #,v))]
+          [else
+           (flat/sc #`(flat-named-contract '#,v (lambda (x) (equal? x '#,v))))])]
        [(Base-name/contract: sym ctc) (flat/sc ctc)]
        [(Distinction: _ _ t) ; from define-new-subtype
         (t->sc t)]
@@ -531,7 +580,7 @@
                (sequence/sc (t->sc t)))]
        [(Sequence: ts) (apply sequence/sc (map t->sc ts))]
        [(SequenceTop:)
-        (only-untyped (flat/sc #'sequence?))]
+        (only-untyped sequence?/sc)]
        [(Immutable-HeterogeneousVector: ts)
         (apply immutable-vector/sc (map t->sc ts))]
        [(Immutable-Vector: t)
@@ -562,7 +611,7 @@
        [(Promise: t)
         (promise/sc (t->sc t))]
        [(Opaque: p?)
-        (flat/sc #`(flat-named-contract (quote #,(syntax-e p?)) #,p?))]
+        (flat/sc p?)]
        [(Continuation-Mark-Keyof: t)
         (continuation-mark-key/sc (t->sc t))]
        ;; TODO: this is not quite right for case->
@@ -587,6 +636,7 @@
        [(Async-ChannelTop:) (only-untyped async-channel?/sc)]
        [(MPairTop:) (only-untyped mpair?/sc)]
        [(ThreadCellTop:) (only-untyped thread-cell?/sc)]
+       [(ThreadCell: _) (fail #:reason "contract generation not supported for this type")]
        [(Prompt-TagTop:) (only-untyped prompt-tag?/sc)]
        [(Continuation-Mark-KeyTop:) (only-untyped continuation-mark-key?/sc)]
        [(ClassTop:) (only-untyped class?/sc)]
@@ -626,7 +676,8 @@
            (recursive-sc
             n*s
             (list untyped typed both)
-            (recursive-sc-use (if (from-typed? typed-side) typed-n* untyped-n*)))])]
+            (recursive-sc-use (if (from-typed? typed-side) typed-n* untyped-n*)))]
+          [else (raise-argument-error 'Mu-case typed-side?-str typed-side)])]
        ;; Don't directly use the class static contract generated for Name,
        ;; because that will get an #:opaque class contract. This will do the
        ;; wrong thing for object types since it errors too eagerly.
@@ -644,7 +695,7 @@
        [(Instance: (Class: _ _ fields methods _ _))
         (match-define (list (list field-names field-types) ...) fields)
         (match-define (list (list public-names public-types) ...) methods)
-        (object/sc (from-typed? typed-side)
+        (object/sc (from-typed? typed-side) ;; TODO 2020-02-10 probably need to keep side info
                    (append (map (λ (n sc) (member-spec 'method n sc))
                                 public-names (map t->sc/meth public-types))
                            (map (λ (n sc) (member-spec 'field n sc))
@@ -742,29 +793,7 @@
             (struct-type/sc null))]
        [(Struct-Property: s _) (struct-property/sc (t->sc s))]
        [(Has-Struct-Property: orig-id)
-        ;; we can't call syntax-local-value/immediate in has-struct-property case in parse-type
-        (define-values (a prop-name) (syntax-local-value/immediate orig-id (λ () (values #t orig-id))))
-        (match-define (Struct-Property: _ pred?) (lookup-id-type/lexical prop-name))
-        ;; if original-name is only set when the type is added via require/typed
-
-        ;; the original-name of `prop-name` is its original referece in the unexpanded program.
-        (define real-prop-var (or (syntax-property prop-name 'original-name) prop-name))
-
-        ;; a property is wrapped so we need its original reference
-        (define real-pred-var (or (syntax-property pred? 'original-name) (syntax-e pred?)))
-
-        ;; the `pred?` could be provided to a property through require/typed,
-        ;; so we need to check if it is produced by the property
-        (flat/sc #`(flat-named-contract '#,real-pred-var
-                                        (lambda (x)
-                                          (if (not (struct-type-property-predicate-procedure? #,pred? #,real-prop-var))
-                                              (raise-arguments-error 'struct-property
-                                                                     "predicate does not match property"
-                                                                     "predicate"
-                                                                     #,pred?
-                                                                     "property"
-                                                                     #,real-prop-var)
-                                              (#,pred? x)))))]
+        (has-struct-property->sc orig-id)]
        [(Prefab: (and key (list key-sym rst ...)) (list flds ...))
         (cond
           [(hash-ref recursive-values key #f)]
@@ -801,6 +830,321 @@
        [_
         (fail #:reason "contract generation not supported for this type")]))))
 
+;; TODO full tests
+(define (type->static-contract/transient orig-type #:typed-side [typed-side? #t])
+  (let t->sc ([type orig-type]
+              [bound-all-vars '()])
+    (define (prop->sc p)
+      ;;bg copied from above, but uses different t->sc
+      (match p
+        [(TypeProp: o t)
+         (define sc (t->sc t bound-all-vars))
+         (cond
+           [(not (equal? flat-sym (get-max-contract-kind sc)))
+            (raise-user-error 'type->static-contract/transient "proposition contract generation not supported for non-flat types")]
+           [else (is-flat-type/sc (obj->sc o) sc)])]
+        [(NotTypeProp: o t)
+         (define sc (t->sc t bound-all-vars))
+         (cond
+           [(not (equal? flat-sym (get-max-contract-kind sc)))
+            (raise-user-error 'type->static-contract/transient "proposition contract generation not supported for non-flat types")]
+           [else (not-flat-type/sc (obj->sc o) sc)])]
+        [(LeqProp: (app obj->sc lhs) (app obj->sc rhs))
+         (leq/sc lhs rhs)]
+        [(AndProp: ps)
+         (and-prop/sc (map prop->sc ps))]
+        [(OrProp: ps)
+         (or-prop/sc (map prop->sc ps))]))
+    (match type
+     ;; Implicit recursive aliases
+     [(Name: _name-id _args #f)
+      (cond [(lookup-name-sc type 'both) ]
+            [else
+             (define resolved-name (resolve-once type))
+             (register-name-sc type
+                               (λ () (t->sc resolved-name bound-all-vars))
+                               (λ () (t->sc resolved-name bound-all-vars))
+                               (λ () (t->sc resolved-name bound-all-vars)))
+             (lookup-name-sc type 'both)])]
+     ;; Ordinary type applications or struct type names, just resolve
+     [(or (App: _ _)
+          (Name/struct:))
+      (t->sc (resolve-once type) bound-all-vars)]
+     [(Univ:) any/sc]
+     [(Bottom:) (transient-or/sc)]
+     ;; This comes before Base-ctc to use the Value-style logic
+     ;; for the singleton base types (e.g. -Null, 1, etc)
+     [(Val-able: v)
+      (cond
+       [(eof-object? v)
+        (flat/sc #'eof-object?)]
+       [(void? v)
+        (flat/sc #'void?)]
+       [(or (symbol? v) (boolean? v) (keyword? v) (null? v) (eq? unsafe-undefined v))
+        (flat/sc #`(lambda (x) (eq? x '#,v)))]
+       [(or (number? v) (regexp? v) (byte-regexp? v) (string? v) (bytes? v) (char? v))
+        (flat/sc #`(lambda (x) (equal? x '#,v)))]
+       [else
+        (raise-arguments-error 'type->static-contract/transient "unexpected Val-able value" "value" v "original type" type)])]
+     [(Base-name/contract: sym ctc) (flat/sc ctc)]
+     [(Distinction: _ _ t) ; from define-new-subtype
+      (t->sc t bound-all-vars)]
+     [(Refinement: par p?)
+      (transient-and/sc (t->sc par bound-all-vars) (flat/sc p?))]
+     [(BaseUnion: bbits nbits)
+      (define numeric (make-BaseUnion #b0 nbits))
+      (define other-scs
+        (for/list ((base-t (in-list (bbits->base-types bbits))))
+          (t->sc base-t bound-all-vars)))
+      (define numeric-sc (numeric-type->static-contract numeric))
+      (if numeric-sc
+          (apply transient-or/sc numeric-sc other-scs)
+          (apply transient-or/sc (append other-scs
+                                         (for/list ((base-t (in-list (nbits->base-types nbits))))
+                                            (t->sc base-t bound-all-vars)))))]
+     [(? Union? t)
+      (match (normalize-type t)
+        [(Union-all-flat: elems)
+         (let* ([sc* (for/list ((e (in-list elems)))
+                       (t->sc e bound-all-vars))]
+                [sc* (remove-duplicates sc*)]
+                [sc* (remove-overlap sc*
+                       (list
+                         (cons vector?/sc (list mutable-vector?/sc immutable-vector?/sc))
+                         (cons hash?/sc (list mutable-hash?/sc weak-hash?/sc immutable-hash?/sc))))])
+           (apply transient-or/sc sc*))]
+        [t (t->sc t bound-all-vars)])]
+     [(Intersection: ts raw-prop)
+      (define scs
+        (for/list ((t (in-list ts)))
+          (t->sc t bound-all-vars)))
+      (define prop/sc
+        (cond
+          [(TrueProp? raw-prop) #f]
+          [else (define x (genid))
+                (define prop (Intersection-prop (-id-path x) type))
+                (define name (format "~a" `(λ (,(syntax->datum x)) ,prop)))
+                (flat-named-lambda/sc name
+                                      (id/sc x)
+                                      (prop->sc prop))]))
+      (apply transient-and/sc (append scs (if prop/sc (list prop/sc) '())))]
+     [(Fun: arrows)
+      (if (null? arrows)
+        procedure?/sc
+        (apply transient-and/sc
+               (for/list ((arr (in-list arrows)))
+                 (arrow->sc/transient arr typed-side?))))]
+     [(DepFun: raw-dom _ rng)
+      (define num-mand-args (length raw-dom))
+      (if (and (not typed-side?) (arrow-rng-has-prop? rng))
+        none/sc
+        (make-procedure-arity-flat/sc num-mand-args '() '()))]
+     [(Set: _) set?/sc]
+     [(or (Sequence: _)
+          (SequenceTop:)
+          (SequenceDots: _ _ _))
+      sequence?/sc]
+     [(Immutable-HeterogeneousVector: ts)
+      (immutable-vector-length/sc (length ts))]
+     [(Immutable-Vector: _)
+      immutable-vector?/sc]
+     [(Mutable-HeterogeneousVector: ts)
+      (mutable-vector-length/sc (length ts))]
+     [(or (Mutable-Vector: _)
+          (Mutable-VectorTop:))
+      mutable-vector?/sc]
+     [(or (Box: _)
+          (BoxTop:))
+      box?/sc]
+     [(or (Weak-Box: _)
+          (Weak-BoxTop:))
+      weak-box?/sc]
+     [(or (Listof: _)
+          (ListDots: _ _))
+      list?/sc]
+     [(Pair: _ t-cdr)
+      ;; look ahead, try making list/sc
+      (let cdr-loop ((t t-cdr)
+                     (num-elems 1))
+        (match t
+         [(Pair: _ t-cdr)
+          (cdr-loop t-cdr (+ num-elems 1))]
+         [(== -Null)
+          (list-length/sc num-elems)]
+         [_
+          cons?/sc]))]
+     [(or (Async-Channel: _)
+          (Async-ChannelTop:))
+      async-channel?/sc]
+     [(Promise: _)
+      promise?/sc]
+     [(Opaque: p?)
+      (flat/sc p?)]
+     [(or (Continuation-Mark-Keyof: _)
+          (Continuation-Mark-KeyTop:))
+      continuation-mark-key?/sc]
+     [(or (Prompt-Tagof: _ _)
+          (Prompt-TagTop:))
+      prompt-tag?/sc]
+     [(F: v)
+      (if (member v bound-all-vars)
+        none/sc
+        any/sc)]
+     [(or (MPair: _ _)
+          (MPairTop:))
+      mpair?/sc]
+     [(or (ThreadCell: _)
+          (ThreadCellTop:))
+      thread-cell?/sc]
+     [(ClassTop:) class?/sc]
+     [(UnitTop:) unit?/sc]
+     [(or (Poly: vs b)
+          (PolyDots: (list vs ... _) b)
+          (PolyRow: vs _ b))
+      (t->sc b (append bound-all-vars vs))]
+     [(Mu: n b)
+      (t->sc b bound-all-vars)]
+     [(Instance: (? Name? t))
+      #:when (Class? (resolve-once t))
+      (cond [(lookup-name-sc type 'both)]
+            [else
+             (define resolved (make-Instance (resolve-once t)))
+             (register-name-sc type
+                               (λ () (t->sc resolved bound-all-vars))
+                               (λ () (t->sc resolved bound-all-vars))
+                               (λ () (t->sc resolved bound-all-vars)))
+             (lookup-name-sc type 'both)])]
+     [(Instance: (Class: _ _ fields methods _ _))
+      (make-object-shape/sc (map car fields) (map car methods))]
+     [(Class: row-var inits fields publics augments _)
+      (make-class-shape/sc (map car inits) (map car fields) (map car publics) (map car augments))]
+     [(Unit: imports exports init-depends results)
+      unit?/sc]
+     [(or (Struct: _ _ _ _ _ pred? _)
+          (StructTop: (Struct: _ _ _ _ _ pred? _)))
+      (flat/sc #`(lambda (x) (#,pred? x)))]
+     [(StructTypeTop:)
+      struct-type?/sc]
+     [(StructType: s)
+      (t->sc s bound-all-vars)]
+     [(Struct-Property: s _)
+      ;; TODO test by accessing the property ... use a default one
+      (t->sc s bound-all-vars)]
+     [(Has-Struct-Property: orig-id)
+      (has-struct-property->sc orig-id)]
+     [(or (Prefab: key _)
+          (PrefabTop: key))
+      ;; TODO test
+      ;; TODO prefab/c-flat-first-order (require typed-racket/utils/prefab-c)
+      (flat/sc #`(struct-type-make-predicate
+                  (prefab-key->struct-type (quote #,(abbreviate-prefab-key key))
+                                           #,(prefab-key->field-count key))))]
+     [(Syntax: (? Base:Symbol?))
+      identifier?/sc]
+     [(Syntax: t)
+      syntax?/sc]
+     [(Param: in out)
+      parameter?/sc]
+     [(or (Mutable-HashTable: _ _)
+          (Mutable-HashTableTop:))
+      mutable-hash?/sc]
+     [(Immutable-HashTable: _ _)
+      immutable-hash?/sc]
+     [(or (Weak-HashTable: _ _)
+          (Weak-HashTableTop:))
+      weak-hash?/sc]
+     [(or (Channel: _)
+          (ChannelTop:))
+      channel?/sc]
+     [(Evt: t)
+      evt?/sc]
+     [(? Prop? rep) (prop->sc rep)]
+     [(Ephemeron: _)
+      ephemeron?/sc]
+     [(Future: _)
+      future?/sc]
+     [_
+      (raise-arguments-error 'type->static-contract/transient "contract generation not supported for this type" "type" type "original" orig-type)])))
+
+(define (remove-overlap sc* pattern*)
+  (for/fold ((acc sc*))
+            ((kv* (in-list pattern*)))
+    (define replacement (car kv*))
+    (define tgt* (cdr kv*))
+    (define-values [success? acc+] (remove** tgt* acc))
+    (if success?
+      (cons replacement acc+)
+      acc)))
+
+(define (remove** target* sc*)
+  (for/fold ((success? #t)
+             (sc* sc*))
+            ((t (in-list target*)))
+    (values (and success?
+                 (member t sc*))
+            (filter (lambda (x) (not (equal? x t))) sc*))))
+
+(define (obj->sc o)
+  (match o
+    [(Path: pes (? identifier? x))
+     (for/fold ([obj (id/sc x)])
+               ([pe (in-list (reverse pes))])
+       (match pe
+         [(CarPE:) (acc-obj/sc #'car obj)]
+         [(CdrPE:) (acc-obj/sc #'cdr obj)]
+         [(VecLenPE:) (acc-obj/sc #'vector-length obj)]))]
+    [(LExp: const terms)
+     (linear-exp/sc const
+                    (for/hash ([(obj coeff) (in-terms terms)])
+                      (values (obj->sc obj) coeff)))]
+    [else
+      (raise-argument-error 'obj->sc "Object?" o)]))
+
+(define (partition-kws kws)
+  (partition (match-lambda [(Keyword: _ _ mand?) mand?]) kws))
+
+(define arrow->sc/transient
+  (let ((conv (match-lambda [(Keyword: kw _ _) kw])))
+    (lambda (orig-ty typed-side?)
+      (match orig-ty
+        [(Arrow: _ _ _ rng)
+         #:when (and (not typed-side?) (arrow-rng-has-prop? rng))
+         none/sc]
+        [(Arrow: _ (RestDots: _ _) _ _)
+         procedure?/sc]
+        [(Arrow: dom _ kws _)
+         (define num-mand-args (length dom))
+         (define-values [mand-kws opt-kws]
+           (let-values ([(mand-kws opt-kws) (partition-kws kws)])
+             (values (map conv mand-kws) (map conv opt-kws))))
+         (make-procedure-arity-flat/sc num-mand-args mand-kws opt-kws)]))))
+
+(define (arrow-rng-has-prop? rng)
+  (match rng
+    [(Values: (list (Result: _
+                             (PropSet: (TrueProp:)
+                                       (TrueProp:))
+                             (Empty:)) ...))
+     #f]
+    ;; Functions that don't return
+    [(Values: (list (Result: (== -Bottom) _ _) ...))
+     #f]
+    ;; functions with props or objects
+    [(Values: (list (Result: rngs _ _) ...))
+     #true]
+    [(? ValuesDots?)
+     #f]
+    [(? AnyValues?)
+     #f]))
+
+(define (make-procedure-arity-flat/sc num-mand mand-kws opt-kws)
+  (flat/sc
+    #`(λ (f)
+        (and (procedure? f)
+             (procedure-arity-includes? f '#,num-mand '#,(not (null? mand-kws)))
+             #,@(if (and (null? mand-kws) (null? opt-kws))
+                  #'()
+                  #`((procedure-arity-includes-keywords? f '#,mand-kws '#,opt-kws)))))))
 
 (define (t->sc/function f fail typed-side recursive-values loop method? #:maybe-existential [opt-exi #f])
   (define (t->sc t #:recursive-values (recursive-values recursive-values))
@@ -819,7 +1163,7 @@
                    (eq? n1 exi))
        (void)]
       [(_ _) (fail #:reason
-                   "contract generation only supports Some Type in this form: (Some (X) (-> ty1 ... (-> X ty ... ty2) : X)) or (-> ty1 ... (Some (X) (-> X ty ... ty2) : X)))")])
+                   "contract generation only supports Some Type in this form: (Some (X) (-> ty1 ... (-> X ty ... ty2) : X)) or (-> ty1 ... (Some (X) (-> X ty ... ty2) : X))")])
 
     (define/with-syntax name exi)
     (define lhs (t->sc/neg dom))
@@ -975,7 +1319,7 @@
                                    (remove-duplicates
                                     (apply append (map free-ids rngs))
                                     free-identifier=?)))
-          (->i/sc (from-typed? typed-side)
+          (->i/sc (from-typed? typed-side) ;; TODO 2020-02-10
                   ids
                   dom*
                   dom-deps
@@ -1064,6 +1408,31 @@
           ;; public method too. This invariant has to be enforced though.
           (sealing->/sc temporaries (take constraints 3)
             (t->sc b #:recursive-values rv))))))
+
+(define (has-struct-property->sc orig-id)
+  ;; we can't call syntax-local-value/immediate in has-struct-property case in parse-type
+  (define-values (a prop-name) (syntax-local-value/immediate orig-id (λ () (values #t orig-id))))
+  (match-define (Struct-Property: _ pred?) (lookup-id-type/lexical prop-name))
+  ;; if original-name is only set when the type is added via require/typed
+
+  ;; the original-name of `prop-name` is its original referece in the unexpanded program.
+  (define real-prop-var (or (syntax-property prop-name 'original-name) prop-name))
+
+  ;; a property is wrapped so we need its original reference
+  (define real-pred-var (or (syntax-property pred? 'original-name) (syntax-e pred?)))
+
+  ;; the `pred?` could be provided to a property through require/typed,
+  ;; so we need to check if it is produced by the property
+  (flat/sc #`(flat-named-contract '#,real-pred-var
+                                  (lambda (x)
+                                    (if (not (struct-type-property-predicate-procedure? #,pred? #,real-prop-var))
+                                        (raise-arguments-error 'struct-property
+                                                               "predicate does not match property"
+                                                               "predicate"
+                                                               #,pred?
+                                                               "property"
+                                                               #,real-prop-var)
+                                        (#,pred? x))))))
 
 ;; Predicate that checks for an App type with a recursive
 ;; Name type in application position
@@ -1196,11 +1565,11 @@
        [_ #false]))))
 
 (module predicates racket/base
-  (require racket/extflonum (only-in racket/contract/base >=/c <=/c))
+  (require racket/extflonum)
   (provide nonnegative? nonpositive?
            extflonum? extflzero? extflnonnegative? extflnonpositive?)
-  (define nonnegative? (>=/c 0))
-  (define nonpositive? (<=/c 0))
+  (define nonnegative? (lambda (x) (>= x 0)))
+  (define nonpositive? (lambda (x) (<= x 0)))
   (define extflzero? (lambda (x) (extfl= x 0.0t0)))
   (define extflnonnegative? (lambda (x) (extfl>= x 0.0t0)))
   (define extflnonpositive? (lambda (x) (extfl<= x 0.0t0))))
@@ -1213,7 +1582,7 @@
       racket/base
       racket/contract
       (submod ".." predicates)
-      (prefix-in t: "../types/numeric-predicates.rkt")))
+      (prefix-in t: (types numeric-predicates))))
   (provide (all-defined-out))
 
   (define-syntax-rule (numeric/sc name body) (flat/sc #'body))
@@ -1252,17 +1621,18 @@
   (define inexact-real/sc (numeric/sc Inexact-Real inexact-real?))
   (define real-zero/sc (numeric/sc Real-Zero (and/c real? zero?)))
   (define positive-real/sc (numeric/sc Positive-Real (and/c real? positive?)))
-  (define nonnegative-real/sc (numeric/sc Nonnegative-Real nonnegative?)) ; implies `real?`
+  (define nonnegative-real/sc (numeric/sc Nonnegative-Real (and/c real? nonnegative?)))
   (define negative-real/sc (numeric/sc Negative-Real (and/c real? negative?)))
-  (define nonpositive-real/sc (numeric/sc Nonpositive-Real nonpositive?)) ; implies `real?`
+  (define nonpositive-real/sc (numeric/sc Nonpositive-Real (and/c real? nonpositive?)))
   (define real/sc (numeric/sc Real real?))
   (define exact-number/sc (numeric/sc Exact-Number (and/c number? exact?)))
   (define inexact-complex/sc
     (numeric/sc Inexact-Complex
-                 (and/c number?
-                   (lambda (x)
-                     (and (inexact-real? (imag-part x))
-                          (inexact-real? (real-part x)))))))
+                (and/c
+                  number?
+                  (lambda (x)
+                    (and (inexact-real? (imag-part x))
+                         (inexact-real? (real-part x)))))))
   (define number/sc (numeric/sc Number number?))
 
   (define extflonum-zero/sc (numeric/sc ExtFlonum-Zero (and/c extflonum? extflzero?)))

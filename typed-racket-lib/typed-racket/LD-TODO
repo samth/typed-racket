@@ -1,0 +1,923 @@
+- [X] rename #:locally-defensive to #:transient
+- [X] add #:guarded
+- [X] rename "#:tag" to "#:shape"
+- [X] remove tag-reduce ... and do all the work inside type->contract instead?
+      ... see what we need to add erasure ... maybe a type-contract unit works best?
+- [X] interactions ....
+  T = TR = Typed Racket = Natural embedding = type-sound = `\tau`
+  S = transient = LD Racket = constructor sound = `\sigma`
+  U = Racket = uni-typed
+  - TR requires LD, add a contract
+    ... or force require/typed
+    ... or contract ONLY the diff between the annotated type and the runtime-inferred type
+    ... try modifying 'current-typed-side' and 'typed-context?' to fix
+    ... 2020-02-10 removed 'current-typed-side'
+  - LD requires TR, need to protect the typed functions
+    ... going to get tag-correct inputs, but need to protect outputs
+  - LD not doing type-checks under a with-handlers ???
+  - TR_N and TR_LD, order of require/typed matters ? (gee this is new)
+  - LD possible to never use type->contract in defender, by generating all
+    contracts up front?
+- [X] 2020-02-17 fixed
+  WTF: #<syntax:/home/ben/code/racket/gradual-typing-performance/benchmarks/tag_kcfa/benchmark/configuration1111111/main.rkt:27:25 args>
+  compilation context...:
+  /home/ben/code/racket/gradual-typing-performance/benchmarks/tag_kcfa/benchmark/configuration1111111/main.rkt
+  context...:
+  /home/ben/code/racket/shallow/tagged-racket/tagged-racket-lib/tagged-racket/defender/defender.rkt:591:0: protect-formals
+  ...rivate/parse.rkt:535:26
+  /home/ben/code/racket/6.10.1/collects/racket/private/map.rkt:20:13: map
+  fail-handler33
+  /home/ben/code/racket/shallow/tagged-racket/tagged-racket-lib/tagged-racket/tc-setup.rkt:33:4: for-loop
+  /home/ben/code/racket/shallow/tagged-racket/tagged-racket-lib/tagged-racket/tc-setup.rkt:28:0: maybe-defend
+  /home/ben/code/racket/shallow/tagged-racket/tagged-racket-lib/tagged-racket/tc-setup.rkt:105:0: tc-module/full
+  /home/ben/code/racket/shallow/tagged-racket/tagged-racket-lib/tagged-racket/tagged-racket.rkt:23:4
+  /home/ben/code/racket/6.10.1/collects/compiler/cm.rkt:363:0: compile-zo*
+  /home/ben/code/racket/6.10.1/collects/compiler/cm.rkt:572:26
+  /home/ben/code/racket/6.10.1/collects/compiler/cm.rkt:564:42
+  /home/ben/code/racket/6.10.1/collects/compiler/cm.rkt:635:0: compile-root
+  /home/ben/code/racket/6.10.1/collects/compiler/cm.rkt:737:4
+  /home/ben/code/racket/6.10.1/share/pkgs/compiler-lib/compiler/commands/make.rkt:81:8: for-loop
+  /home/ben/code/racket/6.10.1/share/pkgs/compiler-lib/compiler/commands/make.rkt: [running body]
+  /home/ben/code/racket/6.10.1/collects/raco/raco.rkt: [running body]
+- [X] ....
+  ;; 2020-02-10 unclear whats problem, this compiles and runs, with or without for/or annotation
+  ;#lang tagged/racket
+  ;
+  ;(struct component
+  ;  ((id : Integer))
+  ;  #:transparent)
+  ;
+  ;(struct frame
+  ;  ((components : (Vectorof component)))
+  ;  #:transparent)
+  ;
+  ;(: find-component (-> Integer frame (U #f component)))
+  ;(define (find-component id frame)
+  ;  (for/or #; (U #f component) ((c (in-vector (frame-components frame))))
+  ;        (and (= (component-id c) id)
+  ;             c)))
+- [X] fsmoo/mbta/quadU/take5, object/sc and class/sc unsupported
+- [X] synth, threadcell contract
+- [X] acquire, cannot generate contract 2 cases of arity 1
+- [X] acquire/dungeon/forth/zombie, sc->tag expected sc got void
+- [X] sc->tag/c why return a static contract and not a contract? (issue with recursion?)
+      yeah it's gotta be an sc because we're not ready to instantiate yet
+- [X] fsm, expected (StructTypeTop ....) failed
+- [X] plot build fails (see in-cycle.rkt test)
+      opened issue in TR (), hacked-around for LD for now
+      EDIT closed the TR issue, hack validated
+- [X] make-typed-renaming needs 3 args but sometimes gets 2 ... how? (in-array.rkt)
+- [X] fsm fsmoo --- need to check `type->flat-contract` returns #f
+      application: not a procedure; expected a procedure that can be applied to arguments given: #f arguments...: 0
+- [X] jpeg, can't use for/array because untype-contract restricts Transient
+      uses, but not typed ones
+- [X] quadU errors in untyped and typed, by cadr
+      error changed after revert x4:
+        sc->tag/c: not implemented for (cons/sc (flat/sc symbol?) (cons/sc (listof/sc (cons/sc (flat/sc symbol?) #0=any/sc)) (listof/sc #0#)))
+      error not fixed by removing rts provides
+      fixed again by not defining predicates in LD code
+- [X] fsmoo (population) quadU (utils) quadT (core-types) forth (command) slow to compile
+      even typed maybe
+      - fsmoo seems much better 2020-02-14 ... forth BAD
+      - 2020-02-17 : forth and quadU were looping in contract generation,
+        because of name/sc lookups (recursively converting everything in
+        name-table to tags?)
+        quadT also needed to move the `quad` macro to a new file, so LD code
+         doesn't need to use a typed macro
+- [X] simplify tag-reduce for no fuel? (does that help much?)
+      2020-02-18 ok now, no depth argument, all decided by LD parameter
+- [X] fixup name-table code? make a tag-table on the side?
+      yeah if we make tags from the start, no need! the table contains tags and doesn't need to be cut later
+- [X] can we have type->contract unit & avoid building full sc's ahead of time?
+      lets try 3 functions for the first
+      ... at least T vs S and we will see if there are code savings
+      LOOKS GOOD
+- [X] remove sc->tag
+- [X] check diff, anything else to remove?
+- [X] remove contract-first-order for classes .... when?
+      maybe should wait, until we can measure the difference of building or not ... no thats silly just make it easy to go back
+      HALF-way removed, it's there but lifted to toplevel; could not check
+       field + method membership otherwise (need to use class internals)
+- [X] jpeg, jfif.rkt component? use-before-def error
+      dammit, struct contract
+      cannot do contract = foo?
+      need contract = (lambda (x) (foo? x))
+      because foo? might not be defined yet, and these are lifted to the toplevel
+- [X] lnm missing type for plot-pict
+      its a define-typed/untyped-id ... need require/typed on the client side
+- [X] runtime perf: sieve
+- [X] 'typed-world ? it's a blame label for `cast` ... we could rename depending
+      on the mode for the current types, but I don't think it matters
+- [X] remove `typed ? at least clearly distinguish a mode from a side
+- [X] remove current-typed-side ?
+- [X] what goes wrong in type->contract doesn't set parameter?
+      nothing yet, so change to an assert for now
+- [X] bless string->path
+- [X] can transient macro appear in untyped?
+  well the macro code CANNOT be type checked and IS NOT defended
+  ... unclear what defense to add to (f x) --> (car (car x))
+  ... if unoptimized then could be fine right?
+  ... yeah I think this is fine, ESCAPE is a problem,
+      but not really right now because all functions are defended no worries about escape
+  OK allowed now
+- [X] bless check-list
+  ... and anything that returns void? NO contexts can distinguish void (void? X) (if X ....)
+- [X] ??? variable-reference-constant? #%variable-reference --- probably TR internal
+      yeah looks like TR internals
+- [X] register-type, look over
+- [X] ... anything returns Nothing (none/c/proc) ... well doesn't change error, but generates a lot of code
+- [X] ??? make-sequence
+         (let-values (((pos->vals pos-pre-inc pos-next init pos-cont?  val-cont?  all-cont?)
+                       (let-values (((dyn-cod22 dyn-cod23 dyn-cod24 dyn-cod25 dyn-cod26 dyn-cod27 dyn-cod28)
+                                     (#%app make-sequence '(word+freq) words+freqs)))
+                         (if (if (#%plain-app g11 dyn-cod22) (if (#%plain-app g14 dyn-cod23) (if (#%plain-app g11 dyn-cod24) (if (#%plain-app g14 dyn-cod26) (if (#%plain-app g14 dyn-cod27) (#%plain-app g21 dyn-cod28)
+                                       '#f) '#f) '#f) '#f) '#f)
+                           (#%app values dyn-cod22 dyn-cod23 dyn-cod24 dyn-cod25 dyn-cod26 dyn-cod27 dyn-cod28)
+                           (#%plain-app error 'dynamic-typecheck '"'(#%app make-sequ... : ((-> Any (List String Integer)) (U (-> Any Any) False) (-> Any Any) Any (U (-> Any Any) False) (U (-> (List String Integer) Any) False) (U (-> Any (List String Integer) Any) False))")))))
+  2020-03-03 pretty sure fixed by changing the base environment
+- [X] for-loop lambda ... all these ifs might be killing loops idk
+  2020-03-03 saves ~1/2 second in morsecode
+  fixed with pattern-match + optimizer escape analysis
+- [X] fill = lambda ... escape analysis?
+      ditto for loops (again they can escape)
+- [X] rackunit env broke
+  fixed rackunit by reverting make-env
+- [X] does extra-env lang need changes for transient?
+  plot is the only user, seems fine
+- [X] define-predicate really flat?
+  2020-03-03 yes, makes a shallow contract
+- [X] suffixtree 4s typed 40s tagged???
+      that's not too far off from ICFP after all ... 10s slower
+      2020-03-03 down to 30s
+      2020-07-21 back 50s ... because of typed-id
+      2020-08-08 down to 3s, problem was both/ files, gotta be #:transient not #:guarded
+- [X] TR master, need pattern-match to create list/sc
+  2020-03-03 looks like its never created, gee!
+  if we had this on master, LD can use to check list? and
+   later use list? knowledge for cdr
+   (important for for-loops list sequence iteration)
+  2020-03-03 done see PR #911
+- [X] can vec? check be simpler, instead of union ivec mvec?
+      ditto for hash ... this is not a pretty solution though
+- [X] cdr does not need check if applied to a Listof type
+  2020-03-03 List -> cons?, so its not safe ... hard to tell Cons vs List in
+   type->contract
+- [X] morsecode/sieve/snake/tetris, very slow runtime (require-typed-check bug?)
+      ... better now after checking "blessed" but heres now fully-typed vs ICPF worst-case
+      morsecode : 4.45 vs 3.48 ... 2020-03-04 : ~2x
+      sieve : 2.84 vs 1.69     ... 2020-03-04 : ~2x
+      snake : 11.3 vs 6.7      ... 2020-03-04 : ~4x
+      tetris : 1.2 vs 8.8      ... 2020-03-04 : ~3x
+      zombie : 24x vs 20x      ... 2020-03-04 : ~14x
+      ICFP should always be slower, but its not ... WTF snake & tetris!!!!!
+- [X] class error
+  - [X] fix acquire dungeon take5 quadU quadT ... all these were typo in class-checker generation code who would have thought
+- [X] fix zordoz bad memory segfault
+  - [X] fails fully-typed on my fork
+  - [X] succeeds fully-typed on 7.6 BC release
+  - [X] fails untyped too, OK THEN!
+  - [X] reduce untyped? yep reduced to contract-out
+  - [X] mflatt fixed the bug yesterday!
+- [X] typed-racket-test/transient/error/values.rkt, typed-racket-test/transient/pass/ll-lambda.rkt
+      typed-racket-lib/typed-racket/defender/defender.rkt:516.24:
+       and: expected one of these identifiers: `#%plain-app', `begin', `begin0', `#%plain-app', `#%plain-lambda', `if', `with-continuation-mark', `#%top', `#%variable-reference', `quote', `quote-syntax', `case-lambda', `let-values', `letrec-values', `#%expression', or `set!'
+- [X] typed-racket-test/transient/pass/for-array.rkt
+      typed-racket-test/transient/pass/in-array.rkt
+      typed-racket-test/transient/pass/match-define.rkt
+      typed-racket-test/transient/pass/poly-union.rkt
+      typed-racket-test/transient/pass/tc-app-special.rkt
+      <pkgs>/math-lib/math/private/array/array-sequence.rkt:31.26: unless: expected one of these identifiers: `#%plain-app', `begin', `begin0', `#%plain-app', `#%plain-lambda', `if', `with-continuation-mark', `#%top', `#%variable-reference', `quote', `quote-syntax', `case-lambda', `let-values', `letrec-values', `#%expression', or `set!'
+        at: unless
+        in: (unless (#%plain-app g4 arr) (#%plain-app error (quote transient-assert) (#%plain-app format (quote "got ~s in ~a") arr (quote "'arr : (Array g4514144)"))))
+- [X] factorial, if issue
+      all if statements turning into dead code,
+      because type checker adds marks for every branch taken --- and these got lost,
+       need to copy them over
+- [X] typed-racket-test/transient/pass/alias.rkt
+      typed-racket-test/transient/pass/lambda.rkt
+      typed-racket-test/transient/pass/list-ref.rkt
+      typed-racket-test/transient/pass/submodule-transient.rkt
+      syntax/loc: contract violation
+        expected: syntax?
+        given: '(#<syntax:/Users/ben/code/racket/fork/extra-pkgs/typed-racket/typed-racket-test/transient/pass/alias.rkt:8:1 +> #<syntax (quote 2)> #<syntax (quote 2)>)
+- [X] acquire dungeon forth fsm errors ....
+      got 'values' expected kernel-literal
+- [X] optimizer
+  leave S,E macros un-optimized (should be no problem ... but lets see)
+  yes they are skipped optimizer/optimizer L67
+  - [X] disable pair, if for transient
+  - [X] try running benchmarks
+- [X] tc-app-lambda todo items (PR to TR?)
+  - [X] ((lambda ....) ....) seems more-correct now, but's also apparently unnecessary,
+    worth doing a TR PR though
+    NO not unneccessary this transient code fails, missing type
+     ((lambda (x) (values x (list 'A 'A))) 42)
+    [X] submit PR 1, ...
+  - [X] ((letrec-values ....) ....) seems fine without annotation,
+    but double-check benchmarks?
+- [X] 2020-03-14 review diff again, factor thhings into PRs
+- [X] revert static-contracts/combinators/structural.rkt
+- [X] need static-contracts/utils.rkt ???
+  no, removed
+- [X] with-type, error, generate-contract-def: current untyped context
+  moved `typed-context?` box reset a little later, no problem!
+  so maybe, can use that box for the TE strategy
+- [X] investigate contract generation, where do names go what gets reused?
+  - objects are looking fine ... they get lifted to top-module and object/c created once
+  - need all these caches?
+  - [X] dungeon error (main)
+    g150: undefined;
+     cannot reference an identifier before its definition
+      module: "/Users/ben/code/racket/gtp/transient-tr-benchmark/dungeon/tagged/main.rkt"
+      internal name: g150.1 context...: raise-undefined proc call-in-empty-metacontinuation-frame body of "/Users/ben/code/racket/gtp/transient-tr-benchmark/dungeon/tagged/main.rkt"<Paste>
+  - [X] zordoz error (transition)
+   g963: undefined;
+    cannot reference an identifier before its definition
+      module: "/Users/ben/code/racket/gtp/transient-tr-benchmark/zordoz/tagged/zo-transition.rkt"
+        internal name: g963.1 context...: raise-undefined proc call-in-empty-metacontinuation-frame body of "/Users/ben/code/racket/gtp/transient-tr-benchmark/zordoz/tagged/zo-transition.rkt"
+  - OK all these fixed ... no more errors and every function uses the caches
+- [-] type->shape function (pick name!)
+  - [X] draft
+  - [-] full
+  - [-] test
+  - DEFERRED less motivation since type->contract no longer using cached-match
+    may still be nice for reference later, but this is a hard function to write
+- [X] type-contract include-extra-requires? is always #true, set to #false
+      sometimes please (maybe always true in transient, fine)
+- [X] fewer extra-requires for LD
+  - [X] tc-app error
+  - [X] submodule-struct-0 error
+  - [X] need #:opaque test
+  - wow, found a bug require/typed #:struct #:opaque was using chaperones, fixed
+  - [X] even fewer requires?
+    down to racket/contract/base (could go further, remove all chaperones)
+- [X] plot error make-typed-renaming: arity mismatch; expected: 3 given: 2
+  context...: body of "/Users/ben/code/racket/fork/extra-pkgs/plot/plot-lib/plot/private/no-gui/plot-pict.rkt"
+  (gotta be compiled-code error ... the fork is ok, cannot reproduce)
+- [X] replace current-te param with the context box (try core.rkt first)
+- [X] defender extra-defs, functional API
+- [X] base-env/prims-contract.rkt ... need to store current-te-mode?
+  if so find example + regression test
+  - [X] note, typed-context? maybe cannot double as the enforcement mode,
+    because in untyped code but generating contract for typed client
+    ... with-type initially triggered a contract when typed-context? = #f
+        but I changed that
+  - [X] WE WILL SEE make more mixed tests, or run mixed benchmarks
+  - NOT currently storing
+- [X] lnm error racket 7.6 on albany
+  - gtp-measure: config 001000 rktd->spreadsheet: broke its own contract
+    promised: g24 produced: #<procedure:rktd->spreadsheet>
+    cannot reproduce
+  - gtp-measure: config 001010 lnm-plot: broke its own contract
+    promised: g23 produced: #<procedure:lnm-plot>
+    cannot reproduce
+  - [X] reproduced on albany, try again (lnm-test/) YES reproduced
+  - ... unbelievable, both reproducible today ... compiled-cache error?
+  - [X] racket/contract allows opt -> mand conversion and now we do too
+- [X] static-contracts/combinators/derived.rkt docs + tests ... ditto object.rkt
+- [X] do all 3 caches get used?
+  - what are the keys? = (cons type side), better to have transient[type]
+  - log hits
+  - [X] yes all used during benchmarks run,
+        not sure if any hits across passes
+        ZERO sc-cache hits
+  - [X] unit-test hit across pass (dungeon?)
+    yes dungeon sets in defender, gets in contract-fixups (non-provide)
+  - [X] unit-test sc-cache hit ... holy cow, was missing because of typo!!!
+  - [X] yikes figure out correct sc-cache change, then re-run the benchmarks
+  - [X] currently removing cache on TR pull request (tc-cache)
+  - [X] ... after that, ask about sharing caches across CORE passes
+  - [-] what happens after type->shape ... well, far-less motivation now
+- [X] run benchmarks on albany machine, look for errorss
+  - [X] tagged lattice
+    - ~3 days to run
+  - [X] guarded/transient lattice (new copy of benchmarks?)
+    - ~1 week to run
+    - [X] fsm take5 errors (committed both/ files)
+    - [ ] inspect ... any hints for performance? (can't get trustworthy hints without t/u data)
+  - [-] some configs that mix typed and tagged .... idk randomize?
+  - [X] different struct defs, incompatible
+    - [X] zordoz errors
+          ("00001" ("/home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt:20:3: Type Checker: type mismatch   expected: (-> zo String (values (U (List    of zo) zo) Boolean))   given: (-> zo String (values (U (Listof zo) zo) Boolean))   in: zo-transition   compilation context...:    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.r    kt/18-max_zordoz/configuration/zo-find.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-shell.rkt    /home/ben/code/racket/transient/manif    est-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/main.rkt   context...:    do-raise-syntax-error    call-in-empty-metacontinuation-frame    .../utils/tc-utils.rkt:139:21: for-loop    ..    ./utils/tc-utils.rkt:129:0: report-all-errors    .../typecheck/tc-toplevel.rkt:359:0: type-check    .../typecheck/tc-toplevel.rkt:606:0: tc-module    winder-dummy    .../typed-racket/tc-set    up.rkt:107:12    winder-dummy    .../typed-racket/typed-racket.rkt:23:4    call-in-empty-metacontinuation-frame    apply-transformer    dispatch-transformer    expand-module    expand-captu    ring-lifts    expand-single /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt:104:49: Type Checker: type mismatch;  incompatible struct t    ypes with the same name   expected: zo   given: a different zo   in: z   compilation context...:    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration    /zo-find.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-shell.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-ma    x_zordoz/configuration/main.rkt   context...:    do-raise-syntax-error    call-in-empty-metacontinuation-frame    .../utils/tc-utils.rkt:139:21: for-loop    .../utils/tc-utils.rkt:129:0: re    port-all-errors    .../typecheck/tc-toplevel.rkt:359:0: type-check    .../typecheck/tc-toplevel.rkt:606:0: tc-module    winder-dummy    .../typed-racket/tc-setup.rkt:107:12    winder-dummy        .../typed-racket/typed-racket.rkt:23:4    call-in-empty-metacontinuation-frame    apply-transformer    dispatch-transformer    expand-module    expand-capturing-lifts    expand-single /h    ome/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt:106:15: Type Checker: type mismatch   expected: (U (Listof zo) zo)   given: (U (Listof zo    ) zo)   in: r*   compilation context...:    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt    /home/ben/code/racket/transient/manifest    -1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-shell.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/main.rkt   context...:    do-rais    e-syntax-error    call-in-empty-metacontinuation-frame    .../utils/tc-utils.rkt:139:21: for-loop    .../utils/tc-utils.rkt:129:0: report-all-errors    .../typecheck/tc-toplevel.rkt:359:0:     type-check    .../typecheck/tc-toplevel.rkt:606:0: tc-module    winder-dummy    .../typed-racket/tc-setup.rkt:107:12    winder-dummy    .../typed-racket/typed-racket.rkt:23:4    call-in-emp    ty-metacontinuation-frame    apply-transformer    dispatch-transformer    expand-module    expand-capturing-lifts    expand-single Type Checker: Summary: 3 errors encountered   compilation     context...:    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_    zordoz/configuration/zo-shell.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/main.rkt   context...:    do-raise-syntax-error    .../typeche    ck/tc-toplevel.rkt:359:0: type-check    .../typecheck/tc-toplevel.rkt:606:0: tc-module    winder-dummy    .../typed-racket/tc-setup.rkt:107:12    winder-dummy    .../typed-racket/typed-rack    et.rkt:23:4    call-in-empty-metacontinuation-frame    apply-transformer    dispatch-transformer    expand-module    expand-capturing-lifts    expand-single    temp71_2    compile    .../pr    ivate/cm-minimal.rkt:608:0: compile-zo* "))
+          ("00010" ("/home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt:23:3: Type Checker: type mismatch   expected: (-> zo Spec)   given: (-> zo S    pec)   in: zo->spec   compilation context...:    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt    /home/ben/code/racket/transient/man    ifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-shell.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/main.rkt   context...:    do    -raise-syntax-error    call-in-empty-metacontinuation-frame    .../utils/tc-utils.rkt:139:21: for-loop    .../utils/tc-utils.rkt:129:0: report-all-errors    .../typecheck/tc-toplevel.rkt:35    9:0: type-check    .../typecheck/tc-toplevel.rkt:606:0: tc-module    winder-dummy    .../typed-racket/tc-setup.rkt:107:12    winder-dummy    .../typed-racket/typed-racket.rkt:23:4    call-i    n-empty-metacontinuation-frame    apply-transformer    dispatch-transformer    expand-module    expand-capturing-lifts    expand-single /home/ben/code/racket/transient/manifest-1/3/0-manife    st-1.rkt/18-max_zordoz/configuration/zo-find.rkt:88:31: Type Checker: type mismatch;  incompatible struct types with the same name   expected: zo   given: a different zo   in: z   compilati    on context...:    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-m    ax_zordoz/configuration/zo-shell.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/main.rkt   context...:    do-raise-syntax-error    call-in-    empty-metacontinuation-frame    .../utils/tc-utils.rkt:139:21: for-loop    .../utils/tc-utils.rkt:129:0: report-all-errors    .../typecheck/tc-toplevel.rkt:359:0: type-check    .../typechec    k/tc-toplevel.rkt:606:0: tc-module    winder-dummy    .../typed-racket/tc-setup.rkt:107:12    winder-dummy    .../typed-racket/typed-racket.rkt:23:4    call-in-empty-metacontinuation-frame        apply-transformer    dispatch-transformer    expand-module    expand-capturing-lifts    expand-single Type Checker: Summary: 2 errors encountered   compilation context...:    /home/ben/c    ode/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-find.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/zo-sh    ell.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/18-max_zordoz/configuration/main.rkt   context...:    do-raise-syntax-error    .../typecheck/tc-toplevel.rkt:359:0:     type-check    .../typecheck/tc-toplevel.rkt:606:0: tc-module    winder-dummy    .../typed-racket/tc-setup.rkt:107:12    winder-dummy    .../typed-racket/typed-racket.rkt:23:4    call-in-emp    ty-metacontinuation-frame    apply-transformer    dispatch-transformer    expand-module    expand-capturing-lifts    expand-single    temp71_2    compile    .../private/cm-minimal.rkt:608:0    : compile-zo* "))
+          00100 01000 10000
+          optimizer errors when using #:guarded structs for all
+    - [X] gregor errors
+          ("0101100010111" ("/home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/4-max_gregor/configuration/moment.rkt:162:23: match: syntax error in pattern   in: (tzoffset offset _ _)   c    ompilation context...:    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rkt/4-max_gregor/configuration/moment.rkt    /home/ben/code/racket/transient/manifest-1/3/0-manifest-1.rk    t/4-max_gregor/configuration/main.rkt   context...:    do-raise-syntax-error    .../match/patterns.rkt:188:10    .../match/patterns.rkt:186:0: pats->bound-vars    .../match/define-forms.rkt    :151:5    call-in-empty-metacontinuation-frame    apply-transformer    dispatch-transformer    loop    for-loop    finish-bodys    loop    [repeats 1 more time]    lambda-clause-expander        loop    [repeats 43 more times]    module-begin-k "))
+          match-expanders fail using #:guarded for all .... issue with unhygienic provide
+          moved to *-test/transient/pass/struct-match-2.rkt
+          damn, have a hack to fix ... issue is for-syntax binding is disallowed "macro in untyped code"
+          ... not sure whether its unsafe, but hacked for now
+          OK opened a PR with a better fix
+  - [X] why untyped FSM so slow? 4sec untyped, 1sec transient
+        #:no-optimize down to 4 sec, wow
+        ok but this does not help find guarded + transient mixtures
+- [X] pos->vals appears in for loop expansion, gets a cod check, but doesn't need one why
+  "pos->vals" is only a variable name, used to describe the first result of `make-sequence`, great
+  one fix: give `make-sequence` a deeper type and in the defender check for "deeper"
+   ... so pos->vals gets a blessed type
+   ... and this means, I guess, that transient-env is the wrong choice; instead
+    should key on types rather than identifiers
+  turns out this is ESSENTIAL for (for ((c (open-input-string "yolo"))) ....)
+  - [X] fixed with better type for `make-sequence` long live occurrence typing
+  - don't want to add trust to types because:
+    1. need to change def-rep to have new keywords, that means EVERYTHING
+       thats a rep --- props, objects ... --- needs transient-trusted
+    2. need to propagate transient-trust outside the initial env,
+       so now every operation on types that might lead to the type the
+       defender sees must reason about trust, yikes
+- [X] merge TR PR hash-contract-only-untyped, adjust transient
+- [X] unhygienic S require T identifier
+  - notes:
+    use contract-def/provide-property ?
+    ... need changes to typecheck/provide-handling.rkt
+  - problem:
+    typed rename + contract def leads to id without type,
+    see test/transient/succeed/guarded-transient-id.rkt
+  - extra challenge, where to fix?
+    register just like normal ids, by changing provide-handling.rkt or the standard-inits?
+     turns out, #%contract-defs is not accessible to standard-inits
+    during typecheck/renamer expansion? during utils/redirect-contract? neither seems to have type info
+    finally fixed at the last second, when we find the id during typechecking
+  - [X] remove `make-register-type-code`
+  - [X] cleanup impl for `maybe-type-of`
+  - [X] remove rtss in provide-handling.rkt
+- [X] tc-app-helper see bg comment
+      tc-app ditto
+- [X] max_zordoz config type error ... what is wrong?
+  my new types for for-loops, really make-sequence, were shadowing the old
+   ones because the interesting parts of the type are on the RETURN type,
+   no way to statically tell which way to go
+- [X] cod check for/list etc, its always a list or void or sum
+  (2020-02-28 still a problem, (check (#%app for-loop  ....)))
+  fixed with very special case check ... hack
+- [X] bless require/typed struct predicates
+  NO nevermind, its gotta be checked
+   suppose allowed non-bool value, then (if (? (struct? x)) ... ...)
+   might go down a branch that should be dead if the returned val
+   was a boolean
+- [X] dungeon, cell.rkt, why 3 copies of same recursive-contract ?
+- [X] issue-625 test, check for nonsense hash keys when contract applied
+      ... or not, not sure if this is transient or not to check
+   not, because the check depends on a deep part of the type,
+    rather than the outer shape --- need the key, but the key is not part
+    of the type soundness guarantee
+- [X] 2020-04-17 yikes, huge number of type errors on T/S lattice, examples:
+  WELL NOW its a funny issue with require/typed ... a regular 'require' from
+   S to T gets the #%type-decl registers, but a no-check require does not
+   so my `require-typed-check` library cannot keep using no-check ... or
+   needs to add the type-decl
+  ==> wait NO that was off-base, the problem was only hidden because no
+   T code acutally used an S id, they simply passed through ... remove the
+   guard (see below)
+  AH part of the problem is S -> T too, because T gets a contract identifier
+   from S without the type-decl ... need to remove the (current-te-mode)
+   guard from env/lexical-env
+  - acquire 0+ 1+01 morsecode 0010 0100 quadT 10+1110 dungeon 00100 forth 0010 0100 1000 fsm 0010 0100 fsmoo 0000 gregor 10+1001 jpeg 00001 kcfa 0+ lnm 0+ mbta 0001
+  - ... re-running on albany, may fail
+- [X] transient breaks tail calls? or does typed-id? check make it okay?
+  - Herman or Disney might have a (workshop?) paper about this,
+    moving contracts into continuation marks
+  - cannot find the paper on Disney or Flanagan's dblp
+  - save for later, way later ... its not clear now whether there IS a concrete
+    problem, only a hunch; looking for typed ids may be good enough
+- [X] support case-lambda in defender
+- [X] quadT 11111110001100
+      Type Checker: Duplicate type annotation of (-> (Listof Index) (Listof Integer)) for add-no-hyphen-zone,
+      previous was (-> (Listof Index) (Listof Integer))
+      - cannot reproduce, maybe fixed by Transient update
+- [X] unsound t-fail/dyn/pr10350.rkt
+  ... function defined in TR cannot be trusted,
+   what to do?
+   DISABLE typed-id? check for now, because unsound in general
+   ... can allow (define (f x) ....), but IDK how to make that cross-module
+   ... I guess optimizartions go to future work, very sad
+   BUT we can turn this on for the benchmarks, to compare
+- [X] defender: why can't cod-checks all share code? values vs single-value
+- [X] require/typed and cast, raise transient
+  errors instead of contract errors
+- [X] send unsound, objects
+  - [X} any other accessors? build a list and tests for all these!
+    - [X] unsound, (cdr (Pairof Sym Sym)) not protected
+- [X] use transient-assert function?
+  seems ok
+- [X] send fix causes errors, ugh
+  take5
+   transient-assert: value does not match static type
+   value: #<procedure:!play-game method in dealer%>
+   type: Result
+  acquire
+   transient-assert: value does not match static type
+   value: #<procedure:to-state method in lplaced%>
+   type: state
+  quadT
+   transient-assert: value does not match static type
+   value: #<procedure:get-solution method in problem%>
+   type: HashTableTop
+  -> very simple, DO NOT defend the class-send code!
+- [X] blame, simple POPL'17
+  - see 'blame-trail' repo + meeting notes
+  - [X] real blame should use srclocs as map keys
+  - MOVED see $GT/blame-trails repo
+- [X] methods not defended
+  - [X] new / init probably not either
+  see transient/pass/object-typed.rkt
+- [X] unsound case-lambda t-fail/dyn/pr14173.rkt 
+  case disappeared ... how why?
+  I'd assumed dom-map has one entry per body,
+   fixed (for now!) by checking for dead-lambda-branch?
+- [X] none/c check for Procedure type what the
+  t-fail/dyn/procedure-top.rkt
+- [X] missing dom check t-fail/dyn/union-or-exclusive.rkt
+- [X] take5 internal error)
+   transient-assert: value does not match static type
+    value: #<unsafe-undefined>
+    type: (U False Nonnegative-Real)
+   even when optimizer off
+   WOW magically fixed after other issue
+- [X] mbta too much printing, took 40 min
+  - from unneeded dom checks? NO
+    comes from field cod-check,
+     around in-neighbors in a private method,
+     ... if privates skipped, runtime 2s
+    ugh
+  - remove opaque print helps? YES
+  - cache for opaque printing also helps
+- [X] new runtime errors
+  ... should something get register-ignored?
+  - [X] acquire
+  - [X] fsm
+  - [X] fsmoo
+    wtf broken again later??? no, I doubt it ever worked
+    methods with kwd + default have the wrong type/expansion,
+     expansion picks default inside the method,
+     but type excludes unsafe-undefined ... expects default outside
+    not sure what to do
+    ... can wait, for blame
+  - [X] gregor
+  - [X] jpeg
+  - [X] lnm
+  - [X] quadT
+  - [X] quadU
+    incorrect type ann, doesn't match default value
+  - [X] synth
+    incomplete type, array-append*
+  - [X] zordoz
+- [X] use kw-lambda and opt-lambda properties for checking?
+  ... oh dear
+  TR says Nothing enters, which is incorrect but happens to work
+   (not sure where this Nothing = empty union originates)
+  then, the body of the function ends up with the right type via occurrence typing and unions,
+   desipite faulty reasoninng (input in NOT Nothing, nor is it only Unsafe-Undef)
+   seems sound, though
+  for transient, need to redo the opt/kw checks,
+   do not check at top
+   wait until the (let ((k (if .... k0))) ....)
+    find the right type (on k) and check the k0 case
+  - [X] found type?
+  - [X] rewrite, simple,
+- [X] what is plambda-property ... can use ?
+  - keeps the plambda syntax, declaring the poly vars, used in typechecking
+  - ((plambda: (x ...) [xs : x ... x] xs) 3 4 5)
+    has the "wrong" type because `tc/funapp1` adds the inferred type for the tooltip table
+    gets type after substitution
+    ... anything to do?
+- [X] refactor domain-map code?
+  - darn, case-lambda makes it tough,
+    see tc-lambda-unit and reuse code
+  - [X] defender: simpler stx->arrow type,
+        is there a built-in union function to combine arrows? (not `union`)
+        can the whole protect-formals code get simpler / fewer steps?
+- [X] basic blame (transient-blame branch)
+  - [X] how to print types, (format "~a" ...) okay? NO use type->sexp
+  - [X] simple filter, no aliases around
+  - [X] filter with alias test
+  - [X] does printing work in require/typed ? see base-env/prims-contract.rkt ... uses symbols and not type->sexp because don't have that yet!
+        ditto for `cast`, in same file
+- [X] blame
+  - [X] filtering works for require/typed
+  - [X] output list of boundaries in error message, ordered "timestamp"
+  - [X] module names only and exactly
+  - [-] ditto cast (we're fine, move on)
+- [X] gtp-benchmarks pre-release v6 has transient errors
+  - [X] acquire "invalid memory reference"
+    HMMM
+    011100101 011101111 111101001
+  - [X] forth "transient-assert: value does not match static type   value: #0=#0#   type: (U False Nonnegative-Real)"
+    HMMM
+    0010 0011 0110 0111 1010 1011 1110 1111
+  - [X] quadT "Type Checker: Macro quad from typed module used in untyped code"
+    ok thats a dumb mistake for me sorry, right?
+    and thats probably all
+    00000000000001
+  - [X] quadU  "identifier already required at: quad?"
+    00000001000000 many others
+    this was a big problem, Lukas had to rerun!
+  - [X] lnm "Type Checker: missing type for identifier;"
+    ok thats obvious
+    010000 011111 111111
+- [X] 2020-06-12 open draft pull request, simplify the diff,
+      list TODO and current status, make RFC
+- [X] quadT 01001101010011 #hash() higher-order value passed as Any, yikes
+  - my PR for HashTableTop caused this 
+    its a Typed / Untyped issue, nothing doing for transient
+  - fixed by changing to (HashTable Any Any)
+  - ... need to run transient/typed sample to check
+  - need to run lattices for normal gtp-benchmarks to see effects
+  --> run other PR tests first, if we need NSA
+- [X] zordoz 00001 10000 etc have type errors
+  - fixed, remove tagged-zo-structs ... only use typed ... consequences?
+- [X] try blame for 2020-04-27 11:00
+  see 'transient-blame' branch and $GT/blame-trails/meeting/2020-04-27
+- [X] defender, need extra cases for kw+opt+rest functions?
+      see transient-blame branch
+      arg-idx vs num-args +1 confusion???
+  - no, no problem
+    transient-blame needs to count up, because `protect-domain` needs an index
+    but transient only uses `num-args` variable and counts down, easy
+- [X] TODO does (All (A) A) break type system with
+      transient? It's inhabited now
+      ... maybe names should be none/c
+      ... maybe NOT (All (A) (-> A A)) still needs to work!
+      yes, it's a problem
+       either `inst` must check,
+       or no contract
+- [X] (All (A) (Union String A)) unsound ... gotta
+  - could track NAME going down and use none/c
+  - or, look for (or/sc any/sc) after??? NO fails for (U String Any)
+  - tests = transient/error/poly-non-function-?.rkt
+- [X] OT predicates can break everything (values : (All (T) (-> Any Any : T)))
+  kills all optimizations and soundness, remove!
+  - tests = transient/error/occurrence-type.rkt
+  - replaced with none/sc
+- [X] organize benchmarks for eval.
+  - [X] jpeg typed/untyped-id issue, (not sure what ID)
+    have a simple fix via vector-map,
+    need to check perf. but anyway
+    guarded code gets precise type, but transient gets supertype to match
+     the handcrafted untyped contract ... don't see a work-around so recommend
+     changing the gtp-benchmark
+  - [X] lnm typed/untyped-id ... deferred
+- [X] no more contracts in transient,
+  - [X] replace or/sc
+  - [X] remove racket/contract/base import?
+    No, need define-module-boundary-contract
+  - [-] remove contracts from numeric-contracts submod
+    Done, but can we make it prettier?
+  - [X] simplify numeric-predicates, nonnegative? don't check real?
+- [X] optimize transient-or/c and/c if 1 contract?
+- [X] acquire 00100* fail, because need contracts for arrows with props!
+  lets distinguish typed-side ... if at boundary and value coming in,
+  can't assign ... should allow 00100*
+   and rule out untyped things with props
+- [X] runtime surprises
+  - [X] fsm 0000 way slow, 400 vs 4000
+    cannot reproduce locally, must be something wrong with NSA code
+    was BC vs CS
+  - [X] snake 20x ?!
+    0*11 0*1011 10001* 10101* 11101*
+    seems LEGIT locally, can improve?
+    . yes, Sam TH had good suggestions
+- [X] case-> is an AND and that works right???? yes
+- [X] fsmoo 0010 1111 etc errors
+  gtp-measure: transient-assert: value does not match static type
+  value: #0=#0# type: (U False Nonnegative-Real) src: '(#f #f #f #f #f)
+  - cannot reproduce locally
+  - fixed by pulling on NSA, yikes
+- [X] go benchmark, unsound,
+  somehow ZERO transient checks in the body, what the heck,
+  (fix now, or after dissertation in shape? ... can collect data again later)
+- [X] set? check wrong, need set-mutable? and set-weak? too
+- [X] deep needs contracts against shallow!!!
+- [X] ((lambda ((x : A)) ....) y) finds 'Error' type
+  test = transient/pass/lambda-allvar.rkt
+  - allow "contains free variables" in prims-contract.rkt?
+- [X] should #:type-enforcement-mode be a keyword?! I think not, this
+      is changing something fundamental, not tacking on another option
+      Its gonna be a new #lang for heavens sake
+- [X] #lang /guarded ... /transient ... /erasure
+- [X] lambda.rkt test fails, bad optimization?
+- [X] 2020-12-24 (1) test lang (2) pull rebase (3) all these bugs
+- [X] 'check-syntax-binding ... introduced bug in optimizer? yes
+  problem = cannot reorder ID case, must consider optimizations (incl. dead code?? no way) before defaulting
+  fixed temporarily by returning to standard order
+  transient/pass/mandlebrot.rkt
+  [-] but this must break something else ... find and fix!
+- [X] why no transient check failure from parametr?
+      #lang typed/racket #:transient
+      (module p racket/base
+        (define world:paper-height (make-parameter 792.0+0.0i))
+        (provide world:paper-height))
+      (require/typed 'p (world:paper-height (Parameterof Float)))
+      (require (only-in typed/racket/draw pdf-dc%))
+      (define dc-output-port (open-output-bytes))
+      (define dc
+        (new pdf-dc%
+             [interactive #f][use-paper-bbox #f][as-eps #f]
+             [output dc-output-port]
+             [width 792.0]
+             [height (world:paper-height)]))
+- [X] defender, need "ignored" cases?
+  - [X] kill them, prevents (new c% [x (car ints)]) from checking the car
+- [X] fix transient/pass/test-engine test (more langs)
+  not important, now that #:transient keyword is gone
+  compatibility langs can stay off to the aside
+- [X] #lang typed/racket/transient
+  - [X] module+ unsoundness
+    tried to add a syntax-time variable to the local env
+     (make-syntax-introducer ; define-syntaxed ; syntax-local-introduce)
+     but no does not work, need a delta introducer because core.rkt instantiated
+     more than once ... probably because of lazy-require
+    so, lets NOT do the delta-introducer,
+     switch to #lang design instead
+    pros of #lang
+    + avoid module+ communication, don't need to disallow (module #:transient (module+ #:guarded))
+    + works in repl
+    + works for (require ....)
+    cons
+    - more langs, from 2 to 8
+    - [X] 2020-05-02 notes
+      - core.rkt -> typed-racket.rkt -> minimal.rkt
+        - not sure how to get TE-MODE into
+          core ... maybe make 3x minimal.rkt
+          and send mode explicitly
+      - other langs set typed-context?
+        see language-info.rkt
+        that can EASILY accept arg
+- [X] rename defender ... move file somewhere, transient?
+- [X] transient/error/with-type-guarded.rkt ... error where is racket/contract/private/misc ?
+- [X] defend holes, nothing protected in here (`struct` may have same holes)
+  - [X] module+
+        can hack-around the problem by adding #:transient to submodules,
+        adding #lang tr/transient may enable a proper fix ... not sure
+  - [X] (test-case ....) and other macros?
+    something is stopping the defender on the way down ... need to look through
+     cases and find the exception!
+    - two problems
+      - register-ignored! on the let-values, not sure why
+      - untyped function around the key parts
+        ... so, need to recur under both those, but then
+      - transient-assert was failing on exn-handler pred. ... why? is there a type bug somewhere?
+- [X] segfault transient/pass/accessors.rkt
+  sensitive to small deletes
+  OK random-ref is unsafe require/typed
+  ```
+  #lang typed/racket #:transient
+  (module untyped racket
+    (define pair0 (cons "A" "B"))
+    (define list0 (list "A" "B" "C"))
+    (provide pair0 list0))
+  (require/typed 'untyped
+    (pair0 (Pairof Symbol Symbol))
+    (list0 (Listof Symbol)))
+  (require typed/racket/random)
+  (random-ref list0)
+  ```
+  2020-05-02 : the above WORKS, but accessors test fails
+  2021-07-27 : both fine nowe, check-exn just fine ... maybe ignored-tests helped?
+- [X] typed-racket-test/t-succeed/README.md (long list!)
+  - [X] one pass
+  - [X] all resolved
+    - [X] stx.rkt
+      problem (stx-cdr #'(a b)) => #'(#'b)
+       what the heck!
+      defender is ... somehow ... changing structure of terms,
+       tried to look for syntax? and pair? in defend-top, but no good
+       skipping all (quote-syntax ...) works though, and is right to do
+    - [X] refinements, identifier out of context
+      ok major problem
+       Refine contract-generation assumes the contract is at the top level,
+        but that's not true here!
+       need to capture those lifts
+- [X] move erasure/succeed to succeed/erasure
+- [X] move transiest/pass tests to succeed/transient
+- [X] what about transient/manual??? expand-tests ?
+      *-test/expander
+- [X] move transient/fail to fail/transient
+  - [X] read through and copy all
+  - [-] what to do for relaxed tests?
+    (( these also need "port hacking" to change the lang, then also an error annotation ))
+    async-channel-contract
+  - [-] untyped-struct-properties-with-self
+    what about Struct-Property contract?
+- [X] TR/fail/with-type-unregister
+      correct error? did I break things?
+      yes I'd broken things, wasn't unsetting the state before an error, golly
+- [X] succeed/make-predicate-top-level1 should pass (define-predicate , racket/load)
+- [X] succeed/make-predicat-mod1 ??? should this work?
+- [X] succeed/transient/with-type3
+- [X] succeed/gh-issue-271 should pass (define-predicate , racket/load)
+      - type name used out of context
+      - WOW make-predicate was unbound because this damn prims-contract file is (lazily) circular
+- [X] succeed/transient/with-type-bug ... another with-type mixup
+      2021-09-16 currently works, but maybe only because of typechecker context issue
+- [X] succeed/??/pr241-variation-5 UNIT issue
+- [X] unit-tests/static-contract-instantiate-tests
+- [X] copy succeed tests for erasure, works out?
+- [X] *-test/succeed/erasure/macro.rkt
+      macro used in untyped code
+- [X] add -test/expander to the CI
+- [X] -test/succeed/transient/scribble???
+      ... still hopeless right?
+      aha fixed by splitting cast etc ... but transient needed new require
+- [-] redo renamer ... export shallow ids with s-l-v
+      and use require/typed on the deep end
+  - NO THANKS
+    (1) deep would need to learn about every TR lang and r/t
+    (2) calls for N copies of the contracts (1 per client) vs. 1 copy
+    [[ it's not great that Shallow needs to set up invariants for
+       the another langs, but that seems better than retrofitting
+       everyone ... and the N vs 1 tips the scales ]]
+- [X] disable refinements for Shallow Erasure
+- [X] what does PR say?
+  - [X] rackunit dep undeclared (remove the dep)
+  - [X] type-of broke own contract returned #f
+  - [X] lexical-env.rkt disable s-l-v when not expanding
+  - [X] prefab CS failure ... I thought I was on CS ... "dead" not dead
+        erasure prefab.rkt
+  - [X] issue filed https://github.com/racket/racket/issues/4030
+- [X] use keyword not stxprop for lang
+- [X] private/with-type ... allow transient as well as guarded
+  - [X] with-type, add te-mode param and update docs
+- [X] fix transient/pass/scribble-example test
+  - no idea what's entry point for evaluator
+
+- [ ] blessed cod: update types, don't use ids, fix for loops
+  - ack what to do?!
+
+- [ ] fix define-typed/untyped-id for plot (from PR)
+      define-typed/untyped-identifier should probably take a 3rd opt.arg.
+      Here's the problem: Transient needs to
+      (require/typed plot (plot-pict ....)) with a huge type because
+      plot defines that as a typed/untyped id and so Transient gets an
+      untyped identifier (it can't use the guarded one). That huge type
+      should be defined once and for all with a require/typed on the
+      library side. Sounds good?
+
+- [ ] what's the cost of library boundaries,
+      can shallow reuse typed/pict declarations
+      at no cost?
+
+- [ ] fail/transient/sealing*
+
+- [ ] TODO write a comment somewhere that explains
+      the ideal "env" changes for trusted-positive
+
+- [ ] unit-tests/contract-tests
+      organize, add more, fix TODO (better polydot contract?)
+      ;; (t-sc (-StructTop s-type))
+      ;; (t-sc (-PrefabTop p-key))
+
+- [ ] 2021-09-19 pr update what are top priorities?
+  - [X] undo cast, gotta check typed-context?
+  - [ ] cleanup defender, basic cleaning
+  - [ ] double-check current-te-mode use
+- [ ] 2021-09-19 ask questions at pr
+  - [ ] language info what why
+  - [ ] defender share code? point out copies
+  - [ ] better way to do lang? cleanup stx prop?
+
+- [ ] move interesting t-succeed to ""
+  - see log.txt for errors for the `new/` folder
+  - [X] update htdp for check-expect.rkt test?
+  - [ ] double check require / eval tests, do these use transient?
+    - ??? which tests
+  - [X] refinements-quicksort, other tests bad too
+  - [ ] values-dots-result, values-dots
+  - [X] with-type-typed-context-flag
+- [ ] any more???!
+- [ ] review unit tests, clean up tranient mess / diff
+  - [ ] rerun all tests, especially careful about optimizer tests
+
+
+- [ ] expander object private
+
+- [ ] wtf (require typed/racket/shallow) should load the typechecker and rewrite??! is that possible?
+- [ ] stop providing with-type-shallow etc. from typed/racket/base
+- [ ] cleanup the COMBINE in prims-contract, require-contract, 
+
+- [ ] claen up code any?
+
+## unsorted
+
+- [ ] defend / optimize : share "escapes" more gracefully
+- [ ] type-contract: new tests + docs
+- [ ] defender : docs, tests, etc
+  - [X] need 'maybe-type-of' fn? yes optimizer needs it, cannot rely on dead-code to avoid untyped code
+
+- [ ] low priority: change extra-env-lang to accept transient blessing,
+      plot-lib is the only user I know of
+
+- [ ] add defend to typecheck/toplevel-trampoline + tests
+- [ ] define-typed/untyped-id ... adapt to E T
+
+- [ ] racket/load default-continuation-prompt-tag,
+  should transient not put a contract on it? ditto erasure
+  ideas:
+  - delay adding the contract somehow
+  - make 3 versions of prims.rkt and 3 versions of base-contracted.rkt
+  - NOPE if prims.rkt knows the te-mode, choose a base-contracted?
+  tests:
+  - t-fail/dyn/control-test-3.rkt 
+  - t-fail/dyn/control-test-6.rkt 
+
+- [ ] support struct prop:procedure, whats the right contract?
+      test/fail/transient/untyped-struct-properties-with-self
+
+- [ ] remove dom checks in private methods --- see failing expand test
+
+- [ ] outstanding 'transient' branches
+  - rackunit, unsafe-provide macro
+  - 2htdp-typed, unsafe-provide macro
+
+## reduce checks
+
+- [ ] enable typed-id? check, safely
+   well ok, not so hard,
+   - try to put info on provided ID
+   - else use the type registry, record "trust" for syntax
+   - make sure to keep type, though, b/c can cast or
+     require/type from typed -> typed and get unsound
+   ... consider T vs S, may need different logic,
+    maybe undo contract redirect
+   - can trust T data structures too?
+   - remove recursive fn checks? thats tail calls !
+  - [ ] literal-lambda? table in current module, see how helps,
+    then try table on side
+    HANG ON, not gonna work, can change the pr1XXX example to use `+`
+     directly and we have a problem ... literal id `+` with bad type
+     can do same with any other function, even lambda defined in current file
+     ... they get a funny intersection type that must be killed with `ann` though
+
+- [ ] no dom checks for private methods
+
+- [ ] no self checks for any methods ... see transient-blame branch
+
+- [ ] type-contract : should `make-procedure-arity-flat/sc
+      use a transient helper, instead of generating lambda everywhere?
+      We save a little with macro-time tests ...
+       but it'd also be front-loaded
+
+- [ ] remove any/c/proc provide contracts
+      (beware: (transient-or any/c/proc))
+
+#### samth questions, need help
+- [X] #lang?
+  - yes make new langs
+- [X] copy tests?
+  - no, change the test language to look for "expects" and use port hacking
+    to run different languages on 'same' code
+
+
+
+- [ ] `lookup-id-type/lexical` ok? uses `provide/contract-info-original-id`
+
+- [ ] 
+
+- [ ] determinance, ..../pass/qmap.rkt
+      - ditto call-comp.rkt
+      - nested-poly.rkt
+      - poly-dots.rkt
+      - 
+      parse error defending a pcase-lambda?
+      need to pick up plambda-property and instantiate somewhere?
+      uses:
+       /Users/ben/code/racket/fork/extra-pkgs/typed-racket/typed-racket-lib/typed-racket/typecheck/check-class-unit.rkt
+       = propagate, nothing special
+       /Users/ben/code/racket/fork/extra-pkgs/typed-racket/typed-racket-lib/typed-racket/typecheck/tc-app/tc-app-lambda.rkt
+       = fail-when bailout no help
+       /Users/ben/code/racket/fork/extra-pkgs/typed-racket/typed-racket-lib/typed-racket/typecheck/tc-expr-unit.rkt
+       = unconvert kw opt type, no?
+       /Users/ben/code/racket/fork/extra-pkgs/typed-racket/typed-racket-lib/typed-racket/typecheck/tc-lambda-unit.rkt
+       = yes this is it, now what to do about envs and instantiation
+      stuck need help with this, not sure where error comes from nor how to fix
+
+- [ ] mark shape checks somehow ... any tiny thing for future later passes to pick up
+
+- [ ] is require/untyped contract correct for transient? puts right ids in right place?
+  (jpeg transient-lib deep-client fails)
+  (... but rewrites can fix, extra functions that remove the union)
+
+- [ ] lnm typed/untyped-id issue
+  plot-pict in transient code cannot find a type
+  ... can we fix by registering a type somewhere?
+  NO this needs work
+  -> "use type and untyped-id" does not work, the untyped id may not be
+     safe / contract-protected, and even so the type might not describe
+     the contract --- anything goes in a typed/untyped-id
+  -> really need an optional 3rd arg for transient-id, up to user to put
+     something sensible as default ... require/typed is a good default
+     for the client, but how can we pick that default earlier with no place
+     to put the generated contract?
+  -> and THEN need typed-renaming struct to take optional 3rd arg, and
+     then need to reinterpret the first two fields (guarded untyped transient) ???
+
+- [ ] do not copy tests,
+      change the test language to accept multiple error outputs,
+      use port tricks to choose guarded vs transient
+      - old langs: typed/racket typed/racket/base typed-scheme typed/scheme/base typed/scheme/base/no-check at-exp typed/racket
+      - all need to map to typed/racket/shallow/X
+      - no matter if they are #lang or module or module+ or (require ....) or whatever
+
+
+

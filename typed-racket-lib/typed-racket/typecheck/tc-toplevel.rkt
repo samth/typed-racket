@@ -74,7 +74,7 @@
   (syntax-parse form
     [t:typed-struct (attribute t.tvars)]))
 
-;; syntax? -> (listof def-binding?)
+;; syntax? -> (listof binding?)
 (define (tc-toplevel/pass1 form)
   (parameterize ([current-orig-stx form])
     (syntax-parse form
@@ -614,7 +614,7 @@
            (module* #%contract-defs #f
              (#%plain-module-begin
               (#%declare #:empty-namespace) ;; avoid binding info from here
-              #,extra-requires
+              #,(extra-requires)
               new-defs ...)))
        #`(begin
            ;; Now we create definitions that are actually provided

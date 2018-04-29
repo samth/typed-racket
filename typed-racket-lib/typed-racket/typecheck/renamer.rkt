@@ -1,18 +1,21 @@
 #lang racket/base
 
-(require typed-racket/utils/tc-utils)
+(require typed-racket/utils/tc-utils
+         racket/struct-info)
 
 (provide make-typed-renaming un-rename)
 
 ;; a constructor for typed renamings that attach the required
 ;; 'not-free-identifier properties
-(define (make-typed-renaming target alternate)
+(define (make-typed-renaming target alternate enforcement-mode)
   (typed-renaming (syntax-property target 'not-free-identifier=? #t)
-                  (syntax-property alternate 'not-free-identifier=? #t)))
+                  (syntax-property alternate 'not-free-identifier=? #t)
+                  enforcement-mode))
 
 ;; target : identifier
 ;; alternate : identifier
-(struct typed-renaming (target alternate)
+;; enforcement-mode : type-enforcement-mode?
+(struct typed-renaming (target alternate enforcement-mode)
   ;; prevent the rename transformer from expanding in
   ;; module-begin context because the typed context flag
   ;; will not be set until the module-begin
@@ -22,9 +25,31 @@
   ;; expansion time when the typed context flag is set correctly
   #:property prop:rename-transformer
   (λ (obj)
-    (if (unbox typed-context?)
-        (typed-renaming-target obj)
-        (typed-renaming-alternate obj))))
+    (define te-mode (current-type-enforcement-mode))
+    (case (typed-renaming-enforcement-mode obj)
+      ((guarded)
+       (case te-mode
+         ((guarded)
+          (typed-renaming-target obj))
+         (else
+          (typed-renaming-alternate obj))))
+      ((transient)
+       (case te-mode
+         ((guarded)
+          (typed-renaming-alternate obj))
+         (else
+          (typed-renaming-target obj))))
+      ((erasure)
+       (case te-mode
+         ((guarded)
+          (typed-renaming-alternate obj))
+         ((transient)
+          ;; need another alternate with a pre-computed transient contract
+          (raise-arguments-error 'typed-renaming "cannot protect transient from erasure" "id" obj))
+         (else
+          (typed-renaming-target obj))))
+      (else
+        (raise-argument-error 'typed-renaming "type-enforcement-mode?" (typed-renaming-enforcement-mode obj))))))
 
 ;; Undo renaming for type lookup.
 ;; Used because of macros that mark the identifier used as the binding such as

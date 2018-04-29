@@ -2,13 +2,19 @@
 
 (require
  (for-template racket/base racket/list racket/unsafe/ops racket/flonum racket/extflonum racket/fixnum)
+ (for-syntax racket/base syntax/parse)
  "../utils/tc-utils.rkt"
  (rename-in "../types/abbrev.rkt"  [-Boolean B] [-Symbol Sym])
  (rename-in "../types/numeric-tower.rkt" [-Number N]))
 
 (provide indexing)
 
-(define-syntax-rule (make-env* [i t] ...) (make-env [i (λ () t)] ...))
+(define-syntax (make-env* stx)
+  (syntax-parse stx
+   [(_ [id ty (~optional trusted-positive? #:defaults ([trusted-positive? #'#true]))] ...)
+    #'(make-env [id ty trusted-positive?] ...)]))
+
+(define needs-transient-check #false)
 
 (define-syntax-rule (indexing index-type)
   (make-env*
@@ -56,8 +62,8 @@
 
 
 
-   [list-ref  (-poly (a) ((-lst a) index-type . -> . a))]
-   [list-tail (-poly (a) ((-lst a) index-type . -> . (-lst a)))]
+   [list-ref  (-poly (a) ((-lst a) index-type . -> . a)) needs-transient-check]
+   [list-tail (-poly (a) ((-lst a) index-type . -> . (-lst a))) needs-transient-check]
 
 
 
@@ -216,11 +222,11 @@
     (-poly (a) ((-lst a) index-type . -> . (-values (list (-lst a) (-lst a)))))]
 
    [vector-ref (-poly (a) (cl->* ((-vec a) index-type . -> . a)
-                                 (-VectorTop index-type . -> . Univ)))]
+                                 (-VectorTop index-type . -> . Univ))) needs-transient-check]
    [unsafe-vector-ref (-poly (a) (cl->* ((-vec a) index-type . -> . a)
-                                        (-VectorTop index-type . -> . Univ)))]
+                                        (-VectorTop index-type . -> . Univ))) needs-transient-check]
    [unsafe-vector*-ref (-poly (a) (cl->* ((-vec a) index-type . -> . a)
-                                         (-VectorTop index-type . -> . Univ)))]
+                                         (-VectorTop index-type . -> . Univ))) needs-transient-check]
    [build-vector (-poly (a) (index-type (-Index . -> . a) . -> . (-mvec a)))]
    [vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [unsafe-vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
