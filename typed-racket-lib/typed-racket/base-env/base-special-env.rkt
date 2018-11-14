@@ -371,4 +371,9 @@
    (-> -ExtFlVector (-seq -ExtFlonum))]
   [(make-template-identifier 'make-namespace-anchor 'racket/private/namespace)
    (-> -Variable-Reference -Namespace-Anchor)]
+  [(make-template-identifier 'place/proc 'racket/place)
+   (-> -Variable-Reference -Symbol -Symbol (-> -Symbol -Module-Path -Symbol (-opt -Input-Port) (-opt -Output-Port) (-opt -Output-Port) -Place)
+       (-opt -Input-Port) (-opt -Output-Port) (-opt -Output-Port) -Place)]
+  [(make-template-identifier 'start-place 'racket/place)
+   (-> -Symbol -Module-Path -Symbol (-opt -Input-Port) (-opt -Output-Port) (-opt -Output-Port) -Place)]
   )
