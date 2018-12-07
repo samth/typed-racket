@@ -22,6 +22,7 @@
   (syntax-parse form
     #:literal-sets (kernel-literals)
     [(~and (#%provide . rest) (~not _:unsafe-provide^))
+     #:when (not always-unsafe?)
      form]
     [_ #f]))
 
@@ -126,7 +127,7 @@
        #`(begin
            #,constr-defn
            #,@defns)
-       (if always-unsafe?
+       (if #f ;always-unsafe?
            #`(begin
                #,constr-export-defn
                #,@export-defns
@@ -166,7 +167,7 @@
        #`(begin)
        ;; There's no need to put this macro in the submodule since it
        ;; has no dependencies.
-       (if always-unsafe?
+       (if #f #;always-unsafe?
            #`(define-syntax export-id (make-rename-transformer #'id))
            #`(begin 
                (define-syntax (untyped-id stx)

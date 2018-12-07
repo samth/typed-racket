@@ -561,7 +561,8 @@
                          #,(ignore
                             #`(require/contract pred
                                                 hidden
-                                                #,(if always-unsafe? #'any/c
+                                                #,(if (or always-unsafe? (attribute unsafe.unsafe?))
+                                                      #'any/c
                                                       #'(or/c struct-predicate-procedure?/c
                                                               (c-> any-wrap/c boolean?)))
                                                 lib))
