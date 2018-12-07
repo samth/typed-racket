@@ -10,7 +10,7 @@
 
 (require (for-template racket/base (prefix-in k: '#%kernel)))
 
-(provide initialize-structs -Date -Srcloc -Date -Arity-At-Least -Exn)
+(provide initialize-structs -Date -Srcloc -Date -Arity-At-Least -Exn -Date*)
 
 (define-syntax define-hierarchy
   (syntax-rules (define-hierarchy)
@@ -37,6 +37,7 @@
 
 (define -Srcloc (-struct-name #'srcloc))
 (define -Date (-struct-name #'date))
+(define -Date* (-struct-name #'date*))
 (define -Arity-At-Least (-struct-name #'arity-at-least))
 (define -Exn (-struct-name #'exn))
 
@@ -52,16 +53,20 @@
      [span : (Un -Integer (-val #f))]))
 
   (define-hierarchy date (#:kernel-maker k:date)
-    ([second : -Nat]
-     [minute : -Nat]
-     [hour : -Nat]
-     [day : -Nat]
-     [month : -Nat]
-     [year : -Nat]
-     [week-day : -Nat]
-     [year-day : -Nat]
+    ([second : -Byte]
+     [minute : -Byte]
+     [hour : -Byte]
+     [day : -PosByte]
+     [month : -PosByte]
+     [year : -Integer]
+     [week-day : -Byte]
+     [year-day : -Index]
      [dst? : -Boolean]
-     [time-zone-offset : -Integer]))
+     [time-zone-offset : -Integer])
+
+    (define-hierarchy date* (#:kernel-maker k:date*)
+      ([nanosecond : -NonNegFixnum]
+       [time-zone-name : -String])))
 
   (define-hierarchy arity-at-least (#:kernel-maker k:arity-at-least)
     ([value : -Nat]))

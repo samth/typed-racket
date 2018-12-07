@@ -3028,8 +3028,8 @@
         (make-ValuesDots null a 'a)))]
 
 ;; Section 15.6 (Time)
-[seconds->date (cl->* (-Integer . -> . -Date)
-                      (-Integer Univ . -> . -Date))]
+[seconds->date (cl->* (-Real . -> . -Date*)
+                      (-Real Univ . -> . -Date*))]
 [current-seconds (-> -Integer)]
 [current-milliseconds (-> -Fixnum)]
 [current-inexact-milliseconds (-> -Flonum)]
