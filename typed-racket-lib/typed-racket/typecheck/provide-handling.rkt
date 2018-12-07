@@ -11,7 +11,8 @@
          (utils tc-utils)
          (env env-utils)
          (for-syntax racket/base)
-         (for-template racket/base))
+         (for-template racket/base)
+         (submod "../base-env/prims-contract.rkt" always-unsafe))
 
 (provide remove-provides provide? generate-prov)
 
@@ -122,33 +123,38 @@
                    [export-id new-id]
                    [protected-id (freshen-id #'id)])
       (values
-        #`(begin
-            #,constr-defn
-            #,@defns)
-        #`(begin
-            #,constr-export-defn
-            #,@export-defns
-            ;; Here, we construct a new static struct identifier whose
-            ;; contents point to newly-defined identifiers that are
-            ;; themselves redirections. Unlike for value exports, we
-            ;; don't provide two distinct identifiers, one for typed
-            ;; code and one for untyped code, because they both have
-            ;; to accessible by `syntax-local-value` and thus have to
-            ;; be protected from re-export regardless of whether the
-            ;; identifiers are copied out. Additionally, we can't put
-            ;; a protected version in the submodule, since that
-            ;; wouldn't be accessible by `syntax-local-value`.
-            (define-syntax protected-id
-              (let ((info (list type-desc* (syntax export-id) pred* (list accs* ...)
-                                (list #,@(map (lambda (x) #'#f) accs)) super*)))
-                #,(if type-is-constructor?
-                      #'(make-struct-info-self-ctor constr* info)
-                      #'info)))
-            (define-syntax export-id
-              (make-rename-transformer #'protected-id)))
-        #'export-id
-        (cons (list #'export-id internal-id)
-              (apply append constr-aliases aliases)))))
+       #`(begin
+           #,constr-defn
+           #,@defns)
+       (if always-unsafe?
+           #`(begin
+               #,constr-export-defn
+               #,@export-defns
+               (define-syntax export-id (make-rename-transformer (syntax-property #'id 'not-free-identifer=? #t))))
+           #`(begin
+               #,constr-export-defn
+               #,@export-defns
+               ;; Here, we construct a new static struct identifier whose
+               ;; contents point to newly-defined identifiers that are
+               ;; themselves redirections. Unlike for value exports, we
+               ;; don't provide two distinct identifiers, one for typed
+               ;; code and one for untyped code, because they both have
+               ;; to accessible by `syntax-local-value` and thus have to
+               ;; be protected from re-export regardless of whether the
+               ;; identifiers are copied out. Additionally, we can't put
+               ;; a protected version in the submodule, since that
+               ;; wouldn't be accessible by `syntax-local-value`.
+               (define-syntax protected-id
+                 (let ((info (list type-desc* (syntax export-id) pred* (list accs* ...)
+                                   (list #,@(map (lambda (x) #'#f) accs)) super*)))
+                   #,(if type-is-constructor?
+                         #'(make-struct-info-self-ctor constr* info)
+                         #'info)))
+               (define-syntax export-id
+                 (make-rename-transformer #'protected-id))))
+       #'export-id
+       (cons (list #'export-id internal-id)
+                 (apply append constr-aliases aliases)))))
 
 
   ;; mk-syntax-quad : identifier? identifier? -> quad/c
@@ -160,11 +166,13 @@
        #`(begin)
        ;; There's no need to put this macro in the submodule since it
        ;; has no dependencies.
-       #`(begin 
-           (define-syntax (untyped-id stx)
-             (tc-error/stx stx "Macro ~a from typed module used in untyped code" 'untyped-id))
-           (define-syntax export-id
-             (make-typed-renaming #'id #'untyped-id)))
+       (if always-unsafe?
+           #`(define-syntax export-id (make-rename-transformer #'id))
+           #`(begin 
+               (define-syntax (untyped-id stx)
+                 (tc-error/stx stx "Macro ~a from typed module used in untyped code" 'untyped-id))
+               (define-syntax export-id
+                 (make-typed-renaming #'id #'untyped-id))))
        new-id
        (list (list #'export-id #'id)))))
 

@@ -22,6 +22,12 @@
          require-typed-struct/provide core-cast make-predicate define-predicate
          require-typed-signature)
 
+(module always-unsafe racket/base
+  (provide always-unsafe?)
+  (define always-unsafe? #t))
+
+(require 'always-unsafe)
+
 (module forms racket/base
   (require (for-syntax racket/lazy-require racket/base))
   (begin-for-syntax 
@@ -180,7 +186,7 @@
      #`(require-typed-signature sig.sig-name (sig.var ...) (sig.type ...) #,lib))
    (pattern sc:simple-clause #:attr spec
      #`(require/typed #:internal sc.nm sc.ty #,lib
-                      #,@(if unsafe? #'(unsafe-kw) #'()))))
+                      #,@(if (or always-unsafe? unsafe?) #'(unsafe-kw) #'()))))
 
 
   (define ((r/t-maker legacy unsafe?) stx)
@@ -200,7 +206,7 @@
        (define/with-syntax sm (if (attribute parent)
                                   #'(#:struct-maker parent)
                                   #'()))
-       (cond [(not (attribute unsafe?))
+       (cond [(and (not always-unsafe?) (not (attribute unsafe?)))
               ;; define `cnt*` to be fixed up later by the module type-checking
               (define cnt*
                 (syntax-local-lift-expression
@@ -401,7 +407,7 @@
            #,(if (attribute ne)
                  (internal (syntax/loc stx (define-type-alias-internal ty (Opaque pred))))
                  (syntax/loc stx (define-type-alias ty (Opaque pred))))
-           #,(if (attribute unsafe)
+           #,(if (or always-unsafe? (attribute unsafe))
                  (ignore #'(define pred-cnt any/c)) ; unsafe- shouldn't generate contracts
                  (ignore #'(define pred-cnt
                              (or/c struct-predicate-procedure?/c
@@ -552,25 +558,31 @@
                                   si))
 
                          (dtsi* (tvar ...) spec type (body ...) #:maker maker-name #:type-only)
-                         #,(ignore #'(require/contract pred hidden (or/c struct-predicate-procedure?/c (c-> any-wrap/c boolean?)) lib))
+                         #,(ignore
+                            #`(require/contract pred
+                                                hidden
+                                                #,(if always-unsafe? #'any/c
+                                                      #'(or/c struct-predicate-procedure?/c
+                                                              (c-> any-wrap/c boolean?)))
+                                                lib))
                          #,(internal #'(require/typed-internal hidden (Any -> Boolean : type)))
                          (require/typed #:internal (maker-name real-maker) type lib
                                         #:struct-maker parent
-                                        #,@(if (attribute unsafe.unsafe?) #'(unsafe-kw) #'()))
+                                        #,@(if (or always-unsafe? (attribute unsafe.unsafe?)) #'(unsafe-kw) #'()))
 
                          ;This needs to be a different identifier to meet the specifications
                          ;of struct (the id constructor shouldn't expand to it)
                          #,(if (syntax-e #'extra-maker)
                                #`(require/typed #:internal (maker-name extra-maker) type lib
                                                 #:struct-maker parent
-                                                #,@(if (attribute unsafe.unsafe?) #'(unsafe-kw) #'()))
+                                                #,@(if (or always-unsafe? (attribute unsafe.unsafe?)) #'(unsafe-kw) #'()))
                                #'(begin))
 
                          #,(if (not (free-identifier=? #'nm #'type))
                                #'(define-syntax type type-name-error)
                                #'(begin))
 
-                         #,@(if (attribute unsafe.unsafe?)
+                         #,@(if (or always-unsafe? (attribute unsafe.unsafe?))
                                 #'((require/typed #:internal sel (All (tvar ...) (self-type -> ty)) lib unsafe-kw) ...)
                                 #'((require/typed lib [sel (All (tvar ...) (self-type -> ty))]) ...)))))]))
 

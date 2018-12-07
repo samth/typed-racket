@@ -138,7 +138,8 @@
                                  #:more #,failure-reason
                                  "identifier" #,(symbol->string (syntax-e orig-id))
                                  "type" #,(pretty-format-rep type #:indent 8)))]
-           [else
+           [else #`(begin (define #,untyped-id #,orig-id))]
+           #;[else
             (match-define (list defs ctc) result)
             (define maybe-inline-val
               (should-inline-contract?/cache ctc cache))

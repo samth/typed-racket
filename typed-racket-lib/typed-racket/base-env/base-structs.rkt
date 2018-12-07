@@ -63,7 +63,7 @@
      [year-day : -Index]
      [dst? : -Boolean]
      [time-zone-offset : -Integer])
-
+    
     (define-hierarchy date* (#:kernel-maker k:date*)
       ([nanosecond : -NonNegFixnum]
        [time-zone-name : -String])))
