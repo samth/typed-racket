@@ -186,16 +186,21 @@
 ;; b = exact 0
 ;; a,c,d are floats (!= exact 0)
 (define (unbox-one-float-complex-/ a c d res-real res-imag)
-  ;; TODO: In what cases is the negation in the d=0 case useful
   (define d=0-case
     #`(values (unsafe-fl/ #,a #,c)
-              (unsafe-fl* -1.0 (unsafe-fl* #,d #,a))))
+              (unsafe-fl* #,d #,a)))
   (define c=0-case
     #`(values (unsafe-fl* #,c #,a)
               (unsafe-fl* -1.0 (unsafe-fl/ #,a #,d))))
 
 
   (define general-case
+    #`(let* ([cm (unsafe-fl/ #,a
+                             (unsafe-fl+ (unsafe-fl* #,c #,c)
+                                         (unsafe-fl* #,d #,d)))])
+        (values (unsafe-fl* #,c cm)
+                (unsafe-fl* -1.0 (unsafe-fl* #,d cm))))
+    #;
     #`(let* ([cm    (unsafe-flabs #,c)]
              [dm    (unsafe-flabs #,d)]
              [swap? (unsafe-fl< cm dm)]
