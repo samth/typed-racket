@@ -51,8 +51,8 @@
  (define -Area<%> (parse-type #'Area<%>))
  (define -Frame:Editor<%> (parse-type #'Frame:Editor<%>))
 
- (define -Color-Prefs:Color-Scheme-Style-Name (-opq #'color-prefs:color-scheme-style-name?))
- (define -Color-Prefs:Known-Color-Scheme-Name (-opq #'color-prefs:known-color-scheme-name?))
+ (define -Color-Prefs:Color-Scheme-Style-Name (parse-type #'Color-Prefs:Color-Scheme-Style-Name))
+ (define -Color-Prefs:Known-Color-Scheme-Name (parse-type #'Color-Prefs:Known-Color-Scheme-Name))
  (define -Color-Model:Xyz (-opq #'color-model:xyz?))
  (define -Eventspace (-opq #'eventspace?))
  (define -Handler:Handler (-opq #'handler:handler?))
@@ -159,8 +159,8 @@
  [color-prefs:register-info-based-color-schemes (-> -Void)]
  [color-prefs:set-current-color-scheme (-Symbol . -> . -Void)]
  [color-prefs:get-current-color-scheme-name (-> -Color-Prefs:Color-Scheme-Style-Name)]
- [#:opaque Color-Prefs:Known-Color-Scheme-Name color-prefs:known-color-scheme-name?]
- [#:opaque Color-Prefs:Color-Scheme-Style-Name color-prefs:color-scheme-style-name?]
+ [color-prefs:known-color-scheme-name? (make-pred-ty (list Univ) -Boolean -Color-Prefs:Known-Color-Scheme-Name)]
+ [color-prefs:color-scheme-style-name? (make-pred-ty (list Univ) -Boolean -Color-Prefs:Color-Scheme-Style-Name)]
  [color-prefs:lookup-in-color-scheme
   ;; TODO less precise than doc
   (-Color-Prefs:Known-Color-Scheme-Name . -> . (Un -Style-Delta%-Instance -Color%-Instance))]
