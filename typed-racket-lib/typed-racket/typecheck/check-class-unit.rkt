@@ -3,6 +3,7 @@
 ;; This module provides a unit for type-checking classes
 
 (require "../utils/utils.rkt"
+         racket/pretty
          racket/dict
          racket/format
          racket/list
@@ -471,6 +472,8 @@
   (define top-level-exprs
     (trawl-for-property make-methods-stx tr:class:top-level-property))
 
+  (for-each (lambda (v) (eprintf "top-level-expr ~s\n" v) (pretty-print (syntax->datum v))) top-level-exprs)
+  
   ;; Set up type aliases before any types get parsed
   (define type-aliases
     (filter (syntax-parser [t:type-alias #t] [_ #f])
@@ -676,11 +679,12 @@
         ;; The second part of this pattern ensures that we find the actual
         ;; initialization call, rather than the '(declare-super-new) in
         ;; the expansion.
-        [(~and :tr:class:super-new^ (#%plain-app . rst))
+        [(~and :tr:class:super-new^)
          (when super-new
            (tc-error/fields #:delayed? #t
                             "ill-formed typed class"
                             #:more "must only call `super-new' a single time"))
+         (eprintf "super-new: ~s\n" (syntax->datum expr))
          (set! super-new (find-provided-inits expr))
          other-exprs]
         [(~and t:class-type-declaration :tr:class:type-annotation^)
@@ -1472,26 +1476,26 @@
 ;; Look through the expansion of the class macro in search for
 ;; syntax with some property (e.g., methods)
 (define (trawl-for-property form accessor)
-  (define (recur-on-all stx-list)
-    (apply append (map (λ (stx) (trawl-for-property stx accessor))
-                       (syntax->list stx-list))))
+  (define (recur-on-all form stx-list)
+    (append (if (accessor form)
+                (list form)
+                null)
+            (apply append (map (λ (stx) (trawl-for-property stx accessor))
+                               (syntax->list stx-list)))))
   (syntax-parse form
     #:literals (let-values letrec-values #%plain-app
                 #%plain-lambda #%expression)
-    [stx
-     #:when (accessor #'stx)
-     (list form)]
     [(let-values (b ...) body ...)
-     (recur-on-all #'(b ... body ...))]
+     (recur-on-all form #'(b ... body ...))]
     ;; for letrecs, traverse the RHSs too
     [(letrec-values ([(x ...) rhs ...] ...) body ...)
-     (recur-on-all #'(rhs ... ... body ...))]
+     (recur-on-all form #'(rhs ... ... body ...))]
     [(#%plain-app e ...)
-     (recur-on-all #'(e ...))]
+     (recur-on-all form #'(e ...))]
     [(#%plain-lambda (x ...) e ...)
-     (recur-on-all #'(e ...))]
+     (recur-on-all form #'(e ...))]
     [(#%expression e)
-     (recur-on-all #'(e))]
+     (recur-on-all form #'(e))]
     [_ '()]))
 
 ;; setup-pubment-defaults : Listof<Symbol> Hash Hash -> Void
