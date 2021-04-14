@@ -2,8 +2,8 @@
 
 (require syntax/parse racket/pretty
          "../utils/utils.rkt"
-         (private syntax-properties)
-         (types type-table)
+         "../private/syntax-properties.rkt"
+         "../types/type-table.rkt"
          (optimizer utils
                     number fixnum float extflonum float-complex
                     vector string list pair sequence
@@ -17,6 +17,9 @@
   #:commit
   #:literal-sets (kernel-literals)
   #:attributes (opt)
+  ;; This code is intentionally not optimized
+  (pattern opt:skip^)
+  
   ;; Can't optimize this code because it isn't typechecked
   (pattern opt:ignore^)
 

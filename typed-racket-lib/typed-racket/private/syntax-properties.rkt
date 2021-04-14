@@ -47,6 +47,7 @@
 
 (define-properties
   (plambda typechecker:plambda)
+  (skip typechecker:skip #:mark)
   (ignore typechecker:ignore #:mark)
   (ignore-some typechecker:ignore-some #:mark)
   (ignore-some-expr typechecker:ignore-some)
