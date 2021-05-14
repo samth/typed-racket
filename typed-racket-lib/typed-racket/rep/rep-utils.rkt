@@ -10,7 +10,7 @@
          syntax/parse/define
          syntax/id-table
          racket/generic
-         (only-in racket/unsafe/ops unsafe-struct-ref)
+         ;(only-in racket/unsafe/ops unsafe-struct-ref)
          (for-syntax
           (utils tc-utils)
           racket/match
@@ -221,7 +221,7 @@
                   [(fld ...) struct-fields]
                   [body body])
       #'(λ (self f-id)
-          (let ([fld (unsafe-struct-ref self (struct-field-index fld))] ...) . body))))
+          (let ([fld ((lambda (v i) (vector-ref (struct->vector v) i)) self (struct-field-index fld))] ...) . body))))
   ;; like "rep-transform" but the folding function is fixed (e.g. free-vars)
   (define (fixed-rep-transform self f-id fun struct-fields body)
     (with-syntax ([transformer (rep-transform self f-id struct-fields body)]
@@ -394,7 +394,7 @@
                              #'constr-def.def
                              #'(begin))]
         [(maybe-transparent ...) (if (attribute non-transparent-kw)
-                                     #'()
+                                     #'(#:transparent)
                                      #'(#:transparent))]
         ;; match expander (skips 'meta' fields)
         [mexpdr-def

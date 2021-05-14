@@ -2,7 +2,7 @@
 
 (require "rep-utils.rkt"
          racket/match
-         racket/unsafe/ops
+         ;racket/unsafe/ops
          (for-syntax racket/base
                      syntax/parse
                      racket/list
@@ -67,4 +67,4 @@
            (vector-set! switch-table clause.idx clause.function)
            ...
            (λ (pre-args ... arg post-args ...)
-             ((unsafe-vector-ref switch-table (Rep-uid arg)) pre-args ... arg post-args ...)))))]))
+             ((vector-ref switch-table (Rep-uid arg)) pre-args ... arg post-args ...)))))]))
