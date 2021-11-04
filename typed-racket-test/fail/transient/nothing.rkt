@@ -1,7 +1,7 @@
 #;
 (exn-pred exn:fail:contract? #rx"transient-assert")
 
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; type `Nothing` should get a none/c check
 

@@ -1,7 +1,7 @@
 #;
 (exn-pred exn:fail:contract? #rx"typed/racket/shallow:.*#:with-refinements")
 
-#lang typed/racket/shallow/base #:with-refinements
+#lang typed/racket/base/shallow #:with-refinements
 
 (: safe-vector-ref
    (All (A) (-> ([v : (Vectorof A)]

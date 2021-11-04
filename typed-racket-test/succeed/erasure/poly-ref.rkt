@@ -1,4 +1,4 @@
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 ;; Test that type variables do not have a run-time check
 ;;  (no need for a check, because a context cannot make assumptions about the value)

@@ -1,7 +1,7 @@
 #;
 (exn-pred exn:fail:contract? #rx"unbox")
 
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 (module u racket/base
   (provide f)

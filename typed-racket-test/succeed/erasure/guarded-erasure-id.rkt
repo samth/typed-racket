@@ -1,4 +1,4 @@
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 (module guarded typed/racket/base
   (provide xxx)

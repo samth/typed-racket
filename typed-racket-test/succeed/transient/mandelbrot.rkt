@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base #:optimize
+#lang typed/racket/base/shallow #:optimize
 (require racket/future racket/flonum)
 (define: MAX-ITERS : Positive-Fixnum 50)
 (define MAX-DIST 2.0)

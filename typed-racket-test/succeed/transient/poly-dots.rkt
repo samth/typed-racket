@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 (: map-with-funcs (All (b ...) ((List (b ... b -> b) ... b ) -> (b ... b -> (values b ... b)))))
 (define (map-with-funcs fs)

@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(module shallow typed/racket/shallow/base
+(module shallow typed/racket/base/shallow
   (provide bad-dom bad-cod)
 
   (: bad-dom (-> (Vectorof Real) Void))

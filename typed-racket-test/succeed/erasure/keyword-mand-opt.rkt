@@ -1,4 +1,4 @@
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 (module u racket/base
   (define (f0 x #:y y)

@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; Test Hash Table functions with "complicated" types
 

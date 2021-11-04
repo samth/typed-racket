@@ -1,4 +1,4 @@
 #lang racket/load
-(require typed/racket/shallow/base)
+(require typed/racket/base/shallow)
 
 (make-predicate (Number -> Number))

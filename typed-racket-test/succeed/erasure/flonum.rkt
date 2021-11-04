@@ -1,6 +1,6 @@
 #lang racket/base
 
-(module t typed/racket/optional/base
+(module t typed/racket/base/optional
   ;; Test case-> type
   (require racket/flonum)
   (provide flprobability?)

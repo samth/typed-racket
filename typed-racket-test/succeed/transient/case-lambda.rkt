@@ -1,6 +1,6 @@
 #lang racket/base
 
-(module t typed/racket/shallow/base
+(module t typed/racket/base/shallow
   (: f0 (case-> (-> Symbol Symbol)))
   (define f0
     (case-lambda
@@ -62,7 +62,7 @@
       [(y z) 'oops]))
   (provide f1))
 
-(module t1 typed/racket/shallow/base
+(module t1 typed/racket/base/shallow
   (require/typed (submod ".." u)
     (f1 (case-> (-> Symbol Symbol)
                 (-> String String String))))

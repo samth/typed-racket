@@ -1,8 +1,8 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
-;; LD submodules in LD code
+;; shallow submodules of shallow mod
 
-(module t typed/racket/shallow/base
+(module t typed/racket/base/shallow
   (: f (-> Real (-> Real Real) Real))
   (define (f r g)
     (g (g r)))

@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; Test the `ann` and `inst` forms
 

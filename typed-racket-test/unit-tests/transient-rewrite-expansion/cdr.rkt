@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; Expand, and make sure no transient checks,
 ;;  because cdr applied to a list is OK

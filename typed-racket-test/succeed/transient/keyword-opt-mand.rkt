@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; No error when function accepts optional kws
 ;;  and type says mandatory

@@ -10,7 +10,7 @@
   (define (f x)
     x))
 
-(module t typed/racket/shallow/base
+(module t typed/racket/base/shallow
   (require/typed (submod ".." u)
     (f (-> (Listof String) (Listof Natural))))
 

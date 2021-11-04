@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; Expand and look for transient-assert / lack of.
 ;; See comments below.

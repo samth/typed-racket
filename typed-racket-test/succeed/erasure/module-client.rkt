@@ -1,4 +1,4 @@
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 ;; Test:
 ;; 1. enclosing module is locally-defensive

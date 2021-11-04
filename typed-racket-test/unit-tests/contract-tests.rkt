@@ -1102,4 +1102,3 @@
    (t-sc top-func procedure?/sc #:transient)
   )
 ))
->>>>>>> 7636e97b... transient: massive commit, squashed all development

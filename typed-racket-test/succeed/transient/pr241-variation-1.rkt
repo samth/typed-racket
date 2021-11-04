@@ -8,7 +8,7 @@
    #t)
  (provide bad))
 
-(module typed typed/racket/shallow/base
+(module typed typed/racket/base/shallow
  (require typed/rackunit)
  (require/typed (submod ".." untyped)
    [#:opaque T bad])

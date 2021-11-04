@@ -1,7 +1,7 @@
 #;
 (exn-pred exn:fail:contract? #rx"add1")
 
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 (module u racket/base
   (provide nats)

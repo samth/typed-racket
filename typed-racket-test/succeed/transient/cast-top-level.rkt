@@ -1,6 +1,6 @@
 #lang racket/load
 
-(require typed/racket/shallow/base)
+(require typed/racket/base/shallow)
 (require typed/rackunit)
 
 (cast 2 Number)

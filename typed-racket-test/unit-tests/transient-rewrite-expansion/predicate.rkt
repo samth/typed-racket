@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; List? should expand to a check for `(and/c list? len=2)`
 ;; Vector? should expand to a check for `vector?`

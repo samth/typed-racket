@@ -9,7 +9,7 @@
   (define (f b)
     ((vector-ref b 0) 2)))
 
-(module t typed/racket/shallow/base
+(module t typed/racket/base/shallow
   (provide test1 test0)
   (require/typed (submod ".." u)
     (f (-> (Vector (-> String String)) Integer)))

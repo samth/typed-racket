@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; Check that things are defended
 ;; - transient-assert x symbol? in f0

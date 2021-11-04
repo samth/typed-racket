@@ -15,7 +15,7 @@
   (define-typed/untyped-identifier f f1 f0)
   (provide f))
 
-(module d typed/racket/optional/base
+(module d typed/racket/base/optional
   ;; fail = (require (submod ".." c))
   (require/typed (submod ".." c)
                  (f (-> Symbol Symbol)))

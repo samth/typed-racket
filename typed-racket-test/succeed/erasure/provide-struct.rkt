@@ -2,7 +2,7 @@
 
 ;; Test providing a struct (and its types)
 
-(module t typed/racket/optional/base
+(module t typed/racket/base/optional
 
   (provide (struct-out foo) wepa)
 

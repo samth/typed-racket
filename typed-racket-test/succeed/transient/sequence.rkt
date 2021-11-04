@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 (define (f0 (tm : (Listof Exact-Nonnegative-Integer)))
   (for/list : (Listof String)

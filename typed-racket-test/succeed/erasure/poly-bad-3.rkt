@@ -1,4 +1,4 @@
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 (require/typed racket/base
   (cdr (All (A) (U (Boxof A) (Pairof A A) (-> (Pairof String String) Symbol)))))

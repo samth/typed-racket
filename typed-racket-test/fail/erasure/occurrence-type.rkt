@@ -1,7 +1,7 @@
 #;
 (exn-pred exn:fail:contract? #rx"string-length")
 
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 (require/typed racket/base
  (values (-> Any Any : String)))

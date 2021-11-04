@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; Test trusted vs. untrusted primitives
 ;; - + is a trusted identifier, its result is not checked

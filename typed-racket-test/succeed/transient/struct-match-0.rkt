@@ -1,6 +1,6 @@
 #lang racket/base
 
-(module s typed/racket/shallow/base
+(module s typed/racket/base/shallow
   (require racket/match)
 
   (struct posn ([x : Real] [y : Real]))

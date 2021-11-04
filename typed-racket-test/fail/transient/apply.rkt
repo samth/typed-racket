@@ -1,7 +1,7 @@
-#;
+#leavevmode
 (exn-pred exn:fail:contract? #rx"transient-assert")
 
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; Test that `(apply f ...)` checks results safely
 

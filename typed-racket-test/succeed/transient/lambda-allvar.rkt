@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; From the `math` library, something like this appears after macro expansion
 ;;  and transient was refusing to defend because had 'Error' type.

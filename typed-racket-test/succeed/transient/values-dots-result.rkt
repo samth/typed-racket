@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 (define #:forall (A ...) (f [v : (List A ... A)])
   (apply values v))

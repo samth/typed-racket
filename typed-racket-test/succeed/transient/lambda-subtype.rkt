@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; transient domain checks must be based off the function's formals --- not
 ;;  on the type assigned to the whole expression

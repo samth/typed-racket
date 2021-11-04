@@ -4,7 +4,7 @@
   (struct posn ([x : Real] [y : Real]))
   (provide (struct-out posn)))
 
-(module s typed/racket/shallow/base
+(module s typed/racket/base/shallow
   (require racket/match
            (submod ".." t))
   (: f (-> posn Void))

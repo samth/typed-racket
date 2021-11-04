@@ -2,7 +2,7 @@
 
 ;; basic transient -> guarded, is ok
 
-(module transient typed/racket/shallow/base
+(module transient typed/racket/base/shallow
   (provide xxx)
   (define xxx '$$$)
   xxx)

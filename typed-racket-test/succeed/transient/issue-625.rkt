@@ -3,7 +3,7 @@
 ;; Hash contracts with non-flat keys should give a good error messages
 ;;  when applied to hashes that are not `hash-equal?`
 
-(module t typed/racket/shallow/base
+(module t typed/racket/base/shallow
   (provide give-me-a-hash)
   (: give-me-a-hash (-> (HashTable (Vectorof Symbol) Symbol) Symbol))
   (define (give-me-a-hash x)

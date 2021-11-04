@@ -1,7 +1,7 @@
 #;
 (exn-pred exn:fail:contract? #rx"transient-assert")
 
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 (module u racket/base
   (define x* (list "OOPS"))

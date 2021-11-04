@@ -1,7 +1,7 @@
 #;
 (exn-pred exn:fail:contract? #rx"car")
 
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 (require/typed racket/base
   (cdr (All (A) (U (Boxof A) A))))

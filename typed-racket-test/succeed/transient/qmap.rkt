@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; TODO parse error in type; used a type variable not bound with ... as a bound on a ...
 

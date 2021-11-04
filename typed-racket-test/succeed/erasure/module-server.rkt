@@ -1,4 +1,4 @@
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 ;; Not a test, just provides a locally-defensive function
 

@@ -1,6 +1,6 @@
 #lang racket/base
 
-(module m typed/racket/shallow/base
+(module m typed/racket/base/shallow
 
   (struct foo ([x : Integer]) #:prefab)
   (define f (foo 42))

@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; Originally raised error in optimizer,
 ;;  expected kernel-literal (or something) got gensym var

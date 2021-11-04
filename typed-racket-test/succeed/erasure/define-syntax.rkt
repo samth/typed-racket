@@ -1,4 +1,4 @@
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 ;; Test that a simple macro works in locally-defensive code
 

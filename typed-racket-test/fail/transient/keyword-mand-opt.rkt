@@ -1,7 +1,7 @@
 #;
 (exn-pred exn:fail:contract? #rx"transient-assert")
 
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; ERROR when function asks for mandatory kw
 ;;  but type makes it optional

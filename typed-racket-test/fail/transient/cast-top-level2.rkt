@@ -3,7 +3,7 @@
 
 #lang racket/load
 
-(require typed/racket/shallow/base)
+(require typed/racket/base/shallow)
 
 (define: (a) (f (x : Number)) : a
   (cast x a))

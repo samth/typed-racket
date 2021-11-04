@@ -1,13 +1,13 @@
 #lang typed/racket/base
 
-;; basic transient -> guarded, is ok
+;; basic optional -> deep, is ok
 
-(module transient typed/racket/shallow/base
+(module opt typed/racket/base/optional
   (provide xxx)
   (define xxx '$$$)
   xxx)
 
-(require 'transient)
+(require 'opt)
 xxx
 
 (define (f y)

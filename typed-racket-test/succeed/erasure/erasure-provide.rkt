@@ -2,7 +2,7 @@
 
 ;; Test providing value to untyped
 
-(module a typed/racket/shallow/base
+(module a typed/racket/base/optional
         (provide f)
         (define (f (x : (Boxof Integer)))
           (unbox x)))

@@ -1,4 +1,4 @@
-#lang typed/racket/shallow/base
+#lang typed/racket/base/shallow
 
 ;; For combinators don't need a codomain check,
 ;;  or a domain check on the `for-loop` functions

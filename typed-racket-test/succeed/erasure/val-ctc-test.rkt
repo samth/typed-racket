@@ -1,4 +1,4 @@
-#lang typed/racket/optional/base
+#lang typed/racket/base/optional
 
 ;; A symbol type should generate a contract that accepts the same symbol
 

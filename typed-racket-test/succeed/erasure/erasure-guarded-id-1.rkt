@@ -1,12 +1,12 @@
 #lang racket/base
 
-;; guarded should protect itself from transient
+;; deep should protect itself from optional
 
 (module uuu racket/base
   (provide bad-list)
   (define bad-list '(X X)))
 
-(module sss typed/racket/shallow
+(module sss typed/racket/optional
 
   (require/typed (submod ".." uuu)
     (bad-list (Listof (List Symbol))))

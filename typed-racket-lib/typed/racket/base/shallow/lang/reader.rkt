@@ -1,6 +1,6 @@
 #lang s-exp syntax/module-reader
 
-typed/racket/deep/base
+typed/racket/base/shallow
 
 #:read r:read
 #:read-syntax r:read-syntax
@@ -14,7 +14,7 @@ typed/racket/deep/base
     [else (use-default key default)]))
 
 (define make-language-info
-  `#(typed-racket/language-info get-info (deep)))
+  `#(typed-racket/language-info get-info (shallow)))
 
 
 (require (prefix-in r: typed-racket/typed-reader))

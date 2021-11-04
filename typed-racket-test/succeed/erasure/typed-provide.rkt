@@ -11,7 +11,7 @@
   (provide bbx)
   (define bbx (box 0)))
 
-(module c typed/racket/optional/base
+(module c typed/racket/base/optional
   (require (submod ".." a))
   (require/typed (submod ".." b) (bbx (Boxof (Boxof Integer))))
   (provide do-c bbx)

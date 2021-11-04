@@ -9,7 +9,7 @@
   (define (random-from xs)
     (first (shuffle xs))))
 
-(module client typed/racket/shallow/base
+(module client typed/racket/base/shallow
   (require/typed (submod ".." util)
     (random-from (All (A) (-> (Listof A) A))))
 
