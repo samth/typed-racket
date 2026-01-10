@@ -15,10 +15,40 @@
          "../types/type-table.rkt"
          "../rep/type-rep.rkt"
          "../utils/tc-utils.rkt"
-         (for-template racket/base))
+         (for-template racket/base)
+         (for-label racket/private/class-internal))
 
 (import tc-expr^)
 (export tc-send^)
+
+(define-literal-set send-literals #:for-label
+  (find-method/who))
+
+;; tc/send-form : Syntax (Option TC-Result) -> (Option TC-Result)
+;; Attempts to match and typecheck a send expression pattern.
+;; Returns #f if the pattern doesn't match, otherwise returns the typechecking result.
+(define (tc/send-form form [expected #f])
+  (syntax-parse form
+    #:literal-sets (kernel-literals send-literals)
+    ;; Match the expanded send pattern
+    [(let-values ([(_) meth])
+       (let-values ([(rcvr-var) rcvr])
+         (let-values (((meth-var) (~and find-app (#%plain-app find-method/who _ _ _))))
+           (let-values ([(arg-var) args] ...)
+             (if wrapped-object-check
+                 ignore-this-case
+                 (~and core-app
+                       (~or (#%plain-app _ _ _arg-var2 ...)
+                            (let-values ([(_) _] ...)
+                              (#%plain-app (#%plain-app _ _ _ _ _ _)
+                                           _ _ _ ...)))))))))
+     (register-ignored! form)
+     (tc/send #'find-app #'core-app
+              #'rcvr-var #'rcvr
+              #'meth-var #'meth
+              #'(arg-var ...) #'(args ...)
+              expected)]
+    [_ #f]))
 
 (define (tc/send form app
                  rcvr-var rcvr

@@ -42,17 +42,12 @@
                        ;; see tc-app-contracts.rkt
                        racket/contract/private/provide)
 
-         (for-label (only-in '#%paramz [parameterization-key pz:pk])
-                    (only-in racket/private/class-internal find-method/who))
+         (for-label (only-in '#%paramz [parameterization-key pz:pk]))
          (for-syntax racket/base racket/syntax))
 
 (import tc-if^ tc-lambda^ tc-app^ tc-let^ tc-send^ check-subforms^ tc-literal^
         check-class^ check-unit^ tc-expression^)
 (export tc-expr^)
-
-(define-literal-set tc-expr-literals #:for-label
-  (find-method/who))
-
 
 ;; typecheck an identifier
 ;; the identifier has variable effect
@@ -168,8 +163,10 @@
     ;; the argument must be syntax
     (unless (syntax? form)
       (int-err "bad form input to tc-expr: ~a" form))
-    (syntax-parse form
-      #:literal-sets (kernel-literals tc-expr-literals)
+    ;; Try to typecheck as a send expression first
+    (or (tc/send-form form expected)
+        (syntax-parse form
+          #:literal-sets (kernel-literals)
       ;; a TR-annotated class
       [stx:tr:class^
        (check-class form expected)]
@@ -278,24 +275,6 @@
        (tc/lambda form #'(formals) #'(body) expected)]
       [(case-lambda [formals . body] ...)
        (tc/lambda form #'(formals ...) #'(body ...) expected)]
-      ;; send
-      [(let-values ([(_) meth])
-         (let-values ([(rcvr-var) rcvr])
-           (let-values (((meth-var) (~and find-app (#%plain-app find-method/who _ _ _))))
-             (let-values ([(arg-var) args] ...)
-               (if wrapped-object-check
-                   ignore-this-case
-                   (~and core-app
-                         (~or (#%plain-app _ _ _arg-var2 ...)
-                              (let-values ([(_) _] ...)
-                                (#%plain-app (#%plain-app _ _ _ _ _ _)
-                                             _ _ _ ...)))))))))
-       (register-ignored! form)
-       (tc/send #'find-app #'core-app
-                #'rcvr-var #'rcvr
-                #'meth-var #'meth
-                #'(arg-var ...) #'(args ...)
-                expected)]
       ;; kw function def
       ;; TODO simplify this case
       [(~and (let-values ([(f) fun]) . body) kw:kw-lambda^)
@@ -381,7 +360,7 @@
       [(letrec-values ([(name ...) expr] ...) . body)
        (tc/letrec-values #'((name ...) ...) #'(expr ...) #'body expected)]
       ;; other
-      [_ (int-err "cannot typecheck unknown form : ~s" (syntax->datum form))])))
+      [_ (int-err "cannot typecheck unknown form : ~s" (syntax->datum form))])))) ;; extra paren closes the 'or'
 
 ;; type check form in the current type environment
 ;; if there is a type error in form, or if it has the wrong annotation, error
