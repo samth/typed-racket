@@ -54,7 +54,9 @@
                               identifier? syntax?
                               syntax? syntax?)
                              ((or/c tc-results/c #f))
-                             . ->* . full-tc-results/c)]))
+                             . ->* . full-tc-results/c)]
+   [cond-contracted tc/send-form ((syntax?) ((or/c tc-results/c #f))
+                                  . ->* . (or/c full-tc-results/c #f))]))
 
 (define-signature tc-expression^
   ([cond-contracted tc/#%expression ((syntax?) ((or/c tc-results/c #f)) . ->* . full-tc-results/c)]))
