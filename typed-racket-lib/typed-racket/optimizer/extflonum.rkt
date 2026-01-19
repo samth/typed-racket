@@ -23,7 +23,7 @@
   ;; (all ops are binary only)
   (mk-extflonum-tbl (list #'extfl+ #'extfl- #'extfl* #'extfl/
                           #'extfl= #'extfl< #'extfl> #'extfl<= #'extfl>=
-                          #'extflmin #'extflmax #'extflexpt)))
+                          #'extflmin #'extflmax)))
 
 (define unary-extflonum-ops
   (mk-extflonum-tbl (list #'extflabs #'extflround #'extflfloor #'extflceiling #'extfltruncate
