@@ -10,7 +10,6 @@ TR opt: extflonums-cs-skip-all.rkt 16:6 (extfl<= 1.0t0 1.0t0) -- binary extflonu
 TR opt: extflonums-cs-skip-all.rkt 17:6 (extfl>= 1.0t0 1.0t0) -- binary extflonum
 TR opt: extflonums-cs-skip-all.rkt 18:6 (extflmin 1.0t0 1.0t0) -- binary extflonum
 TR opt: extflonums-cs-skip-all.rkt 19:6 (extflmax 1.0t0 1.0t0) -- binary extflonum
-TR opt: extflonums-cs-skip-all.rkt 20:6 (extflexpt 1.0t0 1.0t0) -- binary extflonum
 TR opt: extflonums-cs-skip-all.rkt 22:11 (extflabs 1.0t0) -- unary extflonum
 TR opt: extflonums-cs-skip-all.rkt 23:11 (extflround 1.0t0) -- unary extflonum
 TR opt: extflonums-cs-skip-all.rkt 24:11 (extflfloor 1.0t0) -- unary extflonum
