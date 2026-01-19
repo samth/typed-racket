@@ -2,7 +2,6 @@
 #<<END
 TR missed opt: expt.rkt 13:5 (expt -2.0 0.5) -- unexpected complex type
 TR missed opt: expt.rkt 6:13 (expt (sin 0.25) 1.0) -- unexpected complex type
-TR opt: expt.rkt 12:5 (expt 2.0 3.0) -- binary float
 TR opt: expt.rkt 6:19 (sin 0.25) -- unary float
 END
 #<<END
