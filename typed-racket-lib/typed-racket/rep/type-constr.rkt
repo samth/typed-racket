@@ -67,7 +67,10 @@
   (when (and (procedure? type-maker) (not (object-name type-maker)))
     (error 'make-type-constr "only named procedures are allowed"))
 
-  (if (and (zero? arity) (not kind*?))
+  ;; Optimization: for zero-arity non-kind* type constructors, just use the maker directly.
+  ;; But NOT for user-defined type ops - they need to maintain their constructor identity
+  ;; so that nullary type constructors like (define-type (Nat) Natural) work correctly.
+  (if (and (zero? arity) (not kind*?) (procedure? type-maker))
       type-maker
       (TypeConstructor type-maker arity kind*? productive variances)))
 

@@ -286,8 +286,10 @@
 
   (define-splicing-syntax-class type-abbrev
      #:attributes (tname body omit params)
+    ;; Simple alias: (define-type Nat Natural) - params is #f
     (pattern (~seq tname:id (~and body:expr) :omit-define-syntaxes)
-             #:with params #'())
+             #:attr params #'#f)
+    ;; Type constructor (possibly nullary): (define-type (Nat) Natural) or (define-type (Pair A B) ...)
     (pattern (~seq (tname:id arg:id ...) body:expr :omit-define-syntaxes)
              #:with params #'(arg ...)))
 
@@ -298,8 +300,7 @@
          #,(if (not (attribute omit))
                (ignore (syntax/loc stx (define-syntax tname type-name-error)))
                #'(begin))
-         #,(internal (syntax/loc stx
-                       (define-type-alias-internal tname body params))))]))
+         #,(internal #`(define-type-alias-internal tname body params)))]))
 
 (define-syntax define-new-subtype
   (lambda (stx)

@@ -142,10 +142,10 @@
 ;; A type name, potentially recursive or mutually recursive or pointing
 ;; to a type for a struct type
 ;; id is the name stored in the environment
-;; args is the number of arguments expected by this Name type
+;; args is #f for simple aliases, or the number of type arguments for type constructors
 ;; struct? indicates if this maps to a struct type
 (def-type Name ([id identifier?]
-                [args exact-nonnegative-integer?]
+                [args (or/c #f exact-nonnegative-integer?)]
                 [struct? boolean?])
   #:base
   [#:custom-constructor

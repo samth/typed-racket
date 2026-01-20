@@ -70,7 +70,8 @@
                  ([type-alias (in-list type-aliases)])
         (define-values (id type-stx args) (parse-type-alias type-alias))
         ;; start registering type alias names
-        (start-type-alias-registration! id (make-Name id (length args) #f))
+        ;; args is #f for simple aliases, a list for type constructors
+        (start-type-alias-registration! id (make-Name id (and args (length args)) #f))
         (values id (list id type-stx args))))
 
     (begin0
@@ -120,7 +121,7 @@
                ([(name alias-info) (in-free-id-table type-alias-map)])
       (match-define (list _ type-stx args) alias-info)
       (define-values (links classes productivity)
-        (parse-for-effects name (cons args type-stx)))
+        (parse-for-effects name (cons (or args '()) type-stx)))
 
       (define pre-dependencies
         (remove-duplicates links free-identifier=?))
@@ -192,7 +193,7 @@
     (for/list ([id (in-list recursive-aliases)])
       (define record (free-id-table-ref type-alias-map id))
       (match-define (list _ _ args) record)
-      (define name-type (make-Name id (length args) #f))
+      (define name-type (make-Name id (and args (length args)) #f))
       (register-resolved-type-alias id name-type)
       ;; The `(make-placeholder-type id)` expression is used to make sure
       ;; that unions don't collapse the aliases too soon. This is a dummy
@@ -202,11 +203,13 @@
       ;; because dummy values will leak due to environment serialization.
       (register-type-name
        id
-       (if (null? args)
-           (make-placeholder-type id)
+       (if args
+           ;; Type constructor (nullary or n-ary)
            ;; TODO: we should simply gather the names and put them into kind-related
            ;; enviroment
-           (make-Poly (map syntax-e args) (make-placeholder-type id))))
+           (make-Poly (map syntax-e args) (make-placeholder-type id))
+           ;; Simple alias (not a type constructor)
+           (make-placeholder-type id)))
       name-type))
 
   ;; Register non-recursive type aliases
@@ -221,13 +224,15 @@
       (match-define (list _ type-stx args) (free-id-table-ref type-alias-map id #f))
       (define acc^
         (cond
-          [(not (null? args))
+          ;; Type constructor (possibly nullary): (define-type (Pair A B) ...) or (define-type (Nat) ...)
+          ;; args is a list (possibly empty) for type constructors
+          [args
            (define ty-op (parse-type-operator-abstraction id args type-stx #f
                                                           type-alias-productivity-map))
-
            (register-type-constructor! id ty-op)
            (cons id acc)]
           [else
+           ;; Simple alias: (define-type Nat Natural)
            ;; id can be a simple abbreviation for another type constructor
            (define rv (parse-type-or-type-constructor type-stx))
            (match rv
@@ -268,11 +273,13 @@
                #:when (free-id-table-ref type-alias-map id #f))
       (define record (free-id-table-ref type-alias-map id))
       (match-define (list _ type-stx args) record)
-      (if (null? args)
-          (values (cons record type-records)
-                  type-op-records)
+      ;; Type constructors (args is a list) go to type-op-records
+      ;; Simple aliases (args is #f) go to type-records
+      (if args
           (values type-records
-                  (cons record type-op-records)))))
+                  (cons record type-op-records))
+          (values (cons record type-records)
+                  type-op-records))))
 
 
   (define-values (names-to-refine types-to-refine tvarss)
@@ -283,7 +290,8 @@
       (reset-resolver-cache!)
       (register-type-name id type)
       (complete-type-alias-registration! id)
-      (values id type (map syntax-e args))))
+      ;; args is #f for simple aliases
+      (values id type '())))
 
   (define-values (productive unproductive)
     (partition (match-lambda
@@ -314,16 +322,19 @@
     (refine-user-defined-constructor-variances! constr-names)
     (append acyclic-constr-names constr-names)))
 
-;; Syntax -> Syntax Syntax (Listof Syntax)
+;; Syntax -> (values Syntax Syntax (or/c (Listof Syntax) #f))
 ;; Parse a type alias internal declaration
+;; Returns: name, body, params (where params is #f for simple aliases, a list for type constructors)
 (define (parse-type-alias form)
   (syntax-parse form
     #:literal-sets (kernel-literals)
     #:literals (values)
     [t:type-alias
-     (values #'t.name #'t.body (syntax-e #'t.params))]
-    ;; this version is for `let`-like bodies
+     (define params (syntax-e #'t.params))
+     (values #'t.name #'t.body (if (eq? params #f) #f params))]
+    ;; this version is for `let`-like bodies (legacy)
     [(begin (quote-syntax (define-type-alias-internal nm body args))
             (#%plain-app values))
-     (values #'nm #'body (syntax-e #'args))]
+     (define args-val (syntax-e #'args))
+     (values #'nm #'body (if (eq? args-val #f) #f args-val))]
     [_ (int-err "not define-type-alias")]))
