@@ -539,7 +539,7 @@
                       null)
                #,(internal #'(require/typed-internal hidden (Any -> Boolean : (Opaque pred))))
                #,(if (attribute ne)
-                     (internal (syntax/loc stx (define-type-alias-internal ty (Opaque pred))))
+                     (internal (syntax/loc stx (define-type-alias-internal ty (Opaque pred) #f)))
                      (syntax/loc stx (define-type-alias ty (Opaque pred))))
                #,(ignore
                    (with-syntax ((ctc (if (attribute unsafe) ; unsafe- shouldn't generate contracts
