@@ -107,6 +107,7 @@
                        (List Byte Byte Byte)
                        (List Byte Byte Byte Real)
                        (List String)))
+         (field [s-immutable Boolean])
          [red (-> Byte)]
          [green (-> Byte)]
          [blue (-> Byte)]
@@ -148,6 +149,7 @@
                                                        Real Real Real)
                                                Real Real Real Real Real))
                                #:optional])
+         (field [s-immutable Boolean])
          [get-color (-> (Instance Color%))]
          [get-gradient (-> (Option (U (Instance Radial-Gradient%)
                                       (Instance Linear-Gradient%))))]
@@ -182,6 +184,7 @@
                [cap Pen-Cap-Style #:optional]
                [join Pen-Join-Style #:optional]
                [stipple (Option (Instance Bitmap%)) #:optional])
+         (field [s-immutable Boolean])
          [get-style (-> Pen-Style)]
          [get-cap (-> Pen-Cap-Style)]
          [get-color (-> (Instance Color%))]
