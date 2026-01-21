@@ -96,12 +96,15 @@
          (set! bound (cons name* bound))
          ;; traverse what `name` refers to
          (define r (ref name*))
-         ;; ref returns a rib, get the one definition we want
-         (define target (for/first ([k (in-list (car r))]
-                                    [v (in-list (cdr r))]
-                                    #:when (free-identifier=? name* k))
-                          v))
-         (loop target #f))]
+         ;; r can be #f if the name is not in all-name-defs
+         (when r
+           ;; ref returns a rib, get the one definition we want
+           (define target (for/first ([k (in-list (car r))]
+                                      [v (in-list (cdr r))]
+                                      #:when (free-identifier=? name* k))
+                            v))
+           (when target
+             (loop target #f))))]
       [else (sc-traverse sc loop)]))
   (for*/hash ([b (in-list bound)]
               [v (in-value (ref b))]
