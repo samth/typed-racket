@@ -66,6 +66,10 @@
      #f]
     [((struct dcon-dotted _) (struct dcon _))
      #f]
+    [((struct dcon-exact _) (struct dcon-dotted _))
+     #f]
+    [((struct dcon-dotted _) (struct dcon-exact _))
+     #f]
     [(_ _) (int-err "Got non-dcons: ~a ~a" dc1 dc2)]))
 
 ;; dmap dmap -> dmap or #f
