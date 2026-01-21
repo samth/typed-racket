@@ -129,7 +129,9 @@
                             (add1 index)
                             (pretty-format-rep (cleanup-type type)
                                                #:indent 2)))))]
-        [(tc-any-results: _) "AnyValues"]))
+        [(tc-any-results: _) "AnyValues"]
+        ;; Handle invalid results from error propagation
+        [_ #f]))
     (cond [(not printed-type-thunks) tooltips]
           [else
            (append (make-tooltip-vector stx printed-type-thunks pos span)

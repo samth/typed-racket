@@ -75,7 +75,9 @@
   (match res
     [(tc-any-results: _) res]
     [(tc-results: tcrs db)
-     (-tc-results (map update-ps tcrs) db)]))
+     (-tc-results (map update-ps tcrs) db)]
+    ;; Handle error cases (e.g., void from error propagation)
+    [_ res]))
 
 
 ;; atomic-contradiction?: Prop? Prop? -> boolean?
@@ -411,7 +413,9 @@
            [(tc-result: t (PropSet: p+ p-) o)
             (-tc-result t (-PS (-and prop p+) (-and prop p-)) o)])
          tcrs)
-    db)])
+    db)]
+  ;; Handle error cases where results is invalid (e.g., void from error propagation)
+  [(_ _) results])
 
 
 ;; ands the given type prop to both sides of the given arr for each argument
@@ -428,7 +432,13 @@
               rst
               kws
               (make-Values (list (-result tp (-PS (-and p+ new-props) (-and p- new-props)) op)))
-              rng-T+)))])])
+              rng-T+)))]
+     ;; Range doesn't have expected PropSet - return unchanged
+     [_ arr])]
+  ;; Multiple arrows (case->) or other function types - return unchanged
+  [((Fun: _) _) arr]
+  ;; Any other type - return unchanged (e.g., error types)
+  [(_ _) arr])
 
 ;; tc-results/c -> tc-results/c
 (define/match (erase-props tc)
