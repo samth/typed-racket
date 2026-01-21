@@ -521,11 +521,11 @@
                (syntax-e sig-id)))
     (define export-expr (hash-ref export-exprs index fail-no-export))
     (unless (identifier? export-expr)
-      (int-err (string-append "cannot typecheck non-identifier export from unit-from-context"
-                              "\n  export name: ~e"
-                              "\n  export expression: ~e")
-               (syntax-e sig-id)
-               export-expr))
+      (tc-error/fields "unit export must be an identifier"
+                       #:more "macro expanded export to non-identifier expression"
+                       "export name" (syntax-e sig-id)
+                       "export expression" (syntax->datum export-expr)
+                       #:stx form))
        
     (define lexical-type (lookup-id-type/lexical export-expr))
     (unless (subtype lexical-type type)
