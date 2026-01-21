@@ -1470,7 +1470,8 @@
      (make-PolyDots ns (function->method body self-type))]
     [(PolyRow-names: ns body constraints)
      (make-PolyRow ns (function->method body self-type) constraints)]
-    [_ (int-err "function->method: ~a" type)]))
+    [_ (tc-error/expr "expected a function type for method, got: ~a" type
+                      #:return (make-Fun (list (make-Arrow null #f null (make-Values (list (-result -Bottom))) #f))))]))
 
 ;; method->function : Function -> Function
 ;; Turn a "real" method type back into a function type
