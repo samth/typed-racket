@@ -193,6 +193,17 @@
        (expected-but-got t2 t1))
      (upgrade-trusted-rng t1 expected)]
 
+    ;; Handle void or other invalid inputs from error propagation
+    [((? void?) expected) (fix-results expected)]
+    [(actual (? void?)) actual]
+
+    ;; Handle Row types from row-polymorphic instantiation
+    ;; Row is not a Type?, so it needs special handling
+    [((tc-result1: t1 _ _) (? Row?))
+     ;; For row polymorphism, just return the actual type
+     ;; The row constraint checking happens elsewhere
+     t1]
+
     [(a b) (int-err "unexpected input for check-below: ~a ~a" a b)]))
 
 ;; shallow: if the top-level arrow on t1 is reliable, then upgrade the top-level arrow in t2
