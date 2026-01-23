@@ -117,6 +117,47 @@ unions are flattened.
 
 @racketblock[(U Number String Boolean Char)]
 
+@section{Intersection Types}
+
+While union types describe values that can be @emph{any one of}
+several types, intersection types describe values that are
+@emph{simultaneously} all of the specified types.  Intersection types
+are written with the type constructor @racket[∩] (or its alias
+@racket[Intersection]).
+
+Intersection types are particularly useful in combination with
+polymorphism, where they can constrain a type variable to be a
+subtype of another type.  For example, if we want a function that
+accepts any subtype of @racket[Symbol] but returns the more precise
+type, we can write:
+
+@examples[#:label #f #:eval the-eval
+((λ #:forall (A) ([x : (∩ Symbol A)]) x) 'hello)]
+
+In this example, the type variable @racket[A] is constrained to be
+a subtype of @racket[Symbol].  When called with @racket['hello], the
+result has the precise singleton type @racket['hello] rather than
+just @racket[Symbol].
+
+Another use of intersection types is with @racket[case->] function
+types.  A @racket[case->] type is actually a form of intersection
+type for functions --- it describes a function that simultaneously
+satisfies multiple function type signatures:
+
+@racketblock[
+(: string-or-number (case-> (-> String String)
+                            (-> Number Number)))
+]
+
+This function type indicates that when given a @racket[String] it
+returns a @racket[String], and when given a @racket[Number] it
+returns a @racket[Number].
+
+Note that for an intersection type @racket[(∩ t ...)] to be inhabited
+(have any values), there must exist values that satisfy all of the
+component types simultaneously.  For example, @racket[(∩ String Number)]
+has no values because no value is both a string and a number.
+
 @section{Recursive Types}
 
 @deftech{Recursive types} are types whose definitions refer to

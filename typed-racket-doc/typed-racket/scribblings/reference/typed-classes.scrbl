@@ -323,10 +323,24 @@ additional provides all other bindings from @racketmodname[racket/class].
                              (field [color String])))
   ]
 
-  When @racket[row-var-id] is provided, the class type is an abstract type
-  that is row polymorphic. A row polymorphic class type can be instantiated
-  at a specific row using @racket[inst]. Only a single @racket[#:row-var]
+  When @racket[row-var-id] is provided, the class type is abstract and
+  @tech[#:doc '(lib "typed-racket/scribblings/ts-reference.scrbl")
+        #:key "row polymorphism"]{row polymorphic}.  The
+  @racket[row-var-id] must be a
+  @tech[#:doc '(lib "typed-racket/scribblings/ts-reference.scrbl")
+        #:key "row variable"]{row variable} bound using
+  @racket[(All (r #:row) ...)].  This allows writing functions that abstract
+  over classes with different fields and methods.  Row-polymorphic functions
+  must be instantiated using @racket[row-inst] with a @racket[Row] to specify
+  the concrete field and method types.  Only a single @racket[#:row-var]
   clause may appear in a class type.
+
+  @ex[(: make-sized-class (All (r #:row)
+           (-> Integer (Class #:row-var r (field [size Integer])))))
+      (define (make-sized-class n)
+        (class object%
+          (super-new)
+          (field [size : Integer n])))]
 }
 
 @defidform[ClassTop]{
@@ -366,13 +380,25 @@ additional provides all other bindings from @racketmodname[racket/class].
   ]
 
 @defform[(Row class-type-clause ...)]{
-  Represents a row, which is used for instantiating row-polymorphic
-  function types. Accepts all clauses that the @racket[Class] form
-  accepts except the keyword arguments.
+  Represents a row, which is used for instantiating
+  @tech[#:doc '(lib "typed-racket/scribblings/ts-reference.scrbl")
+        #:key "row polymorphism"]{row-polymorphic} function types.
+  Accepts all clauses that the @racket[Class] form accepts except the
+  keyword arguments.
 
+  Rows specify the concrete types for the fields and methods of a class
+  when instantiating a function that has a
+  @tech[#:doc '(lib "typed-racket/scribblings/ts-reference.scrbl")
+        #:key "row variable"]{row variable}.
   Rows are not types, and therefore cannot be used in any context
-  except in the @racket[row-inst] form. See @racket[row-inst] for
-  examples.
+  except in the @racket[row-inst] form.
+
+  @ex[(: id (All (r #:row)
+                 (-> (Class #:row-var r) (Class #:row-var r))))
+      (define (id cls) cls)
+
+      ((row-inst id (Row (field [x Integer])))
+       (class object% (super-new) (field [x : Integer 0])))]
 }
 }
 
