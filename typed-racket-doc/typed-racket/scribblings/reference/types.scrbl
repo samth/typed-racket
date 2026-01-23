@@ -870,7 +870,8 @@ delimited continuation functions and continuation mark functions.
   @racket[t] at types @racket[t1 t2 ...]}
 
 @deftypeform*[[(All (a ...) t)
-               (All (a ... a ooo) t)]]{
+               (All (a ... a ooo) t)
+               (All (a ... r #:row) t)]]{
   is a parameterization of type @racket[t], with
   type variables @racket[a ...].  If @racket[t] is a function type
       constructed with infix @racket[->], the outer pair of parentheses
@@ -880,7 +881,17 @@ delimited continuation functions and continuation mark functions.
             (if (null? lst)
                 0
                 (add1 (list-length (cdr lst)))))
-          (list-length (list 1 2 3))]}
+          (list-length (list 1 2 3))]
+
+  In the third form, @racket[r] is a @deftech{row variable} used for
+  @deftech{row polymorphism} over class types. Row polymorphism allows
+  abstracting over the fields and methods of a class.  A row variable
+  can only appear in a @racket[Class] type using @racket[#:row-var],
+  and functions with row-polymorphic types must be instantiated using
+  @racket[row-inst] rather than @racket[inst].
+      @ex[(: id (All (r #:row)
+                     (-> (Class #:row-var r) (Class #:row-var r))))
+          (define (id cls) cls)]}
 
 @deftypeform[(Some (a ...) t)]{
   See @tech[#:key "Some"]{existential type results}.
