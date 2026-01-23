@@ -25,17 +25,20 @@
                                 (regexp-match #rx"cs-skip-all" name)))
       (define cs-skip? (and (eq? (system-type 'vm) 'chez-scheme)
                             (regexp-match #rx"cs-skip" name)))
+      (define cs-only? (regexp-match #rx"cs-only" name))
       (define-values (log output) (force promised-logs))
       (define-values (expected-log expected-output)
         (get-expected-results (build-path dir name)))
       (unless cs-skip-all?
         ;; some things are just hopeless on RacketCS
-        (unless cs-skip?
-          ;; skip log comparison on RacketCS
-          ;; making program output identical on RacketCS is often worthwhile,
-          ;; but optimization logs are too fragile in some cases
-          (check-equal? (list (set-subtract log expected-log) (set-subtract expected-log log)) (list (list) (list))))
-        (check-equal? (regexp-split "\n" output) (regexp-split "\n" expected-output))))))
+        ;; cs-only tests only run on RacketCS
+        (when (or (not cs-only?) (eq? (system-type 'vm) 'chez-scheme))
+          (unless cs-skip?
+            ;; skip log comparison on RacketCS
+            ;; making program output identical on RacketCS is often worthwhile,
+            ;; but optimization logs are too fragile in some cases
+            (check-equal? (list (set-subtract log expected-log) (set-subtract expected-log log)) (list (list) (list))))
+          (check-equal? (regexp-split "\n" output) (regexp-split "\n" expected-output)))))))
 
 
 (define-runtime-path tests-dir                "./tests")
