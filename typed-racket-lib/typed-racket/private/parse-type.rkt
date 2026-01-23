@@ -208,12 +208,22 @@
        ;; Found the row variable - it's invalid unless we're in a row-ext position
        (unless in-row-ext?
          (set! found-invalid #t))]
-      [(Class: row-ext row _ _ _ _)
-       ;; For Class, check row-ext with the flag set
+      [(Class: row-ext inits fields methods augments init-rest)
+       ;; For Class, check row-ext with the flag set (valid position for row var)
        (when row-ext
          (check! row-ext #t))
-       ;; Check the row itself and other parts normally
-       (check! row #f)]
+       ;; Check types in the row's members for invalid uses
+       ;; These are lists of tuples: (list name Type ...)
+       (for ([entry (in-list inits)])
+         (check! (second entry) #f))
+       (for ([entry (in-list fields)])
+         (check! (second entry) #f))
+       (for ([entry (in-list methods)])
+         (check! (second entry) #f))
+       (for ([entry (in-list augments)])
+         (check! (second entry) #f))
+       (when init-rest
+         (check! init-rest #f))]
       [_ (Rep-for-each ty (lambda (t) (check! t #f)))]))
   found-invalid)
 
