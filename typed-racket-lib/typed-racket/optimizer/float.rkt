@@ -26,6 +26,13 @@
   (mk-unsafe-tbl generic "fl~a" "unsafe-fl~a"))
 
 (define binary-float-ops
+  ;; expt is safe to optimize to flexpt when the type checker determines the result is Flonum
+  ;; (not (Un Flonum Float-Complex)). The type checker only gives type Flonum when it can prove:
+  ;; - the base is non-negative, OR
+  ;; - the exponent is a fixnum (integer)
+  ;; Note: flexpt returns +nan.0 for negative base with non-integer exponent,
+  ;; while expt returns a complex number. This optimization is safe because we only
+  ;; optimize when the type checker has proven the result is real.
   (mk-float-tbl (list #'+ #'- #'* #'/ #'min #'max #'expt)))
 (define binary-float-comps
   (free-id-table-set*
