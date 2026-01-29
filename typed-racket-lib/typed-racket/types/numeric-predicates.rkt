@@ -9,10 +9,11 @@
 
 (begin-encourage-inline
 
-;; we assume indexes are 2 bits shorter than fixnums
-;; We're generating a reference to fixnum? rather than calling it, so
-;; we're safe from fixnum size issues on different platforms.
-(define (index? x) (and (fixnum? x) (unsafe-fx>= x 0) (fixnum? (* x 4))))
+;; Indexes are in the range [0, 2^28), which is portable across all
+;; platforms Racket supports (32-bit and 64-bit).
+;; NOTE: We cannot use (fixnum? (* x 4)) to check this because on Racket BC,
+;; generic multiplication may not return a fixnum even when the result fits.
+(define (index? x) (and (fixnum? x) (unsafe-fx>= x 0) (unsafe-fx< x 268435456)))
 
 (define (exact-rational? x) (and (rational? x) (exact? x)))
 
