@@ -1,52 +1,74 @@
 #lang typed/racket/base
-;; Concrete soundness counterexample for the type proposed in issue #1505:
+;; Demonstration for the call-with-exception-handler discussion in
+;; issue #1505. Run with: racket cweh-unsound-demo.rkt
 ;;
-;;   call-with-exception-handler : (∀ (A) ((Any -> Any) (-> A) -> A))
+;; What this shows
+;; ---------------
+;; A handler installed by `call-with-exception-handler` CAN choose the
+;; result of the surrounding call — not by returning normally (Racket
+;; re-raises that), but by tail-calling a captured continuation that
+;; lives inside the raised value. The helper module implements such a
+;; raise-continuable: the continuation of the raise call is captured
+;; into a `k-box`, the handler pulls it out, and tail-calls it with
+;; whatever value it likes. That value flows back as `make-raise-
+;; continuable`'s return, hence as the thunk's return, hence as the
+;; surrounding `call-with-exception-handler`'s return.
 ;;
-;; This program type-checks. At runtime the value `cweh` returns is a
-;; string, even though the proposed type and the surrounding code would
-;; let TR conclude it is well-typed in any context the thunk's return
-;; type is. The mechanism — a captured continuation embedded in the
-;; raised value — is exactly what the R6RS formal semantics for
-;; with-exception-handler permits, and what rnrs/exceptions-6 implements
-;; on top of Racket.
+;; This mirrors the formal R6RS semantics for `with-exception-handler`
+;; and `raise-continuable` Robby pointed at, and the same shape that
+;; rnrs/exceptions-6 uses on top of Racket.
 ;;
-;; Only `call-with-exception-handler` is brought in via unsafe-require/typed
-;; (mirroring how a base-env entry is trusted within typed code with no
-;; runtime contract enforcement). The helper module is plain Typed Racket.
+;; What this does NOT show
+;; -----------------------
+;; This program does NOT exhibit Typed Racket unsoundness. The static
+;; type of `result` is `Any`, and the runtime value is a string —
+;; which is a perfectly legitimate inhabitant of `Any`. TR's current
+;; built-in type
 ;;
-;; Run with: racket cweh-unsound-demo.rkt
+;;   call-with-exception-handler : (∀ a. (Any -> a) (-> a) -> a)
+;;
+;; produces the same outcome on the same code (a = Any here). The
+;; program type-checks and runs without `unsafe-require/typed`.
+;;
+;; To go from `Any` to a more specific type the user has to write
+;; `(cast result T)`, and the runtime contract on `cast` catches the
+;; mismatch. So nothing leaks past the type system without a runtime
+;; check; the current and the proposed types both rely on that.
+;;
+;; What would be needed for real unsoundness in TR
+;; -----------------------------------------------
+;; Either (a) a path where the handler's normal RETURN flows back as
+;; the result of `call-with-exception-handler` without a cast in the
+;; way (Racket's c-w-e-h doesn't have such a path; cases 2/3 of the
+;; earlier scenario file confirmed it re-raises), or (b) a helper that
+;; type-erases the captured continuation AND a way to assert a more
+;; specific type without cast (only available via unsafe-require/typed
+;; or unsafe-cast — both explicitly unsafe). Without one of those, the
+;; proposed type
+;;
+;;   call-with-exception-handler : (∀ A. (Any -> Any) (-> A) -> A)
+;;
+;; appears sound for Racket's `call-with-exception-handler`, even
+;; though it's strictly more permissive than the current type (it
+;; admits cloudrac3r's example-1, which the current type rejects).
 
-(require typed/racket/unsafe)
-(require "cweh-unsound-helper.rkt")
+(require (file "cweh-unsound-helper.rkt"))
 
-(unsafe-require/typed racket/base
-  [(call-with-exception-handler cweh)
-   (All (A) (-> (-> Any Any) (-> A) A))])
-
-;; The thunk's type is (-> Any), so the proposed cweh-type instantiates
-;; A = Any — TR concludes `result` has type Any. That is itself the
-;; soundness story: a normal cwch use under the proposed type lets the
-;; handler send any value out as the result, regardless of the thunk's
-;; intent.
 (define result : Any
-  (cweh
+  (call-with-exception-handler
     (lambda ([e : Any])
       (cond
-        [(k-box? e) ((k-box-k e) "definitely not an Integer")]
+        [(k-box? e)
+         ;; Tail-call the captured continuation with a string.
+         ((k-box-k e) "value chosen by the handler")]
         [else 0]))
     (lambda () (make-raise-continuable 'boom))))
 
-(printf "result = ~v\n" result)
-(printf "  (string? result)  = ~v\n" (string? result))
-(printf "  (integer? result) = ~v\n" (integer? result))
+(printf "result          = ~v\n" result)
+(printf "(string? result) = ~v\n" (string? result))
+(printf "static type of result is Any — that is consistent.\n")
 
-;; Now imagine the thunk had been typed (-> Integer) — under the proposed
-;; cweh-type, A unifies with Integer and TR considers `result` to be an
-;; Integer with no further checking. We simulate that downstream use by
-;; casting and watching the only thing that catches the lie: the runtime
-;; contract on cast.
-(printf "\nIf the thunk were (-> Integer), TR would let this through:\n")
+(printf "\nIf we now (cast result Integer), the contract on cast catches it:\n")
 (with-handlers ([exn:fail? (lambda ([e : exn]) (printf "  CAST CRASH: ~a\n" (exn-message e)))])
   (define n (cast result Integer))
   (printf "  (* 2 n) = ~v\n" (* 2 n)))
