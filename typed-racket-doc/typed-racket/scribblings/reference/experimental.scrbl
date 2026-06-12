@@ -55,23 +55,27 @@ by logical propositions. These propositions can mention
 certain program terms, allowing a program's types to depend
 on the values of terms.
 
-@defform[#:literals (Refine : Top Bot ! and or when
+@defform[#:literals (Refine : Top Bot ! and or not when
                             unless if < <= = > >= car cdr
                             vector-length + *)
          (Refine [id : type] proposition)
          #:grammar
          ([proposition Top
            Bot
+           type
+           (! type)
            (: symbolic-object type)
            (! symbolic-object type)
            (and proposition ...)
            (or proposition ...)
+           (not proposition)
            (when proposition proposition)
            (unless proposition proposition)
            (if proposition proposition proposition)
            (linear-comp symbolic-object symbolic-object)]
           [linear-comp < <= = >= >]
           [symbolic-object exact-integer
+           (exact-nonnegative-integer exact-nonnegative-integer)
            symbolic-path
            (+ symbolic-object ...)
            (- symbolic-object ...)
@@ -89,7 +93,9 @@ on the values of terms.
  @ex[(ann 42 (Refine [n : Integer] (= n 42)))]
 
  Note: The identifier in a refinement type is in scope
- inside the proposition, but not the type.
+ inside the proposition, but not the type. A bare @racket[type] proposition
+ is shorthand for @racket[(: id type)], and @racket[(! type)] is shorthand
+ for @racket[(! id type)].
 
 }
 
@@ -123,6 +129,11 @@ specifying the language of your program:
 
 
 @racketmod[typed/racket #:with-refinements]
+
+The @racket[#:print-propositions] language option enables full proposition and
+object printing in printed types:
+
+@racketmod[typed/racket #:print-propositions]
 
 
 With this language option on, type checking the following
@@ -185,7 +196,17 @@ A function's range may depend on any of its arguments.
 The grammar of supported propositions and symbolic objects
 (i.e. @racket[prop] and @racket[obj]) is the same as
 the @racket[proposition] and @racket[symbolic-object] grammars
-from @racket[Refine]'s syntax.
+from @racket[Refine]'s syntax. When exactly one argument is in scope for a
+latent proposition or precondition, a bare @racket[type] proposition refers to
+that argument. Otherwise, write @racket[(: id type)] or
+@racket[(! id type)] to name the argument explicitly.
+
+This form can express predicates over an outer argument in a curried function:
+
+@ex[#:label #f
+ (: double-num? (-> ([x : Any])
+                    (-> ([y : Any]) Boolean #:+ (: x Number))))
+ (define ((double-num? x) y) (number? x))]
 
 For example, here is a dependently typed version of
 Racket's @racket[vector-ref] which eliminates vector

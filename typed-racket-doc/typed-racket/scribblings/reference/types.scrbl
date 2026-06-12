@@ -646,7 +646,8 @@ delimited continuation functions and continuation mark functions.
 
 @section{Other Type Constructors}
 
-@deftypeconstr*/subs[#:id -> #:literals (|@| * ... ! and or implies car cdr)
+@deftypeconstr*/subs[#:id -> #:literals (* ... ! and or not when unless if
+                                             car cdr vector-length)
                      [(-> dom ... rng opt-proposition)
                       (-> dom ... rest * rng)
                       (-> dom ... rest ooo bound rng)
@@ -659,34 +660,52 @@ delimited continuation functions and continuation mark functions.
                            mandatory-kw
                            opt-kw]
                       [rng type
+                           result
                            (code:line (Some (a ...) type : #:+ proposition))
-                           (Values type ...)]
+                           (Values result ...)
+                           (values result ...)
+                           (AnyValues : proposition)]
+                      [result type
+                              (code:line type : latent-propositions)]
                       [mandatory-kw (code:line keyword type)]
                       [opt-kw [keyword type]]
                       [opt-proposition (code:line)
                                        (code:line : type)
-                                       (code:line : pos-proposition
-				                    neg-proposition
-				      	      object)]
+                                       (code:line : latent-propositions)]
+                      [latent-propositions type
+                                           pos-proposition
+                                           neg-proposition
+                                           object
+                                           (code:line pos-proposition
+                                                      neg-proposition
+                                                      object)]
                       [pos-proposition (code:line)
                                        (code:line #:+ proposition ...)]
                       [neg-proposition (code:line)
                                        (code:line #:- proposition ...)]
                       [object (code:line)
-                              (code:line #:object index)]
+                              (code:line #:object symbolic-object)]
                       [proposition Top
 		                   Bot
 			           type
                                    (! type)
-                                   (type |@| path-elem ... index)
-                                   (! type |@| path-elem ... index)
+                                   (: symbolic-object type)
+                                   (! symbolic-object type)
                                    (and proposition ...)
                                    (or proposition ...)
-                                   (implies proposition ...)]
-                      [path-elem car cdr]
-                      [index positive-integer
-                             (positive-integer positive-integer)
-                             identifier])]{
+                                   (not proposition)
+                                   (when proposition proposition)
+                                   (unless proposition proposition)
+                                   (if proposition proposition proposition)]
+                      [symbolic-object exact-integer
+                             index
+                             identifier
+                             (car symbolic-object)
+                             (cdr symbolic-object)
+                             (vector-length symbolic-object)]
+                      [index exact-nonnegative-integer
+                             (exact-nonnegative-integer
+                              exact-nonnegative-integer)])]{
   The type of functions from the (possibly-empty)
   sequence @racket[dom ....] to the @racket[rng] type.
 
@@ -715,12 +734,12 @@ delimited continuation functions and continuation mark functions.
       (is-zero? 2 #:equality =)
       (is-zero? 2 #:equality eq? #:zero 2.0)]
 
-  When @racket[opt-proposition] is provided, it specifies the
-  @emph{proposition} for the function type (for an introduction to
+  When @racket[opt-proposition] is provided, it specifies latent
+  @emph{propositions} for the function type (for an introduction to
   propositions in Typed Racket, see
-  @tr-guide-secref["propositions-and-predicates"]).  For almost all use
-  cases, only the simplest form of propositions, with a single type after a
-  @racket[:], are necessary:
+  @tr-guide-secref["propositions-and-predicates"]). For almost all use
+  cases, only the simplest form of proposition, with a single type after a
+  @racket[:], is necessary:
 
   @ex[string?]
 
@@ -730,9 +749,13 @@ delimited continuation functions and continuation mark functions.
   expression evaluates to @racket[#f] in a branch, the variable
   @emph{does not} have type @racket[String].
 
-  In some cases, asymmetric type information is useful in the
-  propositions. For example, the @racket[filter] function's first
-  argument is specified with only a positive proposition:
+  The shorthand @racket[(-> Any Boolean : String)] is equivalent to a
+  positive proposition that the argument has type @racket[String] and a
+  negative proposition that the argument does not have type @racket[String].
+
+  In some cases, asymmetric type information is useful. For example, the
+  @racket[filter] function's first argument is specified with only a
+  positive proposition:
 
   @ex[filter]
 
@@ -741,10 +764,35 @@ delimited continuation functions and continuation mark functions.
   the type-checker gains no information in branches in which the result is @racket[#f].
 
   Conversely, @racket[#:-] specifies that a function provides information for the
-  false branch of a conditional.
+  false branch of a conditional. Within @racket[#:+] and @racket[#:-], a bare
+  @racket[type] proposition refers to the default subject when there is exactly
+  one. For a unary predicate type, the default subject is the argument:
+
+  @racketblock[(-> Any Boolean : #:+ Number)]
+
+  Use @racket[(: symbolic-object type)] and @racket[(! symbolic-object type)]
+  when the proposition must name a subject explicitly. For example,
+  @racket[(0 0)] refers to the first argument of the current function type and
+  @racket[(1 0)] refers to the first argument of the immediately enclosing
+  function type:
+
+  @racketblock[(-> Any (-> Any Boolean : #:+ (: (1 0) Number)))]
+
+  An identifier symbolic object refers to an immutable variable in scope at the
+  type annotation. The @racket[#:object] form specifies which symbolic object is
+  produced as the result of the function:
+
+  @racketblock[(let ([z : Any 1])
+                 (ann (lambda ([x : Any]) z)
+                      (Any -> Any : #:object z)))]
 
   The other proposition cases are rarely needed, but the grammar documents them
   for completeness. They correspond to logical operations on the propositions.
+  Older code may use compatibility forms such as
+  @tt{(Number }@racketidfont["@"]@tt{ 0)} and
+  @tt{(! Number }@racketidfont["@"]@tt{ 0)} for type propositions about
+  positional arguments; new
+  code should prefer @racket[(: (0 0) Number)] and @racket[(! (0 0) Number)].
 
   The type of functions can also be specified with an @emph{infix} @racket[->]
   which comes immediately before the @racket[rng] type. The fourth through
@@ -759,7 +807,7 @@ delimited continuation functions and continuation mark functions.
 
   @racket[(Some (a ...) type : #:+ proposition)] for @racket[rng] specifies an
   @deftech[#:key "Some"]{existential type result}, where the type variables @racket[a ...] may appear
-  in @racket[type] and @racket[opt-proposition]. Unpacking the existential type
+  in @racket[type] and @racket[proposition]. Unpacking the existential type
   result is done automatically while checking application of the function.
 
   @history[#:changed "1.12" @elem{Added @tech[#:key "Some"]{existential type results}}]
@@ -829,8 +877,8 @@ delimited continuation functions and continuation mark functions.
 @deftogether[(
 @deftype[Top]
 @deftype[Bot])]{ These are propositions that can be used with @racket[->].
-  @racket[Top] is the propositions with no information.
-  @racket[Bot] is the propositions which means the result cannot happen.
+  @racket[Top] is the proposition with no information.
+  @racket[Bot] is the proposition which means the result cannot happen.
 }
 
 
@@ -892,6 +940,9 @@ delimited continuation functions and continuation mark functions.
 Returns the type of a sequence of multiple values, with
 types @racket[t ...].  This can only appear as the return type of a
 function.
+Each result may also include latent propositions and an object using the same
+@racket[(type : #:+ proposition #:- proposition #:object symbolic-object)]
+syntax as function ranges.
 @ex[(values 1 2 3)]}
 Note that a type variable cannot be instantiated with a @racket[(Values ....)]
 type. For example, the type @racket[(All (A) (-> A))] describes a thunk that

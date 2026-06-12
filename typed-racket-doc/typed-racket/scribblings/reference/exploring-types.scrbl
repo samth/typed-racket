@@ -22,7 +22,7 @@ The following bindings are only available at the Typed Racket REPL.
   will remain unexpanded.
 
   If @racket[#:verbose] is provided, all type aliases are expanded
-  in the printed type.
+  in the printed type and latent propositions and objects are printed.
 
   @examples[#:eval the-top-eval
     ;; I'm not sure why, but the :type examples below don't work
@@ -33,9 +33,13 @@ The following bindings are only available at the Typed Racket REPL.
   ]
 }
 
-@defform[(:print-type e)]{Prints the type of @racket[_e], which must be
-an expression. This prints the whole
-type, which can sometimes be quite large.
+@defform[(:print-type maybe-verbose e)
+         #:grammar ([maybe-verbose (code:line)
+                                   (code:line #:verbose)])]{
+Prints the type of @racket[_e], which must be an expression. This prints the
+whole type, which can sometimes be quite large. If @racket[#:verbose] is
+provided, all type aliases are expanded in the printed type and latent
+propositions and objects are printed.
 
 @examples[#:eval the-top-eval
   (:print-type (+ 1 2))

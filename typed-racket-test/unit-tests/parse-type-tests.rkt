@@ -216,13 +216,34 @@
     (make-pred-ty -Number)]
    [(-> Any Boolean : #:+ (Number @ 0) #:- (! Number @ 0))
     (make-pred-ty -Number)]
+   [(Any -> Boolean : #:+ (: (0 0) Number) #:- (! (0 0) Number))
+    (make-pred-ty -Number)]
+   [(Any -> Boolean : #:+ (and Number (! Integer)) #:- (or Integer (! Number)))
+    (t:->* (list Univ) -Boolean
+           : (-PS (-and (-is-type 0 -Number)
+                        (-not-type 0 -Int))
+                  (-or (-is-type 0 -Int)
+                       (-not-type 0 -Number))))]
    [(Any -> Boolean : #:+ (! Number @ 0) #:- (Number @ 0))
     (t:->* (list Univ) -Boolean : (-PS (-not-type 0 -Number) (-is-type 0 -Number)))]
    [(-> Any Boolean : #:+ (! Number @ 0) #:- (Number @ 0))
     (t:->* (list Univ) -Boolean : (-PS (-not-type 0 -Number) (-is-type 0 -Number)))]
+   [(-> Any Any : #:object not-mutated-var)
+    (t:->* (list Univ) Univ : (-PS -tt -tt) : (-id-path #'not-mutated-var))]
+   [(-> Any Any : #:object (0 0))
+    (t:->* (list Univ) Univ : (-PS -tt -tt) : (-arg-path 0 0))]
    [(-> Any (-> Any Boolean : #:+ (Number @ 1 0) #:- (! Number @ 1 0)))
     (t:-> Univ
           (t:->* (list Univ) -Boolean : (-PS (-is-type (cons 1 0) -Number) (-not-type (cons 1 0) -Number))))]
+   [(-> Any (-> Any Boolean : #:+ (Number @ (1 0)) #:- (! Number @ (1 0))))
+    (t:-> Univ
+          (t:->* (list Univ) -Boolean : (-PS (-is-type (cons 1 0) -Number) (-not-type (cons 1 0) -Number))))]
+   [(-> Any (-> Any Boolean : #:+ (: (1 0) Number) #:- (! (1 0) Number)))
+    (t:-> Univ
+          (t:->* (list Univ) -Boolean : (-PS (-is-type (cons 1 0) -Number) (-not-type (cons 1 0) -Number))))]
+   [(-> Any (-> Any Any : #:object (1 0)))
+    (t:-> Univ
+          (t:->* (list Univ) Univ : (-PS -tt -tt) : (-arg-path 0 1)))]
    [(-> Any Any (-> Any Boolean : #:+ (Number @ 1 1) #:- (! Number @ 1 1)))
     (t:-> Univ Univ
           (t:->* (list Univ) -Boolean : (-PS (-is-type (cons 1 1) -Number) (-not-type (cons 1 1) -Number))))]
@@ -252,10 +273,23 @@
          #:msg "Index 1 used in"]
    [FAIL (-> Any (-> Any Boolean : #:+ (Number @ 1 1) #:- (! Number @ 1 1)))
          #:msg "larger than argument length"]
+   [FAIL (-> Any Any : #:object mutated-var)
+         #:msg "may not reference identifiers that are mutated"]
+   [FAIL (-> Any Any : #:object unbound)
+         #:msg "may not reference identifiers that are unbound"]
 
 
    [(Any -> Boolean : #:+ (Symbol @ not-mutated-var))
     (t:-> Univ -Boolean : (-PS (-is-type (-id-path #'not-mutated-var) -Symbol) -tt))]
+   [(Any -> Boolean : #:+ (: not-mutated-var Symbol) #:- (! not-mutated-var Symbol))
+    (t:-> Univ -Boolean
+          : (-PS (-is-type (-id-path #'not-mutated-var) -Symbol)
+                 (-not-type (-id-path #'not-mutated-var) -Symbol)))]
+   [(Any -> Boolean : #:+ (and (: not-mutated-var Symbol) (! not-mutated-var String)))
+    (t:-> Univ -Boolean
+          : (-PS (-and (-is-type (-id-path #'not-mutated-var) -Symbol)
+                       (-not-type (-id-path #'not-mutated-var) -String))
+                 -tt))]
    [FAIL (Any -> Boolean : #:+ (Symbol @ mutated-var))
          #:msg "may not reference identifiers that are mutated"]
    [(Any -> Boolean : #:+ (! Symbol @ not-mutated-var))
@@ -374,6 +408,7 @@
 
    [(Some (X) (-> Number (-> X Number) : X)) (-some (X) (t:-> -Number (t:-> X -Number) : (-PS (-is-type 0 X) (-not-type 0 X))))]
    [(-> Number (Some (X) (-> X Number) : #:+ X)) (t:-> -Number (-some-res (X) (t:-> X -Number) : #:+ X))]
+   [(-> Number (Some (X) (-> X Number) : #:+ (: (0 0) X))) (t:-> -Number (-some-res (X) (t:-> X -Number) : #:+ X))]
 
    ;;; Classes
    [(Class) (-class)]
@@ -522,6 +557,7 @@
    [(Refine [x : Number] Top) -Number]
    [(Refine [x : Number] Bot) -Bottom]
    ;; simplify props about subject
+   [(Refine [x : Any] String) -String]
    [(Refine [x : Any] (: x String)) -String]
    [(Refine [x : Integer] (: x Integer)) -Int]
    [(Refine [x : Integer] (: x Symbol)) -Bottom]
@@ -684,8 +720,22 @@
     (t:-> Univ -Boolean : (-PS (-is-type (cons 0 0) -Int) -tt))]
    [(-> ([x : Any])
         Boolean
+        #:+ Integer)
+    (t:-> Univ -Boolean : (-PS (-is-type (cons 0 0) -Int) -tt))]
+   [(-> ([x : Any])
+        Boolean
+        #:+ (and Number (! Integer)))
+    (t:-> Univ -Boolean : (-PS (-and (-is-type (cons 0 0) -Number)
+                                      (-not-type (cons 0 0) -Int))
+                               -tt))]
+   [(-> ([x : Any])
+        Boolean
         #:- (! x Integer))
     (t:-> Univ -Boolean : (-PS -tt (-not-type (cons 0 0) -Int)))]
+   [(-> ([x : Any])
+        Boolean
+        #:- Integer)
+    (t:-> Univ -Boolean : (-PS -tt (-is-type (cons 0 0) -Int)))]
    [(-> ([x : Any])
         Boolean
         #:+ (: x Integer)
@@ -702,6 +752,17 @@
           : (-PS (-is-type (cons 0 0) -Int)
                  (-is-type (cons 0 1) -Int))
           : (-id-path (cons 0 0)))]
+   [(-> ([x : Any])
+        #:pre (x) Number
+        Boolean)
+    (make-DepFun (list Univ)
+                 (-is-type (cons 0 0) -Number)
+                 (-values -Boolean))]
+   [FAIL (-> ([x : Any]
+              [y : Any])
+             Boolean
+             #:+ Integer)
+         #:msg "expected proposition"]
    ;; simple dependencies
    [(-> ([v : (Vectorof Any)]
          [i : (v) (Refine [n : Integer] (<= n (vector-length v)))])
@@ -904,6 +965,16 @@
              Any)]
    [FAIL (-> ([x : Integer]
               [y : Integer])
-             (Refine [x : Univ] (<= x 42)))]))
+             (Refine [x : Univ] (<= x 42)))]
 
-;; FIXME - add tests for parse-values-type, parse-tc-results
+   ;; Values and AnyValues proposition syntax
+   [(-> Any (AnyValues : (: (0 0) String)))
+    (t:-> Univ (-AnyValues (-is-type (cons 0 0) -String)))]
+   [(-> Any (values (String : #:+ (: (0 0) String) #:- Top)))
+    (t:-> Univ (-values (-result -String (-PS (-is-type (cons 0 0) -String) -tt))))]
+   [(-> Any (values (String : #:+ String #:- Top #:object (0 0))))
+    (t:-> Univ (-values (-result -String (-PS (-is-type 0 -String) -tt) (-arg-path 0 0))))]
+   [FAIL (-> Any (AnyValues : String))
+         #:msg "expected proposition"]))
+
+;; FIXME - add tests for parse-tc-results

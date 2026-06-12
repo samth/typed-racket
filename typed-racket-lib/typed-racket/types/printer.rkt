@@ -409,11 +409,11 @@
          `(,(type->sexp t) : #:+ ,(type->sexp ft))]
         [(Values: (list (Result: t ps (? Empty?))))
          (if (print-complex-props?)
-             `(,(type->sexp t) : ,(propset->sexp ps))
+             `(,(type->sexp t) : ,@(propset->latent-sexps ps))
              (list (type->sexp t)))]
         [(Values: (list (Result: t ps o)))
          (if (print-complex-props?)
-             `(,(type->sexp t) : ,(propset->sexp ps) ,(object->sexp o))
+             `(,(type->sexp t) : ,@(propset->latent-sexps ps) #:object ,(object->sexp o))
              (list (type->sexp t)))]
         [_ (list (values->sexp rng))]))]
     [else `(Unknown Function Type: ,(struct->vector arr))]))
@@ -531,9 +531,10 @@
               (or 'none (PropSet: (? TrueProp?) (? TrueProp?)))
               (or 'none (? Empty?)))
      (type->sexp t)]
-    [(Result: t ps (? Empty?)) `(,(type->sexp t) : ,(propset->sexp ps))]
+    [(Result: t ps (? Empty?)) `(,(type->sexp t) : ,@(propset->latent-sexps ps))]
     [(Result: t ps lo) `(,(type->sexp t) :
-                         ,(propset->sexp ps) :
+                         ,@(propset->latent-sexps ps)
+                         #:object
                          ,(object->sexp lo))]
     [else `(Unknown Result: ,(struct->vector res))]))
 
@@ -541,8 +542,14 @@
 ;; convert a prop set to an s-expression that can be printed
 (define (propset->sexp ps)
   (match ps
-    [(PropSet: thn els) `(,(prop->sexp thn) \| ,(prop->sexp els))]
+    [(? PropSet?) (propset->latent-sexps ps)]
     [else `(Unknown PropSet: ,(struct->vector ps))]))
+
+(define (propset->latent-sexps ps)
+  (match ps
+    [(PropSet: thn els)
+     `(#:+ ,(prop->sexp thn) #:- ,(prop->sexp els))]
+    [else `(#:+ (Unknown PropSet: ,(struct->vector ps)))]))
 
 ;; values->sexp : SomeValues -> S-expression
 ;; convert a values to an s-expression that can be printed
