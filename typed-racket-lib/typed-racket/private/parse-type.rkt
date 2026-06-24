@@ -197,6 +197,36 @@
     [_ null]))
 
 
+;; Symbol Type -> Boolean
+;; Check if a row type variable appears in invalid positions (not as Class row-ext)
+;; Returns #t if there are invalid usages
+(define (row-var-in-invalid-position? var-name type)
+  (define found-invalid #f)
+  (let check! ([ty type] [in-row-ext? #f])
+    (match ty
+      [(F: (== var-name))
+       ;; Found the row variable - it's invalid unless we're in a row-ext position
+       (unless in-row-ext?
+         (set! found-invalid #t))]
+      [(Class: row-ext inits fields methods augments init-rest)
+       ;; For Class, check row-ext with the flag set (valid position for row var)
+       (when row-ext
+         (check! row-ext #t))
+       ;; Check types in the row's members for invalid uses
+       ;; These are lists of tuples: (list name Type ...)
+       (for ([entry (in-list inits)])
+         (check! (second entry) #f))
+       (for ([entry (in-list fields)])
+         (check! (second entry) #f))
+       (for ([entry (in-list methods)])
+         (check! (second entry) #f))
+       (for ([entry (in-list augments)])
+         (check! (second entry) #f))
+       (when init-rest
+         (check! init-rest #f))]
+      [_ (Rep-for-each ty (lambda (t) (check! t #f)))]))
+  found-invalid)
+
 ;; Syntax -> Type
 ;; Parse a Forall type
 (define (parse-all-type stx do-parse)
@@ -227,6 +257,10 @@
      ;; should be no need to extend the constraint environment
      (define body-type
        (extend-tvars (list var*) (do-parse #'t.type)))
+     ;; Check that row variable only appears in valid positions (Class #:row-var)
+     (when (row-var-in-invalid-position? var* body-type)
+       (parse-error "row type variable used in invalid position; row type variables may only appear in (Class #:row-var ...)"
+                    "variable" var*))
      (make-PolyRow
       (list var*)
       ;; No constraints listed, so we need to infer the constraints
@@ -238,10 +272,15 @@
      (define constraints (attribute constr.constraints))
      (extend-row-constraints (list var*) (list constraints)
        (extend-tvars (list var*)
-         (make-PolyRow
-          (list var*)
-          (do-parse #'t.type)
-          constraints)))]
+         (let ([body-type (do-parse #'t.type)])
+           ;; Check that row variable only appears in valid positions (Class #:row-var)
+           (when (row-var-in-invalid-position? var* body-type)
+             (parse-error "row type variable used in invalid position; row type variables may only appear in (Class #:row-var ...)"
+                          "variable" var*))
+           (make-PolyRow
+            (list var*)
+            body-type
+            constraints))))]
     [(:All^ (_:id ...) _ _ _ ...) (parse-error "too many forms in body of All type")]
     [(:All^ . rest) (parse-error "bad syntax")]))
 

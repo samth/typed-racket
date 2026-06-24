@@ -1404,7 +1404,19 @@
 (define (has-struct-property->sc orig-id)
   ;; we can't call syntax-local-value/immediate in has-struct-property case in parse-type
   (define-values (a prop-name) (syntax-local-value/immediate orig-id (λ () (values #t orig-id))))
-  (match-define (Struct-Property: _ pred?) (lookup-id-type/lexical prop-name))
+  (define pred?
+    (match (lookup-id-type/lexical prop-name)
+      [(Struct-Property: _ (? values p)) p]
+      [(Struct-Property: _ #f)
+       (tc-error/fields "struct property has no predicate"
+                        #:stx orig-id
+                        "property" (syntax-e orig-id))]
+      [#f (tc-error/fields "could not find type for struct property"
+                           #:stx orig-id
+                           "property" (syntax-e orig-id))]
+      [other (tc-error/fields "expected a Struct-Property type"
+                              #:stx orig-id
+                              "given type" other)]))
   ;; if original-name is only set when the type is added via require/typed
 
   ;; the original-name of `prop-name` is its original referece in the unexpanded program.
