@@ -27,7 +27,13 @@
        (match-define (prompt-tag-combinator (pt-seq vals call-cc)) v)
        (with-syntax ([(vals-stx ...) (map f vals)]
                      [(call-cc-stx ...) (if call-cc
-                                            #`(#:call/cc (values #,@(map f call-cc)))
+                                            ;; the captured continuation's result
+                                            ;; is constrained the same way whether
+                                            ;; captured non-composably (#:call/cc)
+                                            ;; or composably (#:call/comp)
+                                            (let ([cc-stx (map f call-cc)])
+                                              #`(#:call/cc (values #,@cc-stx)
+                                                 #:call/comp (values #,@cc-stx)))
                                             empty)])
          #'(prompt-tag/c vals-stx ... call-cc-stx ...)))
      (define (sc->constraints v f)
