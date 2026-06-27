@@ -325,17 +325,29 @@
            stx)]
       [(syntax? stx)
        (define e (syntax-e stx))
-       (if (pair? e) (datum->syntax stx (rewrite-seq e) stx stx) stx)]
+       (cond [(pair? e) (datum->syntax stx (rewrite-seq e) stx stx)]
+             ;; must descend exactly where key-of does (incl. vectors), or a
+             ;; merged-away def-ref left in a vector becomes unbound
+             [(vector? e)
+              (datum->syntax stx (list->vector (map rewrite (vector->list e))) stx stx)]
+             [else stx])]
       [else stx]))
   (define (rewrite-seq e)
     (cond [(pair? e) (cons (rewrite (car e)) (rewrite-seq (cdr e)))]
           [(syntax? e) (rewrite e)]
           [(null? e) '()]
           [else e]))
-  (define kept-defs
-    (for/list ([s (in-list order)] #:when (eq? (hash-ref canon s) s))
-      #`(define #,(hash-ref id-of s) #,(rewrite (hash-ref rhs-of s)))))
-  (values kept-defs (rewrite ctc)))
+  ;; Emit every original def so cross-call references (via the shared sc
+  ;; cache and the Name tables) still resolve: representatives keep their
+  ;; (rewritten) body; merged defs become a tiny alias to their rep, which
+  ;; collapses the duplicated body while staying sound.
+  (define out-defs
+    (for/list ([s (in-list order)])
+      (define rep (hash-ref canon s))
+      (if (eq? rep s)
+          #`(define #,(hash-ref id-of s) #,(rewrite (hash-ref rhs-of s)))
+          #`(define #,(hash-ref id-of s) #,(hash-ref id-of rep)))))
+  (values out-defs (rewrite ctc)))
 
 ;; Determine whether the given contract syntax should be inlined or
 ;; not.  if top-level? is true, we inline functions because the
