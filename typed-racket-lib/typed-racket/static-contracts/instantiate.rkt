@@ -250,13 +250,92 @@
              #`(define #,name
                  (recursive-contract #,(recur sc)
                                      #,(kind->keyword (hash-ref recursive-kinds name)))))]))
-  (list (append ;; These contracts are sub-contract definitions used to
-                ;; increase sharing among contracts in a given fixup pass
-                extra-defs
-                (for/list ([sc (in-list (reverse sc-queue))])
-                  (match-define (cons id ctc) (hash-ref cache sc))
-                  #`(define #,id #,ctc)))
-        ctc))
+  (define all-defs
+    (append ;; These contracts are sub-contract definitions used to
+            ;; increase sharing among contracts in a given fixup pass
+            extra-defs
+            (for/list ([sc (in-list (reverse sc-queue))])
+              (match-define (cons id ctc) (hash-ref cache sc))
+              #`(define #,id #,ctc))))
+  (if (canon-ids?)
+      (let-values ([(defs* ctc*) (hashcons-defs all-defs ctc)]) (list defs* ctc*))
+      (list all-defs ctc)))
+
+;; M4: the per-sc cache misses structurally-identical recursive/object
+;; contracts because recursive-sc/name temporaries are fresh per occurrence.
+;; This post-pass merges definitions whose right-hand sides are equal modulo
+;; renaming of the (generate-temporary) definition identifiers, rewriting all
+;; references to the surviving representative.  Sound (the merge key is
+;; binding-aware) and a consistent ~10-14% smaller, so it is on by default;
+;; PLT_TR_NO_CANON_IDS disables it.
+(define (canon-ids?) (not (getenv "PLT_TR_NO_CANON_IDS")))
+
+(define (hashcons-defs defs ctc)
+  ;; def-id symbols are unique generate-temporary outputs
+  (define entries
+    (for/list ([d (in-list defs)])
+      (define parts (syntax->list d))   ; (define <id> <rhs>)
+      (define i (cadr parts))
+      (cons (syntax-e i) (cons i (caddr parts)))))
+  (define def-syms (for/hasheq ([e (in-list entries)]) (values (car e) #t)))
+  (define rhs-of   (for/hasheq ([e (in-list entries)]) (values (car e) (cddr e))))
+  (define id-of    (for/hasheq ([e (in-list entries)]) (values (car e) (cadr e))))
+  (define order    (map car entries))
+  (define canon (make-hasheq))
+  (for ([s (in-list order)]) (hash-set! canon s s))
+  ;; binding-aware key for a non-def identifier, so two same-symbol but
+  ;; different-binding identifiers (e.g. like-named predicates from different
+  ;; modules) are NOT treated as equal — keeping the merge sound.
+  (define (id->key x)
+    (define b (identifier-binding x))
+    (cond [(list? b)
+           (vector 'id (resolved-module-path-name
+                        (module-path-index-resolve (car b)))
+                   (cadr b))]
+          [else (vector 'lex (syntax-e x))]))
+  ;; structural key of a def's rhs, with def-refs replaced by their current rep
+  (define (key-of s)
+    (let recur ([x (hash-ref rhs-of s)])
+      (cond [(identifier? x)
+             (define sym (syntax-e x))
+             (if (hash-ref def-syms sym #f) (vector 'ref (hash-ref canon sym)) (id->key x))]
+            [(syntax? x) (recur (syntax-e x))]
+            [(pair? x) (cons (recur (car x)) (recur (cdr x)))]
+            [(vector? x) (vector 'v (map recur (vector->list x)))]
+            [(null? x) '()]
+            [else x])))
+  ;; fixpoint: collapse defs with equal keys to a single representative
+  (let loop ()
+    (define seen (make-hash))
+    (define changed #f)
+    (for ([s (in-list order)])
+      (define k (key-of s))
+      (define rep (hash-ref seen k (lambda () (hash-set! seen k s) s)))
+      (unless (eq? (hash-ref canon s) rep)
+        (hash-set! canon s rep) (set! changed #t)))
+    (when changed (loop)))
+  ;; rewrite references (in surviving defs and the top contract) to reps,
+  ;; preserving the original syntax (and thus bindings) elsewhere
+  (define (rewrite stx)
+    (cond
+      [(identifier? stx)
+       (define sym (syntax-e stx))
+       (if (and (hash-ref def-syms sym #f) (not (eq? (hash-ref canon sym) sym)))
+           (hash-ref id-of (hash-ref canon sym))
+           stx)]
+      [(syntax? stx)
+       (define e (syntax-e stx))
+       (if (pair? e) (datum->syntax stx (rewrite-seq e) stx stx) stx)]
+      [else stx]))
+  (define (rewrite-seq e)
+    (cond [(pair? e) (cons (rewrite (car e)) (rewrite-seq (cdr e)))]
+          [(syntax? e) (rewrite e)]
+          [(null? e) '()]
+          [else e]))
+  (define kept-defs
+    (for/list ([s (in-list order)] #:when (eq? (hash-ref canon s) s))
+      #`(define #,(hash-ref id-of s) #,(rewrite (hash-ref rhs-of s)))))
+  (values kept-defs (rewrite ctc)))
 
 ;; Determine whether the given contract syntax should be inlined or
 ;; not.  if top-level? is true, we inline functions because the

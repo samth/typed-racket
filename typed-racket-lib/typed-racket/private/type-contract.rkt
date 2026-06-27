@@ -18,6 +18,7 @@
  "../env/row-constraint-env.rkt"
  "../env/lexical-env.rkt"
  "../env/type-constr-env.rkt"
+ (only-in "../env/init-envs.rkt" type->sexp)
 
  "../rep/core-rep.rkt"
  "../rep/rep-utils.rkt"
@@ -189,18 +190,31 @@
             (match-define (list defs ctc) result)
             (define maybe-inline-val
               (should-inline-contract?/cache ctc cache))
-            ;; When the contract is actually defined (not inlined), provide
-            ;; it and record it, so downstream modules that reference this
-            ;; same type can use the definition instead of regenerating it.
-            (when (and (not maybe-inline-val) (auto-register-provide-contracts?))
+            ;; Register (and provide) the contract only when it is actually
+            ;; defined (not inlined) AND big enough to be worth sharing — a
+            ;; small contract's registration submodule would cost more than
+            ;; the duplication it saves (M2 size threshold).
+            (define register?
+              (and (not maybe-inline-val)
+                   (auto-register-provide-contracts?)
+                   (>= (contract-size defs) (predef-min-size))))
+            (when register?
               (add-predef-registration!
-               orig-id #'ctc-id
+               type orig-id #'ctc-id
                (if (eq? 'deep (current-type-enforcement-mode)) 'typed 'both)))
+            ;; M3: also register the reachable Name contracts and provide their
+            ;; gen-ids so downstream modules can reference them.
+            (define name-provides
+              (if (and register? (predef-names?))
+                  (collect-name-registrations defs)
+                  null))
             #`(begin #,@defs
                      #,@(if maybe-inline-val
                             null
-                            (list #`(define-values (ctc-id) #,ctc)
-                                  #`(provide ctc-id)))
+                            (list* #`(define-values (ctc-id) #,ctc)
+                                   (if register? #`(provide ctc-id) #`(begin))
+                                   (for/list ([g (in-list name-provides)])
+                                     #`(provide #,g))))
                      (define-module-boundary-contract #,untyped-id
                        #,orig-id
                        #,(or maybe-inline-val #'ctc-id)
@@ -216,43 +230,139 @@
 ;; (each module gains a #%contract-defs-names depending on its #%type-decl)
 ;; and only shares contracts for the *exact* provided type.  Turn on with
 ;; the `PLT_TR_AUTO_PREDEF` environment variable.
+;; Automatic registration is on by default, but only for contracts above the
+;; size threshold (see `contract-size`/`predef-min-size`).  `PLT_TR_NO_AUTO_PREDEF`
+;; turns it off entirely.
 (define (auto-register-provide-contracts?)
-  (and (getenv "PLT_TR_AUTO_PREDEF") #t))
+  (not (getenv "PLT_TR_NO_AUTO_PREDEF")))
 
-;; Collected per module compile: (list orig-id ctc-id side) for each provide
-;; whose contract is defined (and thus shareable).
+;; A cheap proxy for "how big is this contract": the number of shared
+;; sub-contract definitions the optimizer produced.  Big recursive/object
+;; contracts have hundreds–thousands; a contract that is just a reference to a
+;; predefined contract (e.g. `(-> <ref>)`) has ~none.
+(define (contract-size defs) (length defs))
+
+;; Only register contracts with at least this many shared defs.  Default 25
+;; keeps tiny/already-shared contracts from paying the ~12 KB registration
+;; submodule cost; override with PLT_TR_PREDEF_MIN.
+(define (predef-min-size)
+  (define v (getenv "PLT_TR_PREDEF_MIN"))
+  (or (and v (string->number v)) 25))
+
+;; M1: serialize the type key directly (via type->sexp) instead of having the
+;; #%contract-defs-names submodule require this module's #%type-decl and call
+;; lookup-type.  The #%type-decl require drags in the whole type-rep/checker
+;; world and is the dominant .dep/.zo growth source; the serialized key needs
+;; only the lightweight rep/abbrev requires (same set #%type-decl itself uses).
+(define (predef-serialize?)
+  (and (getenv "PLT_TR_PREDEF_SERIALIZE") #t))
+
+;; M3: also register each reachable *named* (Name) type's contract, not just
+;; the whole provided type, so e.g. the DC<%> contract pulled in by Frame% can
+;; be shared by a module that references DC<%> via some other type.  Named-type
+;; keys have no value binding, so they always use the serialized (type->sexp)
+;; key path.  Turn on with PLT_TR_PREDEF_NAMES.
+(define (predef-names?) (and (getenv "PLT_TR_PREDEF_NAMES") #t))
+
+;; Collected per module compile.
+;;   predef-registrations      : (list type orig-id ctc-id side) for provides
+;;   predef-name-registrations : (list type side gen-id) for reachable Names
 (define predef-registrations (box null))
-(define (reset-predef-registrations!) (set-box! predef-registrations null))
-(define (add-predef-registration! orig-id ctc-id side)
+(define predef-name-registrations (box null))
+(define (reset-predef-registrations!)
+  (set-box! predef-registrations null)
+  (set-box! predef-name-registrations null))
+(define (add-predef-registration! type orig-id ctc-id side)
   (set-box! predef-registrations
-            (cons (list orig-id ctc-id side) (unbox predef-registrations))))
+            (cons (list type orig-id ctc-id side) (unbox predef-registrations))))
+
+;; Record the per-Name contracts reachable from a (registered) provide
+;; contract, returning the gen-ids that must be provided from #%contract-defs.
+;; `defs` are the contract's `(define <gen-id> ...)` forms.
+(define (collect-name-registrations defs)
+  (define defined
+    (for/hasheq ([d (in-list defs)])
+      (values (syntax-e (cadr (syntax->list d))) #t)))
+  (for/list ([v (in-list (current-name-gens))]
+             #:when (hash-ref defined (syntax-e (vector-ref v 0)) #f))
+    (define gen-id (vector-ref v 0))
+    (set-box! predef-name-registrations
+              (cons (list (vector-ref v 1) (vector-ref v 2) gen-id)
+                    (unbox predef-name-registrations)))
+    gen-id))
+
+;; shared prologue for a #%contract-defs-names submodule: the table + the
+;; module path to our sibling #%contract-defs
+(define (predef-names-prologue body)
+  #`(begin-for-syntax
+      (module* #%contract-defs-names #f
+        (#%declare #:empty-namespace)
+        #,@body)))
+
+;; emit a hash-set! that registers a serialized type key -> (cd-path . sym)
+(define (serialized-reg-form type side sym)
+  #`(hash-set! predef-contracts
+               (cons #,(datum->syntax #'here (type->sexp type)) '#,side)
+               (cons cd-path '#,sym)))
+
+;; the require set needed to reconstruct serialized type keys (same set
+;; #%type-decl uses, but NOT #%type-decl)
+(define serialize-key-requires
+  #`(require (submod typed-racket/static-contracts/instantiate predefined-contracts)
+             typed-racket/types/numeric-tower typed-racket/env/type-name-env
+             typed-racket/env/global-env typed-racket/env/type-alias-env
+             typed-racket/types/struct-table typed-racket/types/abbrev
+             typed-racket/env/struct-name-env
+             (rename-in racket/private/sort [sort raw-sort])
+             syntax/modcollapse racket/base))
 
 ;; Build the #%contract-defs-names submodule registering the collected
-;; provide contracts (keyed by the binding's type, looked up from this
-;; module's own #%type-decl), or #f if there are none.
+;; provide contracts (and, under M3, the reachable Name contracts), or #f if
+;; there are none.
 (define (predef-registrations-submodule)
   (define regs (unbox predef-registrations))
-  (and (pair? regs)
-       #`(begin-for-syntax
-           (module* #%contract-defs-names #f
-             (#%declare #:empty-namespace)
-             (require (submod ".." #%type-decl)
-                      (submod typed-racket/static-contracts/instantiate predefined-contracts)
-                      typed-racket/env/global-env
-                      syntax/modcollapse
-                      racket/base)
-             (define cd-path
-               (collapse-module-path-index
-                (module-path-index-join
-                 '(submod ".." #%contract-defs)
-                 (variable-reference->module-path-index (#%variable-reference)))))
-             #,@(for/list ([r (in-list regs)])
-                  (match-define (list orig-id ctc-id side) r)
-                  #`(let ([t (lookup-type (quote-syntax #,orig-id) (lambda () #f))])
-                      (when t
-                        (hash-set! predef-contracts
-                                   (cons (if (box? t) (unbox t) t) '#,side)
-                                   (cons cd-path '#,(syntax-e ctc-id))))))))))
+  (define name-regs (unbox predef-name-registrations))
+  (and (or (pair? regs) (pair? name-regs))
+       (cond
+         [(or (predef-serialize?) (predef-names?))
+          ;; serialized-key path (required by M3; also M1).  Both provide-type
+          ;; and Name keys are serialized with type->sexp.
+          (predef-names-prologue
+           (list
+            serialize-key-requires
+            (cd-path-def)
+            #`(begin
+                #,@(for/list ([r (in-list regs)])
+                     (match-define (list type _ ctc-id side) r)
+                     (serialized-reg-form type side (syntax-e ctc-id)))
+                #,@(for/list ([r (in-list name-regs)])
+                     (match-define (list type side gen-id) r)
+                     (serialized-reg-form type side (syntax-e gen-id))))))]
+         [else
+          ;; lookup-type path: provide keys only, recovered from #%type-decl
+          (predef-names-prologue
+           (list
+            #`(require (submod ".." #%type-decl)
+                       (submod typed-racket/static-contracts/instantiate predefined-contracts)
+                       typed-racket/env/global-env syntax/modcollapse racket/base)
+            (cd-path-def)
+            #`(begin
+                #,@(for/list ([r (in-list regs)])
+                     (match-define (list _ orig-id ctc-id side) r)
+                     #`(let ([t (lookup-type (quote-syntax #,orig-id) (lambda () #f))])
+                         (when t
+                           (hash-set! predef-contracts
+                                      (cons (if (box? t) (unbox t) t) '#,side)
+                                      (cons cd-path '#,(syntax-e ctc-id)))))))))])))
+
+;; the definition of `cd-path` (the module path to this module's
+;; #%contract-defs submodule), shared by both registration strategies
+(define (cd-path-def)
+  #`(define cd-path
+      (collapse-module-path-index
+       (module-path-index-join
+        '(submod ".." #%contract-defs)
+        (variable-reference->module-path-index (#%variable-reference))))))
 
 ;; Syntax (Dict Static-Contract (Cons Id Syntax)) -> (Option Syntax)
 ;; A helper for generate-contract-def/provide that helps inline contract

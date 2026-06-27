@@ -23,7 +23,19 @@
 (provide with-new-name-tables
          name/sc:
          lookup-name-defined
-         set-name-defined)
+         set-name-defined
+         current-name-gens)
+
+;; For every Name type registered in the current tables, the gen-name
+;; identifier of its contract for each side, paired with the (type . side).
+;; Used by M3 to register the per-Name contracts for cross-module sharing.
+;; Returns a list of (vector gen-id Type side).
+(define (current-name-gens)
+  (for*/list ([type (in-list (hash-keys (name-sc-table)))]
+              [side (in-list '(typed untyped both))]
+              #:do [(define nc (lookup-name-sc type side))]
+              #:when nc)
+    (vector (name-combinator-gen-name nc) type side)))
 
 (provide/cond-contract
  [get-all-name-defs
