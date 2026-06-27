@@ -226,15 +226,15 @@
                                         #,(syntax-span orig-id))))])]))
 
 ;; --- automatic registration of (non-inlined) provide contracts ----------
-;; Off by default for now: registering every provide contract grows .dep/.zo
-;; (each module gains a #%contract-defs-names depending on its #%type-decl)
-;; and only shares contracts for the *exact* provided type.  Turn on with
-;; the `PLT_TR_AUTO_PREDEF` environment variable.
-;; Automatic registration is on by default, but only for contracts above the
-;; size threshold (see `contract-size`/`predef-min-size`).  `PLT_TR_NO_AUTO_PREDEF`
-;; turns it off entirely.
+;; OPT-IN (PLT_TR_AUTO_PREDEF), not a default.  Even thresholded, registering
+;; provide contracts adds a per-module #%contract-defs-names submodule, and a
+;; net-size check on math/plot showed this *regresses* libraries that don't
+;; heavily reuse a big contract across modules (plot +2.5%); the large win
+;; only appears with heavy cross-module reuse of one big contract (e.g. an app
+;; using GUI types across many modules).  So leave it opt-in for those cases.
+;; (The size threshold below still limits which contracts register when on.)
 (define (auto-register-provide-contracts?)
-  (not (getenv "PLT_TR_NO_AUTO_PREDEF")))
+  (and (getenv "PLT_TR_AUTO_PREDEF") #t))
 
 ;; A cheap proxy for "how big is this contract": the number of shared
 ;; sub-contract definitions the optimizer produced.  Big recursive/object
