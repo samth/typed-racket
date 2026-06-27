@@ -24,6 +24,15 @@
  (define -Color% (parse-type #'Color%))
  (define -Color%-Obj (make-Instance -Color%)))
 
+;; Predefine the contracts for some big recursive GUI instance types once
+;; here, so modules that reference them get a reference instead of
+;; regenerating the (~545 KB) contract.  Both boundary directions are
+;; registered (typed = value flowing out, untyped = value flowing in).
+(require "../generate-predef-con.rkt")
+(generate-predefined-contracts
+ [(make-Instance (parse-type #'Frame%))  impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Dialog%)) impersonator (typed untyped)])
+
 (type-environment
  #:default-T+ #t
  [button% (parse-type #'Button%)]

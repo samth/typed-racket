@@ -19,6 +19,7 @@
          "utils/utils.rkt"
          "utils/tc-utils.rkt"
          "utils/arm.rkt"
+         "env/env-req.rkt"
          "standard-inits.rkt"
          "tc-setup.rkt")
 
@@ -71,6 +72,12 @@
               (when extra-def*
                 (set-box! include-extra-requires? #t))
               (cons (or extra-def* '()) body+))
+            (reset-predef-registrations!)
+            ;; Populate the predefined-contracts table from this module's
+            ;; typed dependencies, right before contract generation (rather
+            ;; than on every type-env init), so it is tied to the work that
+            ;; actually consults it.
+            (do-contract-requires)
             (with-syntax*
              (;; pmb = #%plain-module-begin
               [(pmb . body2) new-mod]
@@ -85,6 +92,9 @@
               [(before-code ...) (change-provide-fixups/cache (flatten-all-begins pre-before-code))]
               [(after-code ...) (begin0 (change-provide-fixups/cache (flatten-all-begins pre-after-code))
                                   (do-time "Generated contracts"))]
+              ;; register the (non-inlined) provide contracts so downstream
+              ;; modules can reference them (no-op unless auto-predef is on)
+              [predef-names (or (predef-registrations-submodule) #'(begin))]
               ;; potentially optimize the code based on the type information
               [(optimized-body ...) (maybe-optimize #'transformed-body)] ;; has own call to do-time
               ;; add in syntax property on useless expression to draw check-syntax arrows
@@ -97,7 +107,8 @@
              ;; use the regular %#module-begin from `racket/base' for top-level printing
              (arm #`(#%module-begin
                      #,(if (unbox include-extra-requires?) extra-requires #'(begin))
-                     before-rewritten-code ... before-code ... optimized-body ... after-code ... check-syntax-help))))
+                     before-rewritten-code ... before-code ... optimized-body ... after-code ...
+                     predef-names check-syntax-help))))
           #:delay-errors? delay-errors^?)))]))
 
 (define (ti-core stx)

@@ -50,6 +50,10 @@
  "../static-contracts/combinators.rkt"
  "../static-contracts/constraints.rkt"
  (only-in (submod typed-racket/static-contracts/instantiate internals) compute-constraints)
+ ;; the shared table mapping (cons Type? typed-side) -> identifier of a
+ ;; predefined contract, so we can reference instead of regenerating it
+ (only-in (submod typed-racket/static-contracts/instantiate predefined-contracts)
+          predef-contracts)
  ;; TODO make this from contract-req
  (prefix-in c: racket/contract)
  (contract-req)
@@ -69,7 +73,9 @@
          change-provide-fixups
          any-wrap/sc
          extra-requires
-         include-extra-requires?)
+         include-extra-requires?
+         reset-predef-registrations!
+         predef-registrations-submodule)
 
 ;; submod for testing
 (module* test-exports #f (provide type->contract has-contract-def-property? make-procedure-arity-flat/sc))
@@ -183,10 +189,18 @@
             (match-define (list defs ctc) result)
             (define maybe-inline-val
               (should-inline-contract?/cache ctc cache))
+            ;; When the contract is actually defined (not inlined), provide
+            ;; it and record it, so downstream modules that reference this
+            ;; same type can use the definition instead of regenerating it.
+            (when (and (not maybe-inline-val) (auto-register-provide-contracts?))
+              (add-predef-registration!
+               orig-id #'ctc-id
+               (if (eq? 'deep (current-type-enforcement-mode)) 'typed 'both)))
             #`(begin #,@defs
                      #,@(if maybe-inline-val
                             null
-                            (list #`(define-values (ctc-id) #,ctc)))
+                            (list #`(define-values (ctc-id) #,ctc)
+                                  #`(provide ctc-id)))
                      (define-module-boundary-contract #,untyped-id
                        #,orig-id
                        #,(or maybe-inline-val #'ctc-id)
@@ -196,6 +210,49 @@
                                         #,(syntax-column orig-id)
                                         #,(syntax-position orig-id)
                                         #,(syntax-span orig-id))))])]))
+
+;; --- automatic registration of (non-inlined) provide contracts ----------
+;; Off by default for now: registering every provide contract grows .dep/.zo
+;; (each module gains a #%contract-defs-names depending on its #%type-decl)
+;; and only shares contracts for the *exact* provided type.  Turn on with
+;; the `PLT_TR_AUTO_PREDEF` environment variable.
+(define (auto-register-provide-contracts?)
+  (and (getenv "PLT_TR_AUTO_PREDEF") #t))
+
+;; Collected per module compile: (list orig-id ctc-id side) for each provide
+;; whose contract is defined (and thus shareable).
+(define predef-registrations (box null))
+(define (reset-predef-registrations!) (set-box! predef-registrations null))
+(define (add-predef-registration! orig-id ctc-id side)
+  (set-box! predef-registrations
+            (cons (list orig-id ctc-id side) (unbox predef-registrations))))
+
+;; Build the #%contract-defs-names submodule registering the collected
+;; provide contracts (keyed by the binding's type, looked up from this
+;; module's own #%type-decl), or #f if there are none.
+(define (predef-registrations-submodule)
+  (define regs (unbox predef-registrations))
+  (and (pair? regs)
+       #`(begin-for-syntax
+           (module* #%contract-defs-names #f
+             (#%declare #:empty-namespace)
+             (require (submod ".." #%type-decl)
+                      (submod typed-racket/static-contracts/instantiate predefined-contracts)
+                      typed-racket/env/global-env
+                      syntax/modcollapse
+                      racket/base)
+             (define cd-path
+               (collapse-module-path-index
+                (module-path-index-join
+                 '(submod ".." #%contract-defs)
+                 (variable-reference->module-path-index (#%variable-reference)))))
+             #,@(for/list ([r (in-list regs)])
+                  (match-define (list orig-id ctc-id side) r)
+                  #`(let ([t (lookup-type (quote-syntax #,orig-id) (lambda () #f))])
+                      (when t
+                        (hash-set! predef-contracts
+                                   (cons (if (box? t) (unbox t) t) '#,side)
+                                   (cons cd-path '#,(syntax-e ctc-id))))))))))
 
 ;; Syntax (Dict Static-Contract (Cons Id Syntax)) -> (Option Syntax)
 ;; A helper for generate-contract-def/provide that helps inline contract
@@ -426,6 +483,25 @@
             (and/sc sc any-wrap/sc)
             sc))
       (match type
+       ;; If a contract for this type (and side) has already been
+       ;; defined in some required module, just reference it instead of
+       ;; regenerating the (potentially huge, recursive) contract here.
+       ;; The table maps to (module-path . symbol); we emit a statically
+       ;; resolved reference, importing the contract id with a fresh
+       ;; `local-require` co-located with the use so it resolves
+       ;; hygienically (no runtime `dynamic-require` lookup).
+       ;; With an empty table this never fires, so it is behavior-preserving
+       ;; until predefined contracts are registered.
+       [(app (lambda (t) (hash-ref predef-contracts (cons t typed-side) #f))
+             (cons mod-path sym))
+        ;; import the predefined contract (matched by its symbol) under a
+        ;; fresh, properly-scoped local name and reference that name, so
+        ;; the reference resolves hygienically
+        (define local-id (generate-temporary sym))
+        (impersonator/sc
+         #`(let ()
+             (local-require (only-in #,mod-path [#,(datum->syntax #f sym) #,local-id]))
+             #,local-id))]
        ;; Applications of implicit recursive type aliases
        ;;
        ;; We special case this rather than just resorting to standard

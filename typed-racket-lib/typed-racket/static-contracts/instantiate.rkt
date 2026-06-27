@@ -40,6 +40,23 @@
            compute-recursive-kinds
            instantiate/inner))
 
+;; A shared, expansion-time table of contracts that are defined once in
+;; some module and can be referenced by an identifier instead of being
+;; regenerated (and duplicated) in every module that needs them.
+;;
+;; The table maps (cons Type? typed-side?) -> identifier?, where the
+;; identifier is bound (in that defining module's #%contract-defs
+;; submodule) to the contract for that type.  This is its own module, so
+;; every requirer shares a single mutable table.
+(module predefined-contracts racket/base
+  (define predef-contracts (make-hash))
+  ;; (define/contract-decl id ctc key) binds `id` to the contract `ctc`
+  ;; and registers `key` -> #'id in the shared table.
+  (define-syntax-rule (define/contract-decl i ctc key)
+    (begin (hash-set! predef-contracts key #'i)
+           (define i ctc)))
+  (provide predef-contracts define/contract-decl))
+
 (define no-optimize-sc? (and (getenv "PLT_TR_NO_CONTRACT_OPTIMIZE") #t))
 
 (define (instantiate/optimize sc fail [kind 'impersonator] #:cache [cache #f] #:trusted-positive [trusted-positive #f] #:trusted-negative [trusted-negative #f])
