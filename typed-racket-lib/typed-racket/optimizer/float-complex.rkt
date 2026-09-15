@@ -446,22 +446,28 @@
           [(#%plain-app op:magnitude^ c:unboxed-float-complex-opt-expr)
            (log-unboxing-opt "unboxed unary float complex")
            #`(let*-values (c.bindings ...)
-               ;; reuses the algorithm used by the Racket runtime
+               ;; Squaring is safe in this range; outside it, scale before
+               ;; squaring to avoid overflow and underflow.
                (let*-values ([(r) (unsafe-flabs c.real-binding)]
-                             [(i) (unsafe-flabs c.imag-binding)])
-                 (if (unsafe-fl= i 0.0)
-                     r
-                     (if (or (unsafe-fl= r +inf.0)(unsafe-fl= i +inf.0))
-                         +inf.0
-                         (if (unsafe-fl< i r)
-                             (let-values ([(q) (unsafe-fl/ i r)])
-                               (unsafe-fl* r
-                                           (unsafe-flsqrt (unsafe-fl+ 1.0
-                                                                      (unsafe-fl* q q)))))
-                             (let-values ([(q) (unsafe-fl/ r i)])
-                               (unsafe-fl* i
-                                           (unsafe-flsqrt (unsafe-fl+ 1.0
-                                                                      (unsafe-fl* q q))))))))))])))
+                             [(i) (unsafe-flabs c.imag-binding)]
+                             [(larger) (if (unsafe-fl< r i) i r)])
+                 (cond
+                   [(or (unsafe-fl= r +inf.0) (unsafe-fl= i +inf.0)) +inf.0]
+                   [(and (unsafe-fl>= larger 1e-150)
+                         (unsafe-fl<= larger 1e150))
+                    (unsafe-flsqrt (unsafe-fl+ (unsafe-fl* r r)
+                                               (unsafe-fl* i i)))]
+                   [(unsafe-fl= i 0.0) r]
+                   [(unsafe-fl< i r)
+                    (let-values ([(q) (unsafe-fl/ i r)])
+                      (unsafe-fl* r
+                                  (unsafe-flsqrt (unsafe-fl+ 1.0
+                                                             (unsafe-fl* q q)))))]
+                   [else
+                    (let-values ([(q) (unsafe-fl/ r i)])
+                      (unsafe-fl* i
+                                  (unsafe-flsqrt (unsafe-fl+ 1.0
+                                                             (unsafe-fl* q q)))))])))])))
 
 
   (pattern (#%plain-app op:float-complex-op e:expr ...)
