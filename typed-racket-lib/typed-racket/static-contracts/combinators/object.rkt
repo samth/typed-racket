@@ -53,24 +53,6 @@
      (define (sc->constraints v f)
        (merge-restricts* 'impersonator (map f (member-seq->list (combinator-args v)))))])
 
-(struct instanceof-combinator combinator ()
-  #:transparent
-  #:property prop:combinator-name "instanceof/sc"
-  #:methods gen:sc
-    [(define (sc-map v f)
-       (match-define (instanceof-combinator (list class)) v)
-       (instanceof-combinator (list (f class 'covariant))))
-     (define (sc-traverse v f)
-       (match-define (instanceof-combinator (list class)) v)
-       (f class 'covariant)
-       (void))
-     (define (sc->contract v f)
-       (instance/sc->contract v f))
-     (define (sc->constraints v f)
-       (match-define (instanceof-combinator (list class)) v)
-       (f class))])
-
-
 (define member-seq->list
   (match-lambda
     [(member-seq vals) 
@@ -93,8 +75,6 @@
   (object-combinator (member-seq specs) opaque?))
 (define (class/sc opaque? specs absents)
   (class-combinator (member-seq specs) opaque? absents))
-(define (instanceof/sc class)
-  (instanceof-combinator (list class)))
 
 (define ((member-spec->form f) v)
   (match-define (member-spec modifier id sc) v)
@@ -145,10 +125,6 @@
                (inherit [pubment-name pubment-temp] ...)
                (absent #,@absents))))
 
-(define (instance/sc->contract v f)
-  (match-define (instanceof-combinator (list class)) v)
-  #`(instanceof/c #,(f class)))
-
 (define (make-class-shape/sc init* field* public* augment*)
   (define-values [pubment* override*] (partition (lambda (nm) (memq nm augment*)) public*))
   (with-syntax ((ctc-stx
@@ -174,7 +150,6 @@
  [struct member-spec ([modifier symbol?] [id symbol?] [sc static-contract?])]
  [object/sc (boolean? (listof object-member-spec?) . -> . static-contract?)]
  [class/sc (boolean? (listof member-spec?) (listof symbol?) . -> . static-contract?)]
- [instanceof/sc (static-contract? . -> . static-contract?)]
  [make-class-shape/sc ((listof symbol?) (listof symbol?) (listof symbol?) (listof symbol?) . -> . static-contract?)]
  [make-object-shape/sc ((listof symbol?) (listof symbol?) . -> . static-contract?)])
 
