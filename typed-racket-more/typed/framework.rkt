@@ -14,6 +14,13 @@
 
 (provide (all-from-out "private/framework-types.rkt"))
 
+;; predefine contracts for the heavy editor instance types
+(require "racket/generate-predef-con.rkt")
+(generate-predefined-contracts
+ [(make-Instance (parse-type #'Text:Basic<%>)) impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Text:Basic%))   impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Style-Delta%))  impersonator (typed untyped)])
+
 (begin-for-syntax
  (define -Button% (parse-type #'Button%))
  (define -Event% (parse-type #'Event%))

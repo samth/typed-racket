@@ -30,8 +30,14 @@
 ;; registered (typed = value flowing out, untyped = value flowing in).
 (require "../generate-predef-con.rkt")
 (generate-predefined-contracts
- [(make-Instance (parse-type #'Frame%))  impersonator (typed untyped)]
- [(make-Instance (parse-type #'Dialog%)) impersonator (typed untyped)])
+ [(make-Instance (parse-type #'Frame%))            impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Dialog%))           impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Choice%))           impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Editor-Canvas%))    impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Horizontal-Pane%))  impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Horizontal-Panel%)) impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Message%))          impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Text-Field%))       impersonator (typed untyped)])
 
 (type-environment
  #:default-T+ #t

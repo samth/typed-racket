@@ -82,6 +82,14 @@
   (define -Font-Hinting (parse-type #'Font-Hinting))
   (define -LoadFileKind (parse-type #'LoadFileKind)))
 
+;; predefine contracts for the common, heavy draw instance types
+(require "generate-predef-con.rkt"
+         (for-syntax (only-in typed-racket/rep/type-rep make-Instance)))
+(generate-predefined-contracts
+ [(make-Instance (parse-type #'Bitmap%)) impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Color%))  impersonator (typed untyped)]
+ [(make-Instance (parse-type #'Font%))   impersonator (typed untyped)])
+
 (type-environment
  #:default-T+ #t
  [bitmap% (parse-type #'Bitmap%)]
