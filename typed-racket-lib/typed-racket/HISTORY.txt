@@ -1,3 +1,5 @@
+9.4
+- Add types and optimizer support for `flfma` and `unsafe-flfma`.
 9.3
 - Bug fixes.
 9.2

@@ -2032,6 +2032,7 @@
 [flexp (flexp-type 'flonum)]
 [flsqrt (flsqrt-type 'flonum)]
 [flhypot (flhypot-type 'flonum)]
+[flfma (-> -Flonum -Flonum -Flonum -Flonum)]
 [flexpt (flexpt-type 'flonum)]
 [->fl (fx->fl-type 'flonum)]
 [fx->fl (fx->fl-type 'flonum)]
@@ -2077,6 +2078,7 @@
 ;
 [unsafe-flsqrt (flsqrt-type 'flonum)]
 [unsafe-flhypot (flhypot-type 'flonum)]
+[unsafe-flfma (-> -Flonum -Flonum -Flonum -Flonum)]
 [unsafe-fx->fl (fx->fl-type 'flonum)]
 [unsafe-fl->fx (fl->fx-type 'flonum)]
 [unsafe-make-flrectangular (make-flrectangular-type)]

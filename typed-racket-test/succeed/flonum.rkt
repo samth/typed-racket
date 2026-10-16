@@ -55,6 +55,10 @@
 (check = (flexp 1.45) (unsafe-flexp 1.45))
 (check = (flsqrt 1.45) (unsafe-flsqrt 1.45))
 (check = (flhypot 3.0 4.0) (unsafe-flhypot 3.0 4.0))
+(check = (flfma 1.0000000000000002 0.9999999999999998 -1.0) -4.930380657631324e-32)
+(check = (flfma 1e308 2.0 -1e308) (unsafe-flfma 1e308 2.0 -1e308))
+(check = (flfma 5e-324 0.5 5e-324) 1e-323)
+(check eqv? (flfma -0.0 1.0 -0.0) -0.0)
 (check = (->fl 1) 1.0)
 (check = (unsafe-fx->fl 1) 1.0)
 

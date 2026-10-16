@@ -3,6 +3,8 @@
 @begin[(require "../utils.rkt")
        (require (for-label (only-meta-in 0 [except-in typed/racket for])
                            (only-in racket/base for)
+                           (only-in racket/flonum flfma)
+                           (only-in racket/unsafe/ops unsafe-flfma)
                            racket/list srfi/14 net/url
                            version/check
                            ;; Specific libraries wrapped for TR:
@@ -24,6 +26,12 @@ by @racketmodname[racket], such as @racket[modulo], is available by default in
 @racketmod[typed/racket
 (modulo 12 2)
 ]
+
+The @racket[flfma] and @racket[unsafe-flfma] procedures each accept three
+@racket[Flonum] arguments and return a @racket[Flonum]. The optimizer
+replaces a checked @racket[flfma] call with @racket[unsafe-flfma], preserving
+the fused operation's single rounding.
+
 
 The @racketmodname[typed/racket/base] language corresponds to the
 @racketmodname[racket/base] language.

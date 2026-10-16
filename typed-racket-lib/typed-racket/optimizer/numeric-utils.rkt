@@ -63,4 +63,4 @@
               #'unsafe-flsin #'unsafe-flcos #'unsafe-fltan #'unsafe-flasin #'unsafe-flacos #'unsafe-flatan
               #'fllog #'flexp #'flsqrt
               #'unsafe-fllog #'unsafe-flexp #'unsafe-flsqrt
-              #'flhypot #'unsafe-flhypot))))
+              #'flhypot #'unsafe-flhypot #'flfma #'unsafe-flfma))))

@@ -2,7 +2,7 @@
 
 (define collection 'multi)
 
-(define deps '(("base" #:version "9.1.0.7")
+(define deps '(("base" #:version "9.3.0.11")
                "source-syntax"
                "pconvert-lib"
                "compatibility-lib" ;; to assign types
@@ -12,7 +12,7 @@
 
 (define pkg-authors '(samth stamourv))
 
-(define version "1.15")
+(define version "1.16")
 
 (define license
   '(Apache-2.0 OR MIT))
