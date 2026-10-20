@@ -63,4 +63,15 @@
               #'unsafe-flsin #'unsafe-flcos #'unsafe-fltan #'unsafe-flasin #'unsafe-flacos #'unsafe-flatan
               #'fllog #'flexp #'flsqrt
               #'unsafe-fllog #'unsafe-flexp #'unsafe-flsqrt
-              #'flhypot #'unsafe-flhypot))))
+              #'fllog1p #'unsafe-fllog1p
+              #'flexpm1 #'unsafe-flexpm1
+              #'flsinh #'unsafe-flsinh
+              #'flcosh #'unsafe-flcosh
+              #'fltanh #'unsafe-fltanh
+              #'flasinh #'unsafe-flasinh
+              #'flacosh #'unsafe-flacosh
+              #'flatanh #'unsafe-flatanh
+              #'fllog2 #'unsafe-fllog2
+              #'flexp2 #'unsafe-flexp2
+              #'flnextafter #'unsafe-flnextafter
+              #'flhypot #'unsafe-flhypot #'flfma #'unsafe-flfma))))
