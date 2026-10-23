@@ -174,13 +174,16 @@
     [_ (tc-expr e)]))
 
 
-(define (register-aliases-and-declarations names exprs)
+(define (register-aliases-and-declarations names exprs [lifted-declarations '()])
   ;; Collect the declarations, which are represented as expressions.
   ;; We put them back into definitions to reuse the existing machinery
   (define-values (type-aliases declarations signature-forms)
     (for/fold ([aliases '()] [declarations '()] [signature-forms '()])
-              ([body (in-list exprs)])
-      (syntax-parse #`(define-values () #,body)
+              ([def (in-sequences
+                     (for/list ([body (in-list exprs)])
+                       #`(define-values () #,body))
+                     (map lifted-internal->definition lifted-declarations))])
+      (syntax-parse def
         [t:type-alias
          (values (cons #'t aliases) declarations signature-forms)]
         [t:type-declaration
@@ -212,6 +215,38 @@
   ;; Finalize signatures, by parsing member types
   (finalize-signatures!))
 
+;; Declarations in an internal-definition body are lifted by the
+;; expander to the start of the body's expressions (see `internal/lift`
+;; and `:`). After the expander splits the body's definitions into
+;; nested `let-values` and `letrec-values` forms, the declarations are
+;; in the body of the innermost one, but they're needed before checking
+;; the right-hand sides of all of them. So, when checking a `let-values`
+;; or `letrec-values` form whose body is a single such form, continue
+;; into that form's body to find the declarations.
+;;
+;; Checking the outer form goes on to check its body, which is the next
+;; form in the chain. To avoid collecting (and registering) the same
+;; declarations again, `scanned-bodies` records the first form of each
+;; body that has already been covered; a body's forms are `eq?` each
+;; time the enclosing form is taken apart.
+(define scanned-bodies (make-weak-hasheq))
+
+;; collect-lifted-declarations : Syntax -> (Listof Syntax)
+(define (collect-lifted-declarations body)
+  (define forms (syntax->list body))
+  (cond
+    [(and (pair? forms) (hash-ref scanned-bodies (car forms) #f))
+     '()]
+    [else
+     (let loop ([forms forms])
+       (syntax-parse forms
+         #:literal-sets (kernel-literals)
+         [(((~or* let-values letrec-values) _ body-form ...+))
+          (define body-forms (syntax->list #'(body-form ...)))
+          (hash-set! scanned-bodies (car body-forms) #t)
+          (loop body-forms)]
+         [_ (filter lifted-internal? forms)]))]))
+
 ;; The `thunk` argument is run only for its side effects
 ;; It is used to perform additional context-dependent checking
 ;; within the context of a letrec body.
@@ -221,7 +256,7 @@
   (let* ([namess (stx-map syntax->list namess)]
          [orig-flat-names (apply append namess)]
          [exprs (syntax->list exprs)])
-    (register-aliases-and-declarations namess exprs)
+    (register-aliases-and-declarations namess exprs (collect-lifted-declarations body))
 
     ;; First look at the clauses that do not bind the letrec names
     (define all-clauses
@@ -384,7 +419,7 @@
          ;; all the trailing expressions - the ones actually bound to the names
          [exprs (syntax->list exprs)])
 
-    (register-aliases-and-declarations namess exprs)
+    (register-aliases-and-declarations namess exprs (collect-lifted-declarations body))
 
     ;; the annotated types of the name (possibly using the inferred types)
     ;; and collect rhs expressions with no names
