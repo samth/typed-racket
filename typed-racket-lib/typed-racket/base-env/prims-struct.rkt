@@ -298,8 +298,8 @@
          #,(if (not (attribute omit))
                (ignore (syntax/loc stx (define-syntax tname type-name-error)))
                #'(begin))
-         #,(internal (syntax/loc stx
-                       (define-type-alias-internal tname body params))))]))
+         #,(internal/lift (syntax/loc stx
+                            (define-type-alias-internal tname body params))))]))
 
 (define-syntax define-new-subtype
   (lambda (stx)

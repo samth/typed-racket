@@ -99,9 +99,9 @@
          #,(ignore (quasisyntax/loc stx
                      (untyped-define-signature sig-name #,@(attribute super-form.form)
                                                (#,@erased-members))))
-         #,(internal (quasisyntax/loc stx
-                       (define-signature-internal sig-name
-                         #:parent-signature super-form.internal-form
-                         (#,@members)
-                         ;; no need to further check parent information
-                         #:check? #f))))]))
+         #,(internal/lift (quasisyntax/loc stx
+                            (define-signature-internal sig-name
+                              #:parent-signature super-form.internal-form
+                              (#,@members)
+                              ;; no need to further check parent information
+                              #:check? #f))))]))

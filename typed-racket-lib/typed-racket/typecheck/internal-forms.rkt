@@ -19,6 +19,9 @@
 
 (provide
   internal
+  internal/lift
+  lifted-internal?
+  lifted-internal->definition
 
   type-alias
   new-subtype-def
@@ -201,4 +204,45 @@
     (define-values ()
       (begin
         (quote-syntax #,stx #:local)
+        (#%plain-app values)))))
+
+;; Like `internal`, but when expanding directly in an internal-definition
+;; body, lift the declaration to the start of the body's expressions as a
+;; bare `quote-syntax` form, instead of producing a `define-values` with no
+;; bindings. A `define-values` clause with no bindings would otherwise end
+;; up in the body's `letrec-values`, since `quote-syntax #:local` counts as
+;; a reference to every binding, and that prevents splitting the body's
+;; definitions into `let-values` forms.
+(define (internal/lift stx)
+  (cond
+    [(syntax-transforming-with-body-lifts?)
+     (syntax-local-lift-body-expression
+      (quasisyntax/loc stx (quote-syntax #,stx #:local)))
+     (syntax/loc stx (begin))]
+    [else (internal stx)]))
+
+;; Recognizes a declaration lifted by `internal/lift` (or `:`) to the
+;; start of a body. Other `quote-syntax` forms, such as the ones used for
+;; `typecheck-failure`, are ordinary expressions.
+(define-syntax-class lifted-internal^
+  #:literal-sets (kernel-literals internal-literals)
+  (pattern (quote-syntax (~and value
+                               ((~or :-internal
+                                     define-type-alias-internal
+                                     define-signature-internal)
+                                . _))
+                         #:local)))
+
+(define (lifted-internal? stx)
+  (syntax-parse stx
+    [(~var _ lifted-internal^) #t]
+    [_ #f]))
+
+;; Converts a lifted internal form to the `define-values` shape that
+;; `internal` produces, so the same syntax classes recognize both
+(define (lifted-internal->definition stx)
+  (quasisyntax/loc stx
+    (define-values ()
+      (begin
+        #,stx
         (#%plain-app values)))))
