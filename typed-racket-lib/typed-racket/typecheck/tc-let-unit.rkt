@@ -7,6 +7,7 @@
                                 "../types/overlap.rkt"
                                 "../types/type-table.rkt")
                     -> ->* one-of/c)
+         (only-in "../types/subtype.rkt" subtype)
          (only-in "../types/abbrev.rkt" (-> t:->) [->* t:->*])
          "../private/type-annotation.rkt"
          "../private/parse-type.rkt"
@@ -84,9 +85,19 @@
                [(name result) (in-parallel (in-list names) (in-list results))])
     (match-define (tc-result: type p+/p- obj) result)
     (define mutated? (is-var-mutated? name))
-    ;; n-obj is the object naming n (unless n is mutated, then
-    ;; its -empty-obj)
-    (define aliased-obj (if mutated? -empty-obj obj))
+    ;; An alias for a variable x records n's type as x's type. So, if
+    ;; the right-hand side has a less precise type than x, as in
+    ;; `(ann x Any)`, then n is not an alias; otherwise, x would get the
+    ;; less precise type, and n would not get the type it was given.
+    (define widened?
+      (match obj
+        [(Path: '() (? identifier? x))
+         (define x-type (lookup-id-type/lexical x #:fail (λ (_) #f)))
+         (and x-type (not (subtype type x-type)))]
+        [_ #f]))
+    ;; n-obj is the object naming n (unless n is mutated or its type
+    ;; is wider than the object's, then its -empty-obj)
+    (define aliased-obj (if (or mutated? widened?) -empty-obj obj))
     (define-values (p+ p-) (match p+/p-
                              [(PropSet: p+ p-) (values p+ p-)]
                              ;; it's unclear if this 2nd clause is necessary any more.
