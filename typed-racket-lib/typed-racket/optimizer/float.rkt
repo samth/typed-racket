@@ -26,9 +26,12 @@
   (mk-unsafe-tbl generic "fl~a" "unsafe-fl~a"))
 
 (define binary-float-ops
-  (free-id-table-set
+  (free-id-table-set*
    (mk-float-tbl (list #'+ #'- #'* #'/ #'min #'max #'expt))
-   #'flhypot #'unsafe-flhypot))
+   #'flhypot #'unsafe-flhypot
+   #'flnextafter #'unsafe-flnextafter))
+(define ternary-float-ops
+  (free-id-table-set (make-immutable-free-id-table) #'flfma #'unsafe-flfma))
 (define binary-float-comps
   (free-id-table-set*
     (mk-float-tbl (list #'= #'<= #'< #'> #'>=))
@@ -38,10 +41,20 @@
     #'make-flrectangular #'unsafe-make-flrectangular))
 
 (define unary-float-ops
-  (free-id-table-set
+  (free-id-table-set*
     (mk-float-tbl (list #'abs #'sin #'cos #'tan #'asin #'acos #'atan #'log #'exp
                         #'sqrt #'round #'floor #'ceiling #'truncate))
-    #'magnitude #'unsafe-flabs))
+    #'magnitude #'unsafe-flabs
+    #'fllog1p #'unsafe-fllog1p
+    #'flexpm1 #'unsafe-flexpm1
+    #'flsinh #'unsafe-flsinh
+    #'flcosh #'unsafe-flcosh
+    #'fltanh #'unsafe-fltanh
+    #'flasinh #'unsafe-flasinh
+    #'flacosh #'unsafe-flacosh
+    #'flatanh #'unsafe-flatanh
+    #'fllog2 #'unsafe-fllog2
+    #'flexp2 #'unsafe-flexp2))
 
 (define-literal-syntax-class -)
 (define-literal-syntax-class /)
@@ -69,6 +82,7 @@
 (define-syntax-class/specialize real-expr (subtyped-expr -Real))
 (define-syntax-class/specialize unary-float-op (float-op unary-float-ops))
 (define-syntax-class/specialize binary-float-op (float-op binary-float-ops))
+(define-syntax-class/specialize ternary-float-op (float-op ternary-float-ops))
 (define-syntax-class/specialize binary-float-comp (float-op binary-float-comps))
 
 ;; if the result of an operation is of type float, its non float arguments
@@ -132,6 +146,9 @@
 (define-syntax-class float-opt-expr
   #:commit
   #:literal-sets (kernel-literals)
+  (pattern (#%plain-app op:ternary-float-op a:float-expr b:float-expr c:float-expr)
+           #:do [(log-fl-opt "ternary float")]
+           #:with opt #'(op.unsafe a.opt b.opt c.opt))
   (pattern (#%plain-app op:unary-float-op f:float-arg-expr)
            #:when (let* ([safe-to-opt? (subtypeof? this-syntax -Flonum)]
                          [missed-optimization? (and (not safe-to-opt?)
