@@ -159,6 +159,8 @@
      `(make-TreeList ,(type->sexp ty))]
     [(Evt: ty)
      `(make-Evt ,(type->sexp ty))]
+    [(Threadof: ty)
+     `(make-Threadof ,(type->sexp ty))]
     [(Future: ty)
      `(make-Future ,(type->sexp ty))]
     [(Prompt-Tagof: prompt handler)

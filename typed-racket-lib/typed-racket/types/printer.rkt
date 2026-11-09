@@ -682,6 +682,8 @@
     [(Set: e) `(Setof ,(t->s e))]
     [(TreeList: e) `(TreeListof ,(t->s e))]
     [(Evt: r) `(Evtof ,(t->s r))]
+    [(Threadof: (? Base:Void?)) 'Thread]
+    [(Threadof: r) `(Threadof ,(t->s r))]
     [(? Union? (app normalize-type type))
      (match type
        ;; if type is (U Immutable-Vector Vector), use `Vectorof`

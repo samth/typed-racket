@@ -134,6 +134,7 @@
     #t]
    ;; Values where evt? produces #f cannot be Evt
    [((Evt: _) (Val-able: v)) #:no-order (evt? v)]
+   [((Threadof: _) (Val-able: v)) #:no-order (thread? v)]
    [((Pair: _ _) _) #:no-order #f]
    [((Val-able: (? simple-datum? v1))
      (Val-able: (? simple-datum? v2)))

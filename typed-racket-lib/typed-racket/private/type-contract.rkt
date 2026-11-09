@@ -593,6 +593,12 @@
              (for/fold ([sc-cdr (t->sc t-last)]) ([sc (in-list rev-sc*)])
                (cons/sc sc sc-cdr)))]
         [(Async-Channel: t) (async-channel/sc (t->sc t))]
+        ;; A thread's results cannot be checked or wrapped, so only a
+        ;; thread that flows from typed code can be given this type.
+        [(Threadof: _)
+         (if (from-untyped? typed-side)
+             (fail #:reason "contract generation not supported for Threadof")
+             (flat/sc #'thread?))]
         [(Promise: t) (promise/sc (t->sc t))]
         [(Opaque: p?) (flat/sc p?)]
         [(Continuation-Mark-Keyof: t) (continuation-mark-key/sc (t->sc t))]
@@ -1020,6 +1026,8 @@
       channel?/sc]
      [(Evt: t)
       evt?/sc]
+     [(Threadof: _)
+      (flat/sc #'thread?)]
      [(? Prop? rep) (prop->sc rep)]
      [(Ephemeron: _)
       ephemeron?/sc]

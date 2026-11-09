@@ -2233,7 +2233,7 @@
         (tc-e (sync (tcp-listen 5555)) -TCP-Listener)
         (tc-e (sync (tcp-listen 5555) (make-semaphore))
               (t:Un -TCP-Listener -Semaphore))
-        (tc-e (sync (thread (λ () 0))) -Thread)
+        (tc-e (sync (thread (λ () 0))) (-thread -Void))
         (tc-e (sync (make-will-executor)) -Will-Executor)
         (tc-e (sync (make-custodian-box (current-custodian) 0))
               (-CustodianBox (-val 0)))

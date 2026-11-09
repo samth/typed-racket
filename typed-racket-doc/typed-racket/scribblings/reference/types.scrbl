@@ -267,7 +267,6 @@ These are not part of the numeric tower.
 @deftype[Logger]
 @deftype[Log-Receiver]
 @deftype[Log-Level]
-@deftype[Thread]
 @deftype[Thread-Group]
 @deftype[Subprocess]
 @deftype[Place]
@@ -530,6 +529,36 @@ type returned.  @ex[current-input-port current-directory]}
 }
 
 @deftypeconstr[(Custodian-Boxof t)]{Returns the type of @rtech{custodian box} of @racket[t].}
+
+@deftypeconstr[(Threadof t)]{Returns the type of a @rtech{thread descriptor} for which
+  @racket[thread-wait] produces a value of type @racket[t] when the thread
+  finishes normally. With @racket[#:keep 'results], the type of a thread
+  created by @racket[thread] records the result type of its thunk.
+
+  Since a thread's results cannot be checked, a value of type
+  @racket[(Threadof t)] cannot flow from untyped code to typed code.
+
+  @ex[(thread (λ () 5) #:keep 'results)
+      (thread-wait (thread (λ () 5) #:keep 'results))]
+}
+
+@deftype[Thread]{Is the type of a @rtech{thread descriptor} that does not
+  keep its results, and is equivalent to @racket[(Threadof Void)]. A thread
+  created by @racket[thread] without @racket[#:keep] has this type.
+
+  @ex[(thread (λ () 5))
+      (thread-wait (thread (λ () 5)))]
+}
+
+@deftype[ThreadTop]{Is the type of a @rtech{thread descriptor} with unknown
+  results and is the supertype of all @racket[Threadof] types. Since such a
+  thread may keep any number of results, @racket[thread-wait] on a
+  @racket[ThreadTop] produces any number of values. This type typically
+  appears in programs via @racket[current-thread] or the combination of
+  occurrence typing and @racket[thread?].
+@ex[(current-thread)
+    (lambda: ([x : Any]) (if (thread? x) x (error "not a thread!")))]
+}
 
 @deftypeconstr[(Thread-Cellof t)]{Returns the type of @rtech{thread cell} of @racket[t].}
 

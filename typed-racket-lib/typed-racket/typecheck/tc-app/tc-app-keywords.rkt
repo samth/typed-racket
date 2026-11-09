@@ -66,6 +66,40 @@
               (tc-keywords #'form (list (subst-all subst ar))
                            (type->list (tc-expr/t #'kws)) #'kw-arg-list #'pos-args expected))]))
 
+      ;; Use the first arrow whose keywords match and whose type
+      ;; variables can be inferred from the positional arguments.
+      (define (tc/app-poly-case-fun vars arrows fail)
+        (define actual-kws (type->list (tc-expr/t #'kws)))
+        (define argtys
+          (match (stx-map single-value #'pos-args)
+            [(list (tc-result1: argtys-t) ...) argtys-t]
+            [_ (fail)]))
+        (define arrow
+          (for/or ([ar (in-list arrows)])
+            (match ar
+              [(Arrow: dom #f kw-formals rng)
+               #:when (and (set-empty? (fv/list kw-formals))
+                           (tc-keywords/internal ar actual-kws #'kw-arg-list #f))
+               (define subst
+                 (infer vars null argtys dom rng
+                        (and expected (tc-results->values expected))))
+               (and subst (subst-all subst ar))]
+              [_ #f])))
+        (cond
+          [arrow
+           (tc-keywords #'form (list arrow) actual-kws #'kw-arg-list #'pos-args expected)]
+          [else
+           (domain-mismatches
+            #'fn #'pos-args
+            (make-Poly vars (make-Fun arrows))
+            (map Arrow-dom arrows) (map Arrow-rst arrows) (map Arrow-rng arrows)
+            (stx-map tc-expr #'pos-args)
+            #f #f #:expected expected
+            #:msg-thunk
+            (lambda (dom)
+              (string-append "No function domains matched in function application:\n"
+                             dom)))]))
+
       (match (tc-expr/t #'fn)
         [(Poly: vars
                 (Fun: (list arrow)))
@@ -73,6 +107,9 @@
          (tc/app-poly-fun vars arrow fail)]
         [(Fun: arrows)
          (tc/app-mono-fun arrows)]
+        [(Poly: vars (Fun: arrows))
+         (=> fail)
+         (tc/app-poly-case-fun vars arrows fail)]
         [(Poly: _ (Fun: _))
          (tc-error/expr "Inference for polymorphic keyword functions not supported")]
         [(Intersection: (HasArrows: arrows) _)

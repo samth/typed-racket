@@ -145,9 +145,11 @@
 ;; (-> String String Any) and the fact that only the first positional argument
 ;; is mandatory (i.e. the second is optional)
 (define (calculate-mandatory-args orig-arrows)
-  ;; sorted order is important, our loops below rely on this order
+  ;; sorted order is important, our loops below rely on this order;
+  ;; a strict comparison keeps arrows of equal arity in their original
+  ;; order, which decides which arrow an application uses
   (define arity-sorted-arrows
-    (sort orig-arrows >= #:key Arrow-max-arity))
+    (sort orig-arrows > #:key Arrow-max-arity))
   (for/fold ([mand-arg-table '()])
             ([arrow (in-list arity-sorted-arrows)])
     (cond

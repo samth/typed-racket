@@ -832,7 +832,11 @@
          (cg S t)]
         [((? Base:TCP-Listener?) (Evt: t))
          (cg S t)]
-        [((? Base:Thread?) (Evt: t))
+        [((? Base:ThreadTop?) (Evt: t))
+         (cg S t)]
+        [((Threadof: a) (Threadof: a*))
+         (cg a a*)]
+        [((Threadof: _) (Evt: t))
          (cg S t)]
         [((? Base:Subprocess?) (Evt: t))
          (cg S t)]
