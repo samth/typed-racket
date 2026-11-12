@@ -393,9 +393,8 @@
 ;;---------
 
 ;; A thread whose `thread-wait` result, when the thread finishes
-;; normally, has type `result`.  `Thread` means `(Threadof Void)`, a
-;; thread that does not keep its results.  `ThreadTop` is the supertype
-;; of every `Threadof`: it describes a thread whose results are unknown.
+;; normally, has type `result`.  `Thread` is the supertype of every
+;; `Threadof`: it describes a thread whose results are unknown.
 (def-structural Threadof ([result #:covariant])
   [#:mask mask:base])
 

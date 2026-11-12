@@ -124,7 +124,7 @@
                      (compose/and byte-regexp? (¬ byte-pregexp?))]
   [-Byte-PRegexp Byte-PRegexp #'byte-pregexp? byte-pregexp?]
   [-Keyword Keyword #'keyword? keyword?]
-  [-ThreadTop ThreadTop #'thread? thread?]
+  [-Thread Thread #'thread? thread?]
   [-Path Path #'path? path?]
   [-Resolved-Module-Path
    Resolved-Module-Path

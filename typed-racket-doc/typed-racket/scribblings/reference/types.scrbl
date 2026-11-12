@@ -532,30 +532,28 @@ type returned.  @ex[current-input-port current-directory]}
 
 @deftypeconstr[(Threadof t)]{Returns the type of a @rtech{thread descriptor} for which
   @racket[thread-wait] produces a value of type @racket[t] when the thread
-  finishes normally. With @racket[#:keep 'results], the type of a thread
-  created by @racket[thread] records the result type of its thunk.
+  finishes normally. A thread created by @racket[thread] without
+  @racket[#:keep] has type @racket[(Threadof Void)]; with
+  @racket[#:keep 'results], its type records the result type of its thunk.
 
-  Since a thread's results cannot be checked, a value of type
+  Any code that obtains a thread can wait for its results, including
+  untyped code that reaches it through @racket[current-thread] or
+  @racket[custodian-managed-list], and threads cannot be wrapped with
+  contracts. So, as with @racket[raise], typed code can keep only a single
+  immutable first-order result: a number, boolean, symbol, string, byte
+  string, keyword, character, or a pair, immutable vector, or immutable
+  hash table of these. For the same reason, a value of type
   @racket[(Threadof t)] cannot flow from untyped code to typed code.
 
-  @ex[(thread (λ () 5) #:keep 'results)
+  @ex[(thread (λ () 5))
+      (thread (λ () 5) #:keep 'results)
       (thread-wait (thread (λ () 5) #:keep 'results))]
 }
 
-@deftype[Thread]{Is the type of a @rtech{thread descriptor} that does not
-  keep its results, and is equivalent to @racket[(Threadof Void)]. A thread
-  created by @racket[thread] without @racket[#:keep] has this type.
-
-  @ex[(thread (λ () 5))
-      (thread-wait (thread (λ () 5)))]
-}
-
-@deftype[ThreadTop]{Is the type of a @rtech{thread descriptor} with unknown
+@deftype[Thread]{Is the type of a @rtech{thread descriptor} with unknown
   results and is the supertype of all @racket[Threadof] types. Since such a
   thread may keep any number of results, @racket[thread-wait] on a
-  @racket[ThreadTop] produces any number of values. This type typically
-  appears in programs via @racket[current-thread] or the combination of
-  occurrence typing and @racket[thread?].
+  @racket[Thread] produces any number of values.
 @ex[(current-thread)
     (lambda: ([x : Any]) (if (thread? x) x (error "not a thread!")))]
 }

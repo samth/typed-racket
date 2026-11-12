@@ -242,7 +242,7 @@
   (cl->* (-> (-evt -Eventspace))
          (-> -Eventspace (-evt -Eventspace)))]
  [eventspace-shutdown? (-> -Eventspace -Boolean)]
- [eventspace-handler-thread (-> -Eventspace (-opt -ThreadTop))]
+ [eventspace-handler-thread (-> -Eventspace (-opt -Thread))]
  [check-for-break (-> -Boolean)]
  [get-top-level-windows
   (-> (-lst (Un (make-Instance (parse-type #'Frame%))

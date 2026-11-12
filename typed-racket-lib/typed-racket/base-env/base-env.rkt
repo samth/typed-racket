@@ -1565,7 +1565,7 @@
 ;; continuation-marks needs type for continuations as other
 ;; possible first argument
 [continuation-marks
- (->opt (Un (-val #f) -ThreadTop) [-Prompt-TagTop] -Cont-Mark-Set)]
+ (->opt (Un (-val #f) -Thread) [-Prompt-TagTop] -Cont-Mark-Set)]
 [current-continuation-marks (->opt [-Prompt-TagTop] -Cont-Mark-Set)]
 [continuation-mark-set->list
  (-poly (a)
@@ -1614,25 +1614,29 @@
 
 ;; Section 11.1.1
 ;; A thread keeps its thunk's result only with `#:keep 'results`;
-;; otherwise `thread-wait` produces `(void)`.  A thunk that returns
-;; other than one value with `#:keep 'results` gets `ThreadTop`.
-[thread (-poly (a) (cl->* (->key (-> a) #:keep (-val 'results) #t #:pool Univ #f (-thread a))
-                          (->key (-> ManyUniv) #:keep (-val #f) #f #:pool Univ #f -Thread)
-                          (->key (-> ManyUniv) #:keep (Un (-val #f) (-val 'results)) #f #:pool Univ #f
-                                 -ThreadTop)))]
-[thread? (unsafe-shallow:make-pred-ty -ThreadTop)]
-[current-thread (-> -ThreadTop)]
-[thread/suspend-to-kill (-> (-> ManyUniv) -Thread)]
+;; otherwise `thread-wait` produces `(void)`.  Any code that obtains a
+;; thread can `thread-wait` for its results, including untyped code that
+;; reaches it through `current-thread` or `custodian-managed-list`, and
+;; threads cannot be chaperoned.  So, as with `raise`, a thread may keep
+;; only a single immutable first-order result, which is safe to share.
+[thread (-poly (a) (cl->* (->key (-> (-Inter -Flat a)) #:keep (-val 'results) #t #:pool Univ #f
+                                 (-thread a))
+                          (->key (-> ManyUniv) #:keep (-val #f) #f #:pool Univ #f (-thread -Void))
+                          (->key (-> -Flat) #:keep (Un (-val #f) (-val 'results)) #f #:pool Univ #f
+                                 -Thread)))]
+[thread? (unsafe-shallow:make-pred-ty -Thread)]
+[current-thread (-> -Thread)]
+[thread/suspend-to-kill (-> (-> ManyUniv) (-thread -Void))]
 [call-in-nested-thread (-poly (a) (->opt (-> a :T+ #f) [-Custodian] a :T+ #f))]
 
 ;; Section 11.1.2
-[thread-suspend (-ThreadTop . -> . -Void)]
-[thread-resume (->opt -ThreadTop [(Un (-val #f) -ThreadTop -Custodian)] -Void)]
-[kill-thread (-ThreadTop . -> . -Void)]
-[break-thread (-ThreadTop . -> . -Void)]
+[thread-suspend (-Thread . -> . -Void)]
+[thread-resume (->opt -Thread [(Un (-val #f) -Thread -Custodian)] -Void)]
+[kill-thread (-Thread . -> . -Void)]
+[break-thread (-Thread . -> . -Void)]
 [sleep ([N] . ->opt . -Void)]
-[thread-running? (-ThreadTop . -> . B)]
-[thread-dead? (-ThreadTop . -> . B)]
+[thread-running? (-Thread . -> . B)]
+[thread-dead? (-Thread . -> . B)]
 
 ;; Section 11.1.3
 ;; When the thread does not finish normally, `thread-wait` calls
@@ -1640,17 +1644,17 @@
 [thread-wait (-poly (a b)
                     (cl->* (-> (-thread a) (Un a -Void) :T+ #f)
                            (-> (-thread a) (-> b) (Un a b) :T+ #f)
-                           (-> -ThreadTop ManyUniv)
-                           (-> -ThreadTop (-> ManyUniv) ManyUniv)))]
-[thread-dead-evt (-> -ThreadTop (-mu x (-evt x)))]
-[thread-resume-evt (-> -ThreadTop (-mu x (-evt x)))]
-[thread-suspend-evt (-> -ThreadTop (-mu x (-evt x)))]
+                           (-> -Thread ManyUniv)
+                           (-> -Thread (-> ManyUniv) ManyUniv)))]
+[thread-dead-evt (-> -Thread (-mu x (-evt x)))]
+[thread-resume-evt (-> -Thread (-mu x (-evt x)))]
+[thread-suspend-evt (-> -Thread (-mu x (-evt x)))]
 
 ;; Section 11.1.4
 [thread-send
- (-poly (a) (cl->* (-> -ThreadTop Univ -Void)
-                   (-> -ThreadTop Univ (-val #f) (-opt -Void))
-                   (-> -ThreadTop Univ (-> a :T+ #f) (Un -Void a) :T+ #f)))]
+ (-poly (a) (cl->* (-> -Thread Univ -Void)
+                   (-> -Thread Univ (-val #f) (-opt -Void))
+                   (-> -Thread Univ (-> a :T+ #f) (Un -Void a) :T+ #f)))]
 [thread-receive (-> Univ)]
 [thread-try-receive (-> Univ)]
 [thread-receive-evt (-> (-mu x (-evt x)))]
@@ -3296,7 +3300,7 @@
 [current-inexact-milliseconds (-> -Flonum)]
 [current-gc-milliseconds (-> -Fixnum)]
 [current-process-milliseconds
- (->opt [(Un (-val #f) (-val 'subprocesses) -ThreadTop)] -Fixnum)]
+ (->opt [(Un (-val #f) (-val 'subprocesses) -Thread)] -Fixnum)]
 
 ;; Section 15.7
 [environment-variables? (unsafe-shallow:make-pred-ty -Environment-Variables)]
@@ -3332,7 +3336,7 @@
 [current-thread-initial-stack-size (-Param -PosInt -PosInt)]
 [vector-set-performance-stats! (cl->* [-> (-vec -Int) -Void]
                                       [-> (-vec -Int) -False -Void]
-                                      [-> (-vec (Un -Boolean -Int)) -ThreadTop -Void])]
+                                      [-> (-vec (Un -Boolean -Int)) -Thread -Void])]
 
 ;; Section 15.9 (racket/cmdline)
 [parse-command-line

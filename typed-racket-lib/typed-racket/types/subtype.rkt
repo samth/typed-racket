@@ -603,7 +603,7 @@
         -Output-Port
         -Input-Port
         -TCP-Listener
-        -ThreadTop
+        -Thread
         -Subprocess
         -Will-Executor))
 
@@ -1279,8 +1279,8 @@
      [(Threadof: result2) (subtype* A result1 result2)]
      ;; a thread is an event whose synchronization result is itself
      [(Evt: evt-t) (subtype* A t1 evt-t)]
-     ;; `ThreadTop` is the top of every `Threadof`
-     [_ (or (subtype* A -ThreadTop t2 obj)
+     ;; `Thread` is the top of every `Threadof`
+     [_ (or (subtype* A -Thread t2 obj)
             (continue<: A t1 t2 obj))])]
   [(case: TreeList (TreeList: elem1))
    (match t2

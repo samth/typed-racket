@@ -65,8 +65,6 @@
 (define -struct-property make-Struct-Property)
 (define -evt make-Evt)
 (define -thread make-Threadof)
-;; a thread that does not keep its results
-(define -Thread (make-Threadof -Void))
 (define -weak-box make-Weak-Box)
 (define -CustodianBox make-CustodianBox)
 (define -Ephemeron make-Ephemeron)

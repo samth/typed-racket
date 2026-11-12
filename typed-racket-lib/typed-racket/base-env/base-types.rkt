@@ -138,7 +138,6 @@
 [UnitTop -UnitTop]
 [Keyword -Keyword]
 [Thread -Thread]
-[ThreadTop -ThreadTop]
 [Resolved-Module-Path -Resolved-Module-Path]
 [Module-Path -Module-Path]
 [Module-Path-Index -Module-Path-Index]
