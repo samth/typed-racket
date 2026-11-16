@@ -388,21 +388,24 @@
 (define (tc-expr form)
   (tc-expr/check form #f))
 
-(define (single-value form [expected #f])
-  (define t (tc-expr/check form expected))
+(define (check-single-value form t)
   (match t
     [(tc-result1: _ _ _) t]
+    [(tc-any-results: _)
+     (tc-error/expr/fields
+      #:stx form
+      "insufficient type information to typecheck. please add more type annotations"
+      "expected" "a single value"
+      "given" "an unknown number of values")]
     [_ (tc-error/expr
           #:stx form
           "expected single value, got multiple (or zero) values")]))
 
+(define (single-value form [expected #f])
+  (check-single-value form (tc-expr/check form expected)))
+
 (define (tc-dep-fun-arg form [expected #f])
-  (define t (tc-expr/check form expected #t))
-  (match t
-    [(tc-result1: _ _ _) t]
-    [_ (tc-error/expr
-        #:stx form
-        "expected single value, got multiple (or zero) values")]))
+  (check-single-value form (tc-expr/check form expected #t)))
 
 
 (define (tc-expr-seq exps tc-expr

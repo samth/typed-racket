@@ -125,7 +125,7 @@
    [tc-err (send (values 'a 'b) m 'c)
            #:msg #rx"expected single value"]
    [tc-err (send (eval "3") m 'c)
-           #:msg #rx"expected single value"]
+           #:msg #rx"insufficient type information.*unknown number of values"]
    ;; Send to a union of objects in various ways
    [tc-e (let ()
            (: f (-> (U (Object [m (-> String)])

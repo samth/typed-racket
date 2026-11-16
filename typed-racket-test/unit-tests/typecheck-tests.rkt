@@ -1516,6 +1516,12 @@
         [tc-e (apply values (list 1 2 3)) #:ret (tc-ret (list -One -PosByte -PosByte))]
         [tc-e (apply values (string->list "")) #:ret (-tc-any-results -tt)]
         [tc-e (apply values (string->list "abc")) #:ret (-tc-any-results -tt)]
+        [tc-err (if (apply values (string->list "abc")) #t #f)
+                #:msg #rx"insufficient type information.*unknown number of values"]
+        [tc-err (if (values) #t #f)
+                #:msg #rx"expected single value, got multiple \\(or zero\\) values"]
+        [tc-err (if (values 1 2) #t #f)
+                #:msg #rx"expected single value, got multiple \\(or zero\\) values"]
 
         [tc-e/t (ann (if #t 3 "foo") Integer) -Integer]
 
@@ -4532,6 +4538,21 @@
                                            [i : Natural (in-naturals)])
                i)
              (-lst -Nat)]
+
+       ;; GitHub issue #1542: an unknown result count needs annotations.
+       [tc-err (for/list ([i (in-range 16)]) (list i (values i)))
+               #:msg #rx"insufficient type information.*please add more type annotations"]
+       [tc-err (for/list ([i (in-range 16)]) i)
+               #:msg #rx"insufficient type information.*please add more type annotations"]
+       [tc-e (for/list : (Listof (Listof Integer)) ([i (in-range 16)])
+               (list i (values i)))
+             (-lst (-lst -Int))]
+       [tc-err (let ()
+                 (: f (-> ([x : Integer]) #:pre (x) (> x 0) Integer))
+                 (define (f x) x)
+                 (f (let loop () (loop))))
+               #:msg #rx"insufficient type information.*unknown number of values"]
+
        ;; dependent function type basics
        [tc-e (let ()
                (: safe-ref (-> ([v : (Vectorof Any)]
@@ -5370,6 +5391,7 @@
        
 
        [tc-e (let loop () (loop)) #:ret (-tc-any-results -tt)]
+       [tc-e (thread (lambda () (let loop () (loop)))) -Thread]
 
        ;; comparisons must correctly account for if the
        ;; #false result was caused by a NaN (see TR Github issue #747)
